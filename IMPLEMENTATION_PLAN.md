@@ -16,7 +16,7 @@
 |-----------|--------|--------|--------|
 | **M0** — Project, TDD harness & CI | ✅ **DONE** | `milestone/M0-setup` | PR #1 |
 | **M1** — Authentication | ✅ **DONE** | `milestone/M1-auth` | PR #2 |
-| **M2** — Data model, Groups, Security Rules | ⬜ TODO | `milestone/M2-groups` | — |
+| **M2** — Data model, Groups, Security Rules | ✅ **DONE** | `milestone/M2-groups` | PR #4 |
 | **M3** — Invites | ⬜ TODO | `milestone/M3-invites` | — |
 | **M4** — Categories | ⬜ TODO | `milestone/M4-categories` | — |
 | **M5** — Expenses | ⬜ TODO | `milestone/M5-expenses` | — |
@@ -24,7 +24,7 @@
 | **M7** — Summary & Settlement | ⬜ TODO | `milestone/M7-summary` | — |
 | **M8** — Offline/PWA & Deploy | ⬜ TODO | `milestone/M8-pwa-deploy` | — |
 
-**👉 Resume point: start M2.**
+**👉 Resume point: start M3.**
 
 ---
 
