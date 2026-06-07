@@ -1,8 +1,64 @@
+// Manual two-account verification checklist (run against emulator with two test users):
+//   1. Member can read/write own group:
+//      - Sign in as userA, create a group → expect success (201)
+//      - Read that group as userA → expect success (200)
+//      - Write an expense inside that group as userA → expect success
+//   2. Non-member is denied read access to a group:
+//      - Sign in as userB (not in the group's members array)
+//      - Attempt to read that group document → expect PERMISSION_DENIED (403)
+//      - Attempt to write an expense inside that group as userB → expect PERMISSION_DENIED
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function isMember(groupId) {
+      return signedIn()
+        && (request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members);
+    }
+    function isOwner(groupId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/groups/$(groupId)).data.ownerUid == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /groups/{groupId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.auth.uid in request.resource.data.members
+        && request.resource.data.memberUids.hasOnly([request.auth.uid]);
+      allow update: if isMember(groupId)
+        || ( signedIn()
+             && request.auth.token.email_verified == true
+             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberUids'])
+             && !(request.auth.uid in resource.data.members)
+             && request.auth.uid in request.resource.data.members
+             && get(/databases/$(database)/documents/groups/$(groupId)/invites/$(myEmail())).data.status == 'pending' );
+      allow delete: if isOwner(groupId);
+
+      match /invites/{inviteId} {
+        allow create: if isMember(groupId);
+        allow read, write: if isMember(groupId)
+          || (signedIn() && resource != null && resource.data.email == myEmail());
+      }
+      match /categories/{categoryId}    { allow read, write: if isMember(groupId); }
+      match /expenses/{expenseId} {
+        allow read, write: if isMember(groupId);
+        match /items/{itemId}           { allow read, write: if isMember(groupId); }
+      }
+      match /income/{incomeId}          { allow read, write: if isMember(groupId); }
+      match /settlements/{settlementId} { allow read, write: if isMember(groupId); }
+    }
+
+    match /{path=**}/items/{itemId} {
+      allow read: if isMember(resource.data.groupId);
     }
   }
 }

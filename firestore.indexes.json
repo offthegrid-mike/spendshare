@@ -1,1 +1,9 @@
-{ "indexes": [], "fieldOverrides": [] }
+{
+  "indexes": [
+    { "collectionGroup": "items", "queryScope": "COLLECTION_GROUP",
+      "fields": [ { "fieldPath": "groupId", "order": "ASCENDING" }, { "fieldPath": "month", "order": "ASCENDING" } ] },
+    { "collectionGroup": "invites", "queryScope": "COLLECTION_GROUP",
+      "fields": [ { "fieldPath": "email", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" } ] }
+  ],
+  "fieldOverrides": []
+}
