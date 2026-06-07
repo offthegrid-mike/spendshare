@@ -44,6 +44,7 @@ Each milestone is self-contained and ends with working, merged software. To run 
   - `npm run typecheck && npm run lint && npm test && npm run build` pass (full regression, not just new tests)
   - functional acceptance check passes (UI milestones) with evidence
   - CI is green on the PR
+  - `README.md` updated to reflect the features now available (supported features list, how to run/configure)
   - then merge via PR (squash) and delete the branch.
 - **Branch protection** is NOT enabled on GitHub (private repo needs Pro). The gate is enforced **by process** (PR + green CI before merge). Default branch is **`main`**.
 
