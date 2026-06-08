@@ -60,5 +60,13 @@ service cloud.firestore {
     match /{path=**}/items/{itemId} {
       allow read: if isMember(resource.data.groupId);
     }
+
+    // Collection-group read for a user's own incoming invites. A dedicated
+    // recursive-wildcard rule is required: the nested groups/{groupId}/invites
+    // rule isn't reachable for a collection-group query (its isMember(groupId)
+    // branch calls get() on the unbound groupId wildcard, which fails list auth).
+    match /{path=**}/invites/{inviteId} {
+      allow read: if signedIn() && resource.data.email == myEmail();
+    }
   }
 }

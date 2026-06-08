@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "emulators": "npx -y firebase-tools emulators:start --only auth,firestore",
-    "dev:emulator": "VITE_USE_EMULATOR=true vite"
+    "dev:emulator": "VITE_USE_EMULATOR=true VITE_FB_PROJECT_ID=demo-spendshare vite"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

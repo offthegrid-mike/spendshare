@@ -19,6 +19,10 @@ export function useGroup(groupId: string | null) {
     unsubRef.current = onSnapshot(doc(groupsCol, groupId), (snap) => {
       setGroup(snap.exists() ? { ...snap.data(), id: snap.id } : null);
       setLoadedId(groupId);
+    }, () => {
+      // Transient permission-denied can occur while a just-accepted membership
+      // propagates; unblock loading and let the next snapshot resolve it.
+      setLoadedId(groupId);
     });
     return () => {
       if (unsubRef.current) {
