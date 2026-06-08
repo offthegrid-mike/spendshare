@@ -9,6 +9,7 @@ import CreateGroup from './features/groups/CreateGroup';
 import GroupSettings from './features/groups/GroupSettings';
 import SendInvite from './features/invites/SendInvite';
 import PendingInvites from './features/invites/PendingInvites';
+import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 
 function Home() {
@@ -67,6 +68,10 @@ function App() {
         <Route
           path="/group/invites"
           element={group ? <SendInvite key={group.id} user={user} group={group} /> : <div>Loading…</div>}
+        />
+        <Route
+          path="/categories"
+          element={selectedGroupId ? <CategoryManager /> : <div>Loading…</div>}
         />
       </Route>
     </Routes>

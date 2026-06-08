@@ -1,0 +1,18 @@
+Resetting emulator state…
+Emulator reset complete.
+Setup: creating account (tester+1780878636@test.com) and group
+Setup complete: account and group created.
+CP1: Navigate to Categories page and verify seeded categories
+CP1 PASS: all 8 seeded categories visible: ['Groceries', 'Dining', 'Transport', 'Utilities', 'Household', 'Entertainment', 'Health', 'Other']
+CP2: Add new category 'Pets'
+CP2 PASS: 'Pets' category added and visible
+CP3: Rename 'Other' to 'Miscellaneous'
+CP3 PASS: 'Other' renamed to 'Miscellaneous'
+CP4: Archive 'Entertainment'
+CP4 PASS: 'Entertainment' archived — still visible in manager with archived indicator
+CP5: Navigate away and back to verify Firestore persistence
+CP5 PASS: all changes persisted after navigation (Firestore round-trip confirmed)
+
+No console or page errors observed.
+
+ALL CHECKPOINTS PASSED
