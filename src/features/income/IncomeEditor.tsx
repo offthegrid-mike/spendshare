@@ -124,16 +124,16 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || saved}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
           >
-            {saved ? (
+            {saving ? (
+              'Saving…'
+            ) : saved ? (
               <>
                 <Check size={15} />
                 Saved!
               </>
-            ) : saving ? (
-              'Saving…'
             ) : (
               'Save income'
             )}
