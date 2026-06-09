@@ -17,14 +17,14 @@
 | **M0** — Project, TDD harness & CI | ✅ **DONE** | `milestone/M0-setup` | PR #1 |
 | **M1** — Authentication | ✅ **DONE** | `milestone/M1-auth` | PR #2 |
 | **M2** — Data model, Groups, Security Rules | ✅ **DONE** | `milestone/M2-groups` | PR #4 |
-| **M3** — Invites | ⬜ TODO | `milestone/M3-invites` | — |
-| **M4** — Categories | ⬜ TODO | `milestone/M4-categories` | — |
-| **M5** — Expenses | ⬜ TODO | `milestone/M5-expenses` | — |
-| **M6** — Income | ⬜ TODO | `milestone/M6-income` | — |
-| **M7** — Summary & Settlement | ⬜ TODO | `milestone/M7-summary` | — |
-| **M8** — Offline/PWA & Deploy | ⬜ TODO | `milestone/M8-pwa-deploy` | — |
+| **M3** — Invites | ✅ **DONE** | `milestone/M3-invites` | PR #5 |
+| **M4** — Categories | ✅ **DONE** | `milestone/M4-categories` | PR #6 |
+| **M5** — Expenses | ✅ **DONE** | `milestone/M5-expenses` | PR #7 |
+| **M6** — Income | ✅ **DONE** | `milestone/M6-income` | PR #8 |
+| **M7** — Summary & Settlement | ✅ **DONE** | `milestone/M7-summary` | PR #9 |
+| **M8** — Offline/PWA & Deploy | ✅ **DONE** | `milestone/M8-pwa-deploy` | PR #10 |
 
-**👉 Resume point: start M3.**
+**👉 All milestones complete. App live at https://spendshare-e5236.web.app**
 
 ---
 

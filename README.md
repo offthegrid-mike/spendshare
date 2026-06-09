@@ -2,6 +2,8 @@
 
 Offline-first expense-splitting web app for households and groups. Members record expenses and income; the app computes monthly per-person spending, shared totals, and a minimized "who owes whom" settlement — synced through Firebase on the free Spark plan.
 
+**Live app:** https://spendshare-e5236.web.app
+
 ## Status
 
 | Milestone | Status |
@@ -9,29 +11,36 @@ Offline-first expense-splitting web app for households and groups. Members recor
 | M0 — Project, TDD harness & CI | ✅ Done |
 | M1 — Authentication | ✅ Done |
 | M2 — Data model, Groups, Security Rules | ✅ Done |
-| M3 — Invites | ⬜ Planned |
-| M4 — Categories | ⬜ Planned |
-| M5 — Expenses | ⬜ Planned |
-| M6 — Income | ⬜ Planned |
-| M7 — Summary & Settlement | ⬜ Planned |
-| M8 — Offline / PWA / Deploy | ⬜ Planned |
+| M3 — Invites | ✅ Done |
+| M4 — Categories | ✅ Done |
+| M5 — Expenses | ✅ Done |
+| M6 — Income | ✅ Done |
+| M7 — Summary & Settlement | ✅ Done |
+| M8 — Offline / PWA / Deploy | ✅ Done |
 
-## Supported features (M0–M2)
+## Supported features
 
 - **Authentication** — sign up / sign in with email + password or Google; email verification; sign out
-- **Groups** — create a group with a name and currency (AUD/USD/EUR/GBP); group data is isolated per-member (Firestore security rules enforce access)
-- **Group switcher** — switch between groups; selection persists across page reloads
+- **Groups** — create a group with a name and currency (AUD/USD/EUR/GBP); group data is isolated per-member via Firestore security rules
+- **Group switcher** — switch between multiple groups; selection persists across reloads
 - **Group settings** — rename a group or change its currency
-- **Offline persistence** — Firestore IndexedDB cache keeps data readable when offline
+- **Invites** — invite members by email; pending invite banner; accept or decline
+- **Categories** — seeded default categories; add, rename, delete custom categories per group
+- **Expenses** — create, edit, and delete expense transactions with line items and payer assignment
+- **Income** — record monthly income per member
+- **Summary & Settlement** — monthly per-person spending, shared totals, and a minimized "who owes whom" settlement; mark individual payments as paid (with undo)
+- **Offline support** — Firestore IndexedDB cache keeps all data readable offline; PWA service worker caches the app shell so the app loads without a network connection
+- **Installable** — install SpendShare as a PWA on desktop or mobile from the browser address bar
 
 ## Tech stack
 
-- Vite + React 18 + TypeScript
-- Firebase v10 — Auth + Firestore (with `persistentLocalCache`)
+- Vite + React 19 + TypeScript
+- Firebase v12 — Auth + Firestore (with `persistentLocalCache`)
 - Zustand (UI state + localStorage persistence)
 - react-hook-form + zod
 - Tailwind CSS
 - date-fns
+- vite-plugin-pwa + Workbox
 - Vitest + Playwright (testing + functional verification)
 
 ## Running locally
@@ -58,25 +67,9 @@ npm run dev:emulator
 
 Open [http://localhost:5173](http://localhost:5173). Sign up with any email/password — the emulator accepts any address with no real emails sent.
 
-### Against a real Firebase project
+### Against the live Firebase project
 
-1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
-2. Enable **Email/Password** and **Google** sign-in under Authentication → Sign-in method
-3. Create a **Firestore** database (production mode)
-4. Copy `.env.example` to `.env.local` and fill in your project's values:
-
-```bash
-cp .env.example .env.local
-```
-
-```
-VITE_FB_API_KEY=...
-VITE_FB_AUTH_DOMAIN=...
-VITE_FB_PROJECT_ID=...
-VITE_FB_STORAGE_BUCKET=...
-VITE_FB_MESSAGING_SENDER_ID=...
-VITE_FB_APP_ID=...
-```
+Copy `.env.example` to `.env.local` and fill in your Firebase project values, then:
 
 ```bash
 npm run dev
@@ -85,16 +78,31 @@ npm run dev
 ## Available scripts
 
 ```bash
-npm run dev           # Vite dev server (real Firebase project, needs .env.local)
-npm run dev:emulator  # Vite dev server against local emulators
-npm run emulators     # Start Firebase Auth + Firestore emulators
-npm run build         # Production build → dist/
-npm run typecheck     # TypeScript type check
-npm run lint          # ESLint
-npm test              # Vitest unit + component tests
-npm run test:coverage # Test coverage report
+npm run dev             # Vite dev server (real Firebase, needs .env.local)
+npm run dev:emulator    # Vite dev server against local emulators
+npm run emulators       # Start Firebase Auth + Firestore emulators
+npm run build           # Production build → dist/
+npm run preview         # Preview production build locally
+npm run typecheck       # TypeScript type check
+npm run lint            # ESLint
+npm test                # Vitest unit + component tests
+npm run test:coverage   # Test coverage report
+npm run deploy          # Build + deploy to Firebase Hosting
+npm run deploy:rules    # Deploy Firestore rules + indexes only
 ```
 
-## Deploying (M8)
+## Deploying
 
-Full deploy instructions will be added in Milestone 8. Deploy targets Firebase Hosting with the same project used for Auth and Firestore.
+```bash
+# One-time setup
+firebase login
+firebase use spendshare-e5236
+
+# Deploy app
+npm run deploy
+
+# Deploy Firestore rules/indexes only
+npm run deploy:rules
+```
+
+The app is hosted at **https://spendshare-e5236.web.app** and also at **https://spendshare-e5236.firebaseapp.com**.
