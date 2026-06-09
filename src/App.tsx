@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useGroups } from './hooks/useGroups';
 import { useUIStore } from './stores/uiStore';
@@ -11,14 +11,20 @@ import SendInvite from './features/invites/SendInvite';
 import PendingInvites from './features/invites/PendingInvites';
 import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
+import ExpenseEditor from './features/expenses/ExpenseEditor';
+import { useMonthExpenses } from './hooks/useMonthExpenses';
+import ExpenseList from './features/expenses/ExpenseList';
+import type { User } from 'firebase/auth';
+import type { GroupDoc } from './types/models';
 
-function Home() {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold text-blue-600">SpendShare</h1>
-      <p className="mt-4 text-gray-600">Expenses coming in M5.</p>
-    </div>
-  );
+function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
+  const { id } = useParams<{ id: string }>();
+  const { selectedMonth } = useUIStore();
+  const { expenses, itemsByExpense } = useMonthExpenses(group.id, selectedMonth);
+  const expense = expenses.find((e) => e.id === id);
+  const items = id ? (itemsByExpense[id] ?? []) : [];
+  if (!expense) return <div>Loading…</div>;
+  return <ExpenseEditor group={group} currentUserUid={user.uid} expense={expense} items={items} />;
 }
 
 function App() {
@@ -60,7 +66,7 @@ function App() {
   return (
     <Routes>
       <Route element={<Layout groups={groups} user={user} />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={group ? <ExpenseList group={group} /> : <div>Loading…</div>} />
         <Route
           path="/group/settings"
           element={group ? <GroupSettings key={group.id} group={group} /> : <div>Loading…</div>}
@@ -72,6 +78,14 @@ function App() {
         <Route
           path="/categories"
           element={selectedGroupId ? <CategoryManager /> : <div>Loading…</div>}
+        />
+        <Route
+          path="/expense/new"
+          element={group ? <ExpenseEditor group={group} currentUserUid={user.uid} /> : <div>Loading…</div>}
+        />
+        <Route
+          path="/expense/:id/edit"
+          element={group ? <EditExpenseRoute group={group} user={user} /> : <div>Loading…</div>}
         />
       </Route>
     </Routes>

@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import { Outlet, Link } from 'react-router-dom';
 import { auth } from '../lib/firebase';
 import GroupSwitcher from './GroupSwitcher';
+import MonthPicker from './MonthPicker';
 import PendingInvites from '../features/invites/PendingInvites';
 import type { GroupDoc } from '../types/models';
 
@@ -15,6 +16,13 @@ export default function Layout({ groups, user }: Props) {
         <span className="text-lg font-bold text-blue-600">SpendShare</span>
         <div className="flex items-center gap-4">
           <GroupSwitcher groups={groups} />
+          <MonthPicker />
+          <Link
+            to="/expense/new"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + Expense
+          </Link>
           <Link
             to="/categories"
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
