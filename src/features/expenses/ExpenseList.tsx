@@ -14,6 +14,7 @@ export default function ExpenseList({ group }: Props) {
   const { expenses, itemsByExpense, loading } = useMonthExpenses(group.id, selectedMonth);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function payerName(uid: string): string {
     return group.members[uid]?.displayName ?? uid;
@@ -21,6 +22,7 @@ export default function ExpenseList({ group }: Props) {
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);
+    setDeleteError(null);
     try {
       const { writeBatch, doc, collection } = await import('firebase/firestore');
       const batch = writeBatch(db);
@@ -29,6 +31,8 @@ export default function ExpenseList({ group }: Props) {
         batch.delete(doc(collection(db, `groups/${group.id}/expenses/${exp.id}/items`), item.id));
       }
       await batch.commit();
+    } catch {
+      setDeleteError('Failed to delete. Please try again.');
     } finally {
       setDeletingId(null);
     }
@@ -119,6 +123,7 @@ export default function ExpenseList({ group }: Props) {
           </div>
         );
       })}
+      {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
     </div>
   );
 }
