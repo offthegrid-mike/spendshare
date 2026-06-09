@@ -19,6 +19,7 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
   const [memberEmail, setMemberEmail] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [addError, setAddError] = useState('');
+  const [removeError, setRemoveError] = useState('');
 
   const isOwner = group.ownerUid === currentUserUid;
 
@@ -64,13 +65,14 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
   }
 
   async function handleRemoveMember(uid: string) {
+    setRemoveError('');
     try {
       await updateDoc(doc(groupsCol, group.id), {
         [`members.${uid}`]: deleteField(),
         memberUids: arrayRemove(uid),
       });
     } catch {
-      // Firestore remove failures are rare; silent for now
+      setRemoveError('Failed to remove member. Please try again.');
     }
   }
 
@@ -150,6 +152,8 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
             })}
           </ul>
         </div>
+
+        {removeError && <p className="mb-2 text-xs text-red-600">{removeError}</p>}
 
         {isOwner && (
           <form onSubmit={handleAddMember} className="space-y-3 rounded-xl border border-dashed border-gray-200 bg-white p-4 shadow-sm">
