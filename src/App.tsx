@@ -14,8 +14,25 @@ import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
 import { useMonthExpenses } from './hooks/useMonthExpenses';
 import ExpenseList from './features/expenses/ExpenseList';
+import IncomeEditor from './features/income/IncomeEditor';
+import { useIncome } from './hooks/useIncome';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
+
+function IncomeRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
+  const { selectedMonth } = useUIStore();
+  const { income, loading } = useIncome(group.id, selectedMonth);
+  if (loading) return <div>Loading…</div>;
+  return (
+    <IncomeEditor
+      key={selectedMonth}
+      group={group}
+      currentUserUid={user.uid}
+      selectedMonth={selectedMonth}
+      income={income}
+    />
+  );
+}
 
 function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
@@ -86,6 +103,16 @@ function App() {
         <Route
           path="/expense/:id/edit"
           element={group ? <EditExpenseRoute group={group} user={user} /> : <div>Loading…</div>}
+        />
+        <Route
+          path="/income"
+          element={
+            group ? (
+              <IncomeRouteWrapper group={group} user={user} />
+            ) : (
+              <div>Loading…</div>
+            )
+          }
         />
       </Route>
     </Routes>

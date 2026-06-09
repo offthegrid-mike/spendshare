@@ -1,0 +1,32 @@
+SpendShare M6 Income acceptance test — 1780999789
+step 1 action: Navigate to http://localhost:5173
+step 1 action: App loaded at URL=http://localhost:5173/
+step 2 action: Sign up as income-test-1780999789@test.com
+step 2 action: Signed up, URL=http://localhost:5173/
+step 3 action: Create group 'Income Test Group' with AUD currency
+step 3 action: Group created, URL=http://localhost:5173/
+step 4 action: Navigate to Income page via nav link
+step 4 action: Income page loaded, URL=http://localhost:5173/income
+step 5 action: Verify 1 income row for the single group member
+step 5 action: Found 1 income input row(s)
+step 6 action: Enter 5000 in the income field for current month
+step 6 action: Entered 5000
+step 7 action: Click Save button
+step 7 action: Saved current month 5000
+step 7 action: Current month label: 'June 2026'
+step 8 action: Click Previous month button (aria-label='Previous')
+step 8 action: Switched to previous month: 'May 2026', URL=http://localhost:5173/income
+step 9 action: Verify previous month income shows blank or 0
+step 9 action: Previous month income value: ''
+step 9 action: PASS: Previous month shows blank/0 as expected
+step 10 action: Enter 3000 for previous month
+step 10 action: Entered 3000 for previous month
+step 11 action: Click Save for previous month
+step 11 action: Saved previous month 3000
+step 12 action: Click Next month button (aria-label='Next') to go back to current month
+step 12 action: Back to month: 'June 2026'
+step 13 action: Verify current month still shows 5000 (per-month persistence)
+step 13 action: Current month income value after round-trip: '5000.00'
+step 13 action: PASS: Per-month persistence confirmed — current month still shows 5000
+
+FINAL RESULT: PASS — all acceptance criteria met
