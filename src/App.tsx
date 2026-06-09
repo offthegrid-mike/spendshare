@@ -16,6 +16,7 @@ import { useMonthExpenses } from './hooks/useMonthExpenses';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
+import Summary from './features/summary/Summary';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
 
@@ -32,6 +33,11 @@ function IncomeRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
       income={income}
     />
   );
+}
+
+function SummaryRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
+  const { selectedMonth } = useUIStore();
+  return <Summary group={group} currentUserUid={user.uid} selectedMonth={selectedMonth} />;
 }
 
 function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
@@ -113,6 +119,10 @@ function App() {
               <div>Loading…</div>
             )
           }
+        />
+        <Route
+          path="/summary"
+          element={group ? <SummaryRouteWrapper group={group} user={user} /> : <div>Loading…</div>}
         />
       </Route>
     </Routes>

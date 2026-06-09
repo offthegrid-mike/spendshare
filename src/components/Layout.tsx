@@ -30,6 +30,12 @@ export default function Layout({ groups, user }: Props) {
             Income
           </Link>
           <Link
+            to="/summary"
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Summary
+          </Link>
+          <Link
             to="/categories"
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
