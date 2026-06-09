@@ -27,10 +27,11 @@ const navItems = [
   { to: '/group/settings', icon: Settings,    label: 'Settings'   },
 ];
 
+const navLink =
+  'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ' +
+  'text-blue-100 hover:bg-white/20 [&.active]:bg-white [&.active]:text-blue-700';
+
 export default function Layout({ groups, user }: Props) {
-  const navLink =
-    'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ' +
-    'text-blue-100 hover:bg-white/20 [&.active]:bg-white [&.active]:text-blue-700';
 
   return (
     <div className="min-h-screen bg-slate-50 text-gray-900">
