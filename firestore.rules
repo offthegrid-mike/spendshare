@@ -34,7 +34,14 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.auth.uid in request.resource.data.members
         && request.resource.data.memberUids.hasOnly([request.auth.uid]);
+      // Members can only edit non-privileged fields
       allow update: if isMember(groupId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
+        // Owners can edit any group-level field (name, currency, ownerUid, members, memberUids)
+        || ( isOwner(groupId)
+             && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['name', 'currency', 'ownerUid', 'members', 'memberUids']) )
+        // Invite acceptance: a verified user with a pending invite can add themselves to members/memberUids
         || ( signedIn()
              && request.auth.token.email_verified == true
              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberUids'])
