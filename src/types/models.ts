@@ -8,7 +8,7 @@ export interface UserDoc {
   uid: Uid; email: string; displayName: string; photoURL?: string;
   memberOf: string[]; createdAt: Timestamp;
 }
-export interface GroupMember { role: Role; displayName: string; email: string; joinedAt: Timestamp; }
+export interface GroupMember { role: Role; displayName: string; email: string; joinedAt: Timestamp; manual?: boolean; }
 export interface GroupDoc {
   id: string; name: string; currency: string; ownerUid: Uid;
   members: Record<Uid, GroupMember>; memberUids: Uid[]; createdAt: Timestamp;
@@ -28,7 +28,7 @@ export interface ItemDoc {
   name: string; categoryId: string; category: string; amount: number; shared: boolean;
   payerUid: Uid; // denormalized from the expense (for collectionGroup summary)
 }
-export interface IncomeDoc { uid: Uid; month: string; amount: number; }
+export interface IncomeDoc { uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
   id: string; month: string; fromUid: Uid; toUid: Uid; amount: number;
   paid: boolean; paidAt?: Timestamp; markedByUid?: Uid;

@@ -134,7 +134,7 @@ describe('ExpenseList', () => {
     expect(screen.getByText(/42\.50/)).toBeInTheDocument();
 
     // Item count
-    expect(screen.getByText(/2/)).toBeInTheDocument();
+    expect(screen.getByText(/2 items/i)).toBeInTheDocument();
   });
 
   it('expands line items when the expense row is clicked', async () => {

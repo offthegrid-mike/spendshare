@@ -92,7 +92,7 @@ function App() {
         <Route path="/" element={group ? <ExpenseList group={group} /> : <div>Loading…</div>} />
         <Route
           path="/group/settings"
-          element={group ? <GroupSettings key={group.id} group={group} /> : <div>Loading…</div>}
+          element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <div>Loading…</div>}
         />
         <Route
           path="/group/invites"

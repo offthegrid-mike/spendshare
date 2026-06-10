@@ -90,7 +90,8 @@ describe('IncomeEditor', () => {
       />,
     );
 
-    expect(screen.getByText(/Alice/i)).toBeInTheDocument();
+    // Current user (Alice) shows "Your income" section instead of their name
+    expect(screen.getByText(/your income/i)).toBeInTheDocument();
     expect(screen.getByText(/Bob/i)).toBeInTheDocument();
   });
 
@@ -141,8 +142,8 @@ describe('IncomeEditor', () => {
       />,
     );
 
-    // Bob's income (300000 cents = 3000.00) should be shown as display text
-    expect(screen.getByText('3000.00')).toBeInTheDocument();
+    // Bob's income (300000 cents = 3000.00) should be shown as display text with currency formatting
+    expect(screen.getByText(/3[,.]?000/)).toBeInTheDocument();
   });
 
   // 4. On save, calls setDoc only for current user with deterministic id ---------
