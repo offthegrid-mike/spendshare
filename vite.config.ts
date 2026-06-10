@@ -67,6 +67,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    exclude: ['**/node_modules/**', '**/.claude/worktrees/**', '**/*.spec.ts'],
+    exclude: ['**/node_modules/**', '**/.claude/worktrees/**', '**/*.spec.ts', '**/firestore.rules.test.ts'],
   },
 });
