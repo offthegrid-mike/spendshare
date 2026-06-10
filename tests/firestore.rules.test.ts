@@ -119,3 +119,61 @@ describe('Firestore Rules - /groups privilege escalation', () => {
     );
   });
 });
+
+describe('/groups invite-accept takeover prevention', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-spendshare',
+      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
+    });
+    // Seed: group2 with ownerUid=userA, members={userA, userB}, memberUids=[userA, userB]
+    // and a pending invite for userc@test.com
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'groups', 'group2'), {
+        ownerUid: 'userA',
+        name: 'Takeover Test Group',
+        currency: 'USD',
+        members: {
+          userA: { uid: 'userA', name: 'Alice', email: 'alicea@test.com' },
+          userB: { uid: 'userB', name: 'Bob', email: 'bob@test.com' },
+        },
+        memberUids: ['userA', 'userB'],
+        createdAt: new Date(),
+      });
+      await setDoc(doc(db, 'groups', 'group2', 'invites', 'userc@test.com'), {
+        status: 'pending',
+        email: 'userc@test.com',
+        groupId: 'group2',
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  it('denies invite-accept that evicts existing members', async () => {
+    // userC wipes userA and userB, sets only themselves
+    const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
+    await assertFails(updateDoc(doc(userC.firestore(), 'groups', 'group2'), {
+      members: { userC: { uid: 'userC', name: 'Carol', email: 'userc@test.com' } },
+      memberUids: ['userC']
+    }));
+  });
+
+  it('allows invite-accept that preserves existing members', async () => {
+    // userC adds themselves while keeping userA and userB
+    const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
+    await assertSucceeds(updateDoc(doc(userC.firestore(), 'groups', 'group2'), {
+      members: {
+        userA: { uid: 'userA', name: 'Alice', email: 'alicea@test.com' },
+        userB: { uid: 'userB', name: 'Bob', email: 'bob@test.com' },
+        userC: { uid: 'userC', name: 'Carol', email: 'userc@test.com' }
+      },
+      memberUids: ['userA', 'userB', 'userC']
+    }));
+  });
+});
