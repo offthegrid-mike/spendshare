@@ -49,37 +49,34 @@ export default function CreateGroup({ user }: Props) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow">
-        <h1 className="mb-4 text-xl font-semibold text-gray-800">Create your first group</h1>
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-white/60 bg-white/85 p-7 shadow-card backdrop-blur-md">
+        <h1 className="mb-1 text-xl font-bold tracking-tight text-slate-900">Create your first group</h1>
+        <p className="mb-5 text-sm text-slate-500">Pick a name and currency to get started.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Group name</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Group name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Our Household"
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Currency</label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="field"
             >
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <button type="submit" disabled={saving} className="btn-primary w-full py-2.5">
             {saving ? 'Creating…' : 'Create group'}
           </button>
         </form>

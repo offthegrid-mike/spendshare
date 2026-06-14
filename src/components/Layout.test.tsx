@@ -55,6 +55,6 @@ describe('Layout', () => {
   it('header has gradient class', () => {
     renderLayout();
     const header = document.querySelector('header');
-    expect(header?.className).toContain('from-blue-700');
+    expect(header?.className).toContain('bg-brand-gradient');
   });
 });

@@ -53,16 +53,16 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Income — {selectedMonth}</h1>
-        <p className="mt-1 text-sm text-gray-500">Record your monthly income to calculate fair expense splits.</p>
+        <h1 className="text-xl font-bold text-slate-900">Income — {selectedMonth}</h1>
+        <p className="mt-1 text-sm text-slate-500">Record your monthly income to calculate fair expense splits.</p>
       </div>
 
       {group.memberUids.filter((uid) => uid !== currentUserUid).length > 0 && (
-        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-gray-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
             Other members
           </div>
-          <ul className="divide-y divide-gray-50">
+          <ul className="divide-y divide-slate-50">
             {group.memberUids
               .filter((uid) => uid !== currentUserUid)
               .map((uid) => {
@@ -70,12 +70,12 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
                 return (
                   <li key={uid} className="flex items-center justify-between px-4 py-3 text-sm">
                     <div>
-                      <p className="font-medium text-gray-800">{group.members[uid]?.displayName ?? uid}</p>
+                      <p className="font-medium text-slate-800">{group.members[uid]?.displayName ?? uid}</p>
                       {existing?.description && (
-                        <p className="text-xs text-gray-400">{existing.description}</p>
+                        <p className="text-xs text-slate-400">{existing.description}</p>
                       )}
                     </div>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-slate-700">
                       {existing ? formatMoney(existing.amount, group.currency) : '—'}
                     </span>
                   </li>
@@ -85,13 +85,13 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
         </div>
       )}
 
-      <div className="rounded-xl border border-blue-100 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-blue-50 bg-blue-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-blue-600">
+      <div className="rounded-xl border border-brand-100 bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-brand-100 bg-brand-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-600">
           Your income
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Amount ({group.currency})
             </label>
             <input
@@ -100,23 +100,23 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
               min="0"
               placeholder="0.00"
               {...register('amount')}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Description <span className="font-normal text-gray-400">(optional)</span>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Description <span className="font-normal text-slate-400">(optional)</span>
             </label>
             <input
               type="text"
               placeholder="e.g. Salary, freelance, rental income…"
               {...register('description')}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="field"
             />
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
               <AlertCircle size={15} className="shrink-0" />
               {error}
             </div>
@@ -125,7 +125,7 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
           <button
             type="submit"
             disabled={saving || saved}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary w-full py-2.5"
           >
             {saving ? (
               'Saving…'

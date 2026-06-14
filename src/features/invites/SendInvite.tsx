@@ -46,15 +46,15 @@ export default function SendInvite({ user, group }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h1 className="mb-4 text-xl font-semibold text-gray-800">
+      <div className="card p-6">
+        <h1 className="mb-4 text-xl font-semibold text-slate-800">
           Invite to {group.name}
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="invite-email"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1 block text-sm font-medium text-slate-700"
             >
               Email
             </label>
@@ -64,17 +64,17 @@ export default function SendInvite({ user, group }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="friend@example.com"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="field"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-slate-500">
               Invite the exact email they&apos;ll sign in with.
             </p>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-rose-600">{error}</p>}
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary"
           >
             {saving ? 'Sending…' : 'Send invite'}
           </button>
@@ -82,18 +82,18 @@ export default function SendInvite({ user, group }: Props) {
       </div>
 
       {invites.length > 0 && (
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Invites</h2>
-          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-          <ul className="divide-y divide-gray-100">
+        <div className="card p-6">
+          <h2 className="mb-4 text-lg font-semibold text-slate-800">Invites</h2>
+          {error && <p className="mb-2 text-sm text-rose-600">{error}</p>}
+          <ul className="divide-y divide-slate-100">
             {invites.map((invite) => (
               <li
                 key={invite.id}
                 className="flex items-center justify-between py-2"
               >
                 <div>
-                  <p className="text-sm text-gray-800">{invite.email}</p>
-                  <p className="text-xs capitalize text-gray-500">
+                  <p className="text-sm text-slate-800">{invite.email}</p>
+                  <p className="text-xs capitalize text-slate-500">
                     {invite.status}
                   </p>
                 </div>
@@ -110,7 +110,7 @@ export default function SendInvite({ user, group }: Props) {
                         })
                         .finally(() => setRevoking(null));
                     }}
-                    className="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   >
                     Revoke
                   </button>

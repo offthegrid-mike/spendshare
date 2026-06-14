@@ -67,11 +67,22 @@ export default function SignIn() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md">
-        <h1 className="mb-6 text-center text-2xl font-bold text-blue-600">
-          SpendShare
-        </h1>
+    <main className="relative flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm rounded-2xl border border-white/60 bg-white/85 p-8 shadow-card backdrop-blur-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-brand">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4h16v14l-2.5-1.5L15 18l-3-1.5L9 18l-2.5-1.5L4 18z" />
+              <path d="M9 8h6M9 12h4" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+            SpendShare
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Split expenses, settle up, stay friends.
+          </p>
+        </div>
         <form
           className="space-y-4"
           onSubmit={(e) => {
@@ -82,7 +93,7 @@ export default function SignIn() {
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1 block text-sm font-medium text-slate-700"
             >
               Email
             </label>
@@ -91,13 +102,13 @@ export default function SignIn() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="field"
             />
           </div>
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1 block text-sm font-medium text-slate-700"
             >
               Password
             </label>
@@ -106,7 +117,7 @@ export default function SignIn() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="field"
             />
           </div>
 
@@ -121,27 +132,36 @@ export default function SignIn() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-          >
+          <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
             Sign in
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void handleCreateAccount()}
-            className="w-full rounded-md border border-blue-600 px-4 py-2 font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60"
+            className="btn-outline w-full py-2.5"
           >
             Create account
           </button>
+
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
           <button
             type="button"
             disabled={busy}
             onClick={() => void handleGoogle()}
-            className="w-full rounded-md border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.9z" />
+              <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.9-3a7.2 7.2 0 0 1-10.7-3.8H1.4v3.1A12 12 0 0 0 12 24z" />
+              <path fill="#FBBC05" d="M5.3 14.2a7.2 7.2 0 0 1 0-4.5V6.6H1.4a12 12 0 0 0 0 10.8z" />
+              <path fill="#EA4335" d="M12 4.8c1.8 0 3.4.6 4.6 1.8l3.5-3.5A12 12 0 0 0 1.4 6.6l3.9 3.1A7.2 7.2 0 0 1 12 4.8z" />
+            </svg>
             Continue with Google
           </button>
         </form>

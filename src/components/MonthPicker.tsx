@@ -60,17 +60,17 @@ export default function MonthPicker() {
         type="button"
         onClick={goToPrev}
         aria-label="Previous"
-        className="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+        className="rounded-lg px-2 py-1 text-sm text-white/80 transition hover:bg-white/15 hover:text-white"
       >
         ←
       </button>
-      <span className="w-28 text-center text-sm font-medium">{label}</span>
+      <span className="w-28 text-center text-sm font-semibold text-white">{label}</span>
       <button
         type="button"
         onClick={goToNext}
         disabled={isCurrentMonth}
         aria-label="Next"
-        className="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg px-2 py-1 text-sm text-white/80 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
       >
         →
       </button>

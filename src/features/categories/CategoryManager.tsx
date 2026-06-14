@@ -76,23 +76,23 @@ export default function CategoryManager() {
     }
   }
 
-  if (!gid) return <div className="p-4 text-gray-500">No group selected.</div>;
-  if (loading) return <div className="p-4 text-gray-500">Loading…</div>;
+  if (!gid) return <div className="p-4 text-slate-500">No group selected.</div>;
+  if (loading) return <div className="p-4 text-slate-500">Loading…</div>;
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="mb-4 text-lg font-semibold text-gray-800">Categories</h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-800">Categories</h2>
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
 
-      <ul className="mb-6 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+      <ul className="mb-6 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {all.length === 0 && (
-          <li className="px-4 py-3 text-sm text-gray-400">No categories yet.</li>
+          <li className="px-4 py-3 text-sm text-slate-400">No categories yet.</li>
         )}
         {all.map((cat) => (
           <li
             key={cat.id}
-            className={`flex items-center gap-3 px-4 py-3 ${cat.archived ? 'bg-gray-50' : ''}`}
+            className={`flex items-center gap-3 px-4 py-3 ${cat.archived ? 'bg-slate-50' : ''}`}
           >
             {editingId === cat.id ? (
               <>
@@ -105,19 +105,19 @@ export default function CategoryManager() {
                     if (e.key === 'Escape') cancelEdit();
                   }}
                   autoFocus
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => void saveEdit(cat)}
-                  className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                  className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700"
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -126,12 +126,12 @@ export default function CategoryManager() {
               <>
                 <span
                   className={`flex-1 text-sm ${
-                    cat.archived ? 'text-gray-400 line-through' : 'text-gray-800'
+                    cat.archived ? 'text-slate-400 line-through' : 'text-slate-800'
                   }`}
                 >
                   {cat.name}
                   {cat.archived && (
-                    <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500">
+                    <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-500">
                       archived
                     </span>
                   )}
@@ -139,14 +139,14 @@ export default function CategoryManager() {
                 <button
                   type="button"
                   onClick={() => startEdit(cat)}
-                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   Rename
                 </button>
                 <button
                   type="button"
                   onClick={() => void toggleArchive(cat)}
-                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   {cat.archived ? 'Unarchive' : 'Archive'}
                 </button>
@@ -162,12 +162,12 @@ export default function CategoryManager() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="New category name"
-          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
         />
         <button
           type="submit"
           disabled={adding || !newName.trim()}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {adding ? 'Adding…' : 'Add'}
         </button>

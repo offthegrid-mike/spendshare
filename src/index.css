@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    /* Soft tinted aurora behind the app shell */
+    background-image: theme('backgroundImage.app-surface');
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+}
+
+@layer components {
+  /* Frosted card surface */
+  .card {
+    @apply rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm;
+  }
+
+  /* Primary brand button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-gradient px-4 py-2
+      text-sm font-semibold text-white shadow-brand transition
+      hover:brightness-105 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  /* Secondary / outline button */
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2
+      text-sm font-semibold text-slate-700 shadow-sm transition
+      hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  /* Text input / select */
+  .field {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+      transition placeholder:text-slate-400
+      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+  }
+}

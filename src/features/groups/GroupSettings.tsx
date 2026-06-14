@@ -79,33 +79,33 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
   return (
     <div className="space-y-8 mx-auto max-w-sm">
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">Group settings</h2>
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-slate-800">Group settings</h2>
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Group name</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Group name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Currency</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Currency</label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="field"
             >
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-rose-600">{error}</p>}
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="btn-primary"
           >
             {saving ? 'Saving…' : saved ? 'Saved!' : 'Save changes'}
           </button>
@@ -113,9 +113,9 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">Members</h2>
-        <div className="mb-4 rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <ul className="divide-y divide-gray-50">
+        <h2 className="mb-4 text-lg font-semibold text-slate-800">Members</h2>
+        <div className="mb-4 rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <ul className="divide-y divide-slate-50">
             {group.memberUids.map((uid) => {
               const member = group.members[uid];
               const isThisOwner = uid === group.ownerUid;
@@ -123,16 +123,16 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
               return (
                 <li key={uid} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
                       {(member?.displayName ?? uid)[0]?.toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{member?.displayName ?? uid}</p>
-                      {member?.email && <p className="text-xs text-gray-400">{member.email}</p>}
+                      <p className="text-sm font-medium text-slate-900">{member?.displayName ?? uid}</p>
+                      {member?.email && <p className="text-xs text-slate-400">{member.email}</p>}
                     </div>
                     {isThisOwner && <span title="Owner"><Crown size={13} className="text-amber-500" /></span>}
                     {member?.manual && (
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                         manual
                       </span>
                     )}
@@ -141,7 +141,7 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
                     <button
                       type="button"
                       onClick={() => void handleRemoveMember(uid)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                       title="Remove member"
                     >
                       <Trash2 size={14} />
@@ -153,17 +153,17 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
           </ul>
         </div>
 
-        {removeError && <p className="mb-2 text-xs text-red-600">{removeError}</p>}
+        {removeError && <p className="mb-2 text-xs text-rose-600">{removeError}</p>}
 
         {isOwner && (
-          <form onSubmit={handleAddMember} className="space-y-3 rounded-xl border border-dashed border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <UserPlus size={15} className="text-blue-500" />
+          <form onSubmit={handleAddMember} className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <UserPlus size={15} className="text-brand-500" />
               Add member directly
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                Name <span className="text-red-400">*</span>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Name <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -171,26 +171,26 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
                 onChange={(e) => setMemberName(e.target.value)}
                 placeholder="e.g. Jane Smith"
                 required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="field"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                Email <span className="text-gray-400">(optional)</span>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Email <span className="text-slate-400">(optional)</span>
               </label>
               <input
                 type="email"
                 value={memberEmail}
                 onChange={(e) => setMemberEmail(e.target.value)}
                 placeholder="jane@example.com"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="field"
               />
             </div>
-            {addError && <p className="text-xs text-red-600">{addError}</p>}
+            {addError && <p className="text-xs text-rose-600">{addError}</p>}
             <button
               type="submit"
               disabled={addingMember || !memberName.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-medium text-white hover:bg-gray-900 transition-colors disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900 transition-colors disabled:opacity-40"
             >
               <UserPlus size={14} />
               {addingMember ? 'Adding…' : 'Add member'}

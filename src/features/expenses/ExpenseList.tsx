@@ -42,7 +42,7 @@ export default function ExpenseList({ group }: Props) {
     return (
       <div className="space-y-3">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-14 animate-pulse rounded-xl bg-white shadow-sm" />
+          <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/70 shadow-card" />
         ))}
       </div>
     );
@@ -50,13 +50,12 @@ export default function ExpenseList({ group }: Props) {
 
   if (expenses.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-gray-200 bg-white py-16 text-center">
-        <ShoppingBag size={36} className="text-gray-300" />
-        <p className="text-sm font-medium text-gray-500">No expenses for {selectedMonth}</p>
-        <Link
-          to="/expense/new"
-          className="mt-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white/70 py-16 text-center backdrop-blur-sm">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-500 ring-1 ring-brand-100">
+          <ShoppingBag size={28} />
+        </div>
+        <p className="text-sm font-medium text-slate-500">No expenses for {selectedMonth}</p>
+        <Link to="/expense/new" className="btn-primary mt-1">
           Add first expense
         </Link>
       </div>
@@ -72,7 +71,7 @@ export default function ExpenseList({ group }: Props) {
         return (
           <div
             key={exp.id}
-            className="rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md"
+            className="rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm transition-shadow hover:shadow-card-hover"
           >
             <div className="flex items-center gap-3 px-4 py-3">
               <button
@@ -80,22 +79,25 @@ export default function ExpenseList({ group }: Props) {
                 onClick={() => setExpandedId(isExpanded ? null : exp.id)}
                 className="flex flex-1 items-center gap-3 text-left"
               >
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                  <ShoppingBag size={18} />
+                </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{exp.shopName}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-semibold text-slate-900">{exp.shopName}</p>
+                  <p className="text-xs text-slate-400">
                     {payerName(exp.payerUid)} · {exp.itemCount} item{exp.itemCount !== 1 ? 's' : ''}
                   </p>
                 </div>
-                <span className="text-base font-bold text-gray-800">
+                <span className="text-base font-bold tabular-nums text-slate-900">
                   {formatMoney(exp.total, group.currency)}
                 </span>
                 {isExpanded
-                  ? <ChevronUp size={16} className="shrink-0 text-gray-400" />
-                  : <ChevronDown size={16} className="shrink-0 text-gray-400" />}
+                  ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
+                  : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
               </button>
               <Link
                 to={`/expense/${exp.id}/edit`}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
                 title="Edit"
               >
                 <Pencil size={15} />
@@ -104,18 +106,18 @@ export default function ExpenseList({ group }: Props) {
                 type="button"
                 disabled={isDeleting}
                 onClick={() => void handleDelete(exp, items)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
                 title="Delete"
               >
                 <Trash2 size={15} />
               </button>
             </div>
             {isExpanded && items.length > 0 && (
-              <ul className="border-t border-gray-100 px-4 py-2 space-y-1">
+              <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
                 {items.map((it) => (
-                  <li key={it.id} className="flex items-center justify-between text-sm text-gray-600">
+                  <li key={it.id} className="flex items-center justify-between text-sm text-slate-600">
                     <span>{it.name}</span>
-                    <span className="text-gray-400">{formatMoney(it.amount, group.currency)}</span>
+                    <span className="tabular-nums text-slate-400">{formatMoney(it.amount, group.currency)}</span>
                   </li>
                 ))}
               </ul>
