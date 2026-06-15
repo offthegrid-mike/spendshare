@@ -264,7 +264,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
               value={field.value ?? ''}
               suggestions={shopSuggestions}
               onChange={field.onChange}
-              placeholder="Shop name (optional)"
+              placeholder="e.g. Woolworths"
             />
           )}
         />
