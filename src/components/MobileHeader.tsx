@@ -39,7 +39,7 @@ export default function MobileHeader({ groups, user }: Props) {
         <button
           type="button"
           onClick={() => void signOut(auth)}
-          title="Sign out"
+          title={user.displayName ?? 'Sign out'}
           aria-label="Sign out"
           className="rounded-lg p-1.5 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
         >
