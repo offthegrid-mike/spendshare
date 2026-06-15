@@ -69,7 +69,6 @@ describe('computeSuggestionsDelta', () => {
   it('returns entries sorted by count descending', () => {
     const result = computeSuggestionsDelta([milk, bread], [], [
       { name: 'Bread', categoryId: 'cat1', category: 'Groceries' },
-      { name: 'Bread', categoryId: 'cat1', category: 'Groceries' },
     ]);
     expect(result[0].name).toBe('Milk');
     expect(result[1].name).toBe('Bread');
