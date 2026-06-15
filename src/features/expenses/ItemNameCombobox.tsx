@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { SuggestionEntry } from '../../types/models';
+import { findMatchIndex, highlightMatch } from './comboboxUtils';
 
 interface ItemNameComboboxProps {
   value: string;
@@ -7,29 +8,6 @@ interface ItemNameComboboxProps {
   suggestions: SuggestionEntry[];
   id?: string;
   placeholder?: string;
-}
-
-const collator = new Intl.Collator(undefined, { sensitivity: 'base', usage: 'search' });
-
-function findMatchIndex(haystack: string, needle: string): number {
-  const h = haystack.normalize('NFC');
-  const n = needle.normalize('NFC');
-  if (n.length === 0) return -1;
-  for (let i = 0; i <= h.length - n.length; i++) {
-    if (collator.compare(h.slice(i, i + n.length), n) === 0) return i;
-  }
-  return -1;
-}
-
-function highlightMatch(name: string, query: string): React.ReactNode {
-  const normName = name.normalize('NFC');
-  const normQuery = query.normalize('NFC');
-  const idx = findMatchIndex(normName, normQuery);
-  if (idx === -1) return <span>{name}</span>;
-  const before = normName.slice(0, idx);
-  const match  = normName.slice(idx, idx + normQuery.length);
-  const after  = normName.slice(idx + normQuery.length);
-  return <span>{before}<strong>{match}</strong>{after}</span>;
 }
 
 export default function ItemNameCombobox({
@@ -113,7 +91,7 @@ export default function ItemNameCombobox({
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={isOpen}
-        aria-controls={listboxId}
+        aria-controls={isOpen ? listboxId : undefined}
         aria-activedescendant={activeId}
         value={value}
         placeholder={placeholder}
