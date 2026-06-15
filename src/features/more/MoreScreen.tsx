@@ -23,9 +23,9 @@ export default function MoreScreen() {
               to={to}
               className="flex min-h-[44px] items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white"
             >
-              <Icon size={18} className="shrink-0 text-brand-600" />
+              <Icon size={18} className="shrink-0 text-brand-600" aria-hidden="true" />
               <span className="flex-1 text-sm font-medium text-slate-800">{label}</span>
-              <ChevronRight size={16} className="text-slate-400" />
+              <ChevronRight size={16} className="text-slate-400" aria-hidden="true" />
             </Link>
           ))}
         </div>
@@ -39,7 +39,7 @@ export default function MoreScreen() {
           onClick={() => void signOut(auth)}
           className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white"
         >
-          <LogOut size={18} className="shrink-0 text-slate-500" />
+          <LogOut size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
           <span className="flex-1 text-left text-sm font-medium text-slate-800">Sign out</span>
         </button>
       </section>
