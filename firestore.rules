@@ -84,7 +84,11 @@ service cloud.firestore {
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.total is number
-          && request.resource.data.total >= 0;
+          && request.resource.data.total >= 0
+          && (!('giftCardAmount' in request.resource.data)
+              || (request.resource.data.giftCardAmount is number
+                  && request.resource.data.giftCardAmount >= 0
+                  && request.resource.data.giftCardAmount <= request.resource.data.total));
         match /items/{itemId} {
           allow read, delete: if isMember(groupId);
           allow create, update: if isMember(groupId)
