@@ -188,4 +188,92 @@ describe('ExpenseList', () => {
     const editLink = screen.getByRole('link', { name: /edit/i });
     expect(editLink).toHaveAttribute('href', '/expense/exp1/edit');
   });
+
+  // --- Fixtures for new features ---
+  const expenseWithGiftCard: ExpenseDoc = {
+    ...expense1,
+    id: 'exp2',
+    shopName: 'FairPrice',
+    total: 1000, // $10.00
+    giftCardAmount: 530, // $5.30 — net = $4.70
+  };
+
+  const itemsWithRemark: ItemDoc[] = [
+    { ...items1[0], remark: 'on sale' },
+    items1[1],
+  ];
+
+  // 6. Gift card — net amount + strikethrough -----------------------------------
+  it('shows the net amount prominently and receipt total as strikethrough when giftCardAmount is set', () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expenseWithGiftCard],
+      itemsByExpense: { exp2: [] },
+      loading: false,
+    });
+
+    renderExpenseList();
+
+    expect(screen.getByText(/4\.70/)).toBeInTheDocument();
+    expect(screen.getByText(/10\.00/)).toBeInTheDocument();
+  });
+
+  // 7. Gift card badge ----------------------------------------------------------
+  it('shows a gift card badge with the gift card amount', () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expenseWithGiftCard],
+      itemsByExpense: { exp2: [] },
+      loading: false,
+    });
+
+    renderExpenseList();
+
+    expect(screen.getByText(/gift card/i)).toBeInTheDocument();
+    expect(screen.getByText(/5\.30/)).toBeInTheDocument();
+  });
+
+  // 8. No gift card display when absent ----------------------------------------
+  it('shows only the total when giftCardAmount is absent', () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1],
+      itemsByExpense: { exp1: items1 },
+      loading: false,
+    });
+
+    renderExpenseList();
+
+    expect(screen.getByText(/42\.50/)).toBeInTheDocument();
+    expect(screen.queryByText(/gift card/i)).not.toBeInTheDocument();
+  });
+
+  // 9. Remark shown in expanded view -------------------------------------------
+  it('shows item remark below item name in the expanded view', async () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1],
+      itemsByExpense: { exp1: itemsWithRemark },
+      loading: false,
+    });
+
+    const u = userEvent.setup();
+    renderExpenseList();
+
+    await u.click(screen.getByText(/Woolworths/i));
+
+    expect(screen.getByText(/on sale/i)).toBeInTheDocument();
+  });
+
+  // 10. No remark element when absent ------------------------------------------
+  it('does not render a remark element when item has no remark', async () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1],
+      itemsByExpense: { exp1: items1 },
+      loading: false,
+    });
+
+    const u = userEvent.setup();
+    renderExpenseList();
+
+    await u.click(screen.getByText(/Woolworths/i));
+
+    expect(screen.queryAllByTestId('item-remark')).toHaveLength(0);
+  });
 });

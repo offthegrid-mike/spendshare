@@ -119,9 +119,25 @@ export default function ExpenseList({ group }: Props) {
                           )}
                         </div>
                       </div>
-                      <span className="text-base font-bold tabular-nums text-slate-900">
-                        {formatMoney(exp.total, group.currency)}
-                      </span>
+                      <div className="text-right">
+                        {exp.giftCardAmount ? (
+                          <>
+                            <p className="text-xs tabular-nums text-slate-400 line-through">
+                              {formatMoney(exp.total, group.currency)}
+                            </p>
+                            <p className="text-base font-bold tabular-nums text-emerald-600">
+                              {formatMoney(exp.total - exp.giftCardAmount, group.currency)}
+                            </p>
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                              🎁 Gift card {formatMoney(exp.giftCardAmount, group.currency)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-base font-bold tabular-nums text-slate-900">
+                            {formatMoney(exp.total, group.currency)}
+                          </span>
+                        )}
+                      </div>
                       {isExpanded
                         ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
                         : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
@@ -146,8 +162,15 @@ export default function ExpenseList({ group }: Props) {
                   {isExpanded && items.length > 0 && (
                     <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
                       {items.map((it) => (
-                        <li key={it.id} className="flex items-center justify-between text-sm text-slate-600">
-                          <span>{it.name}</span>
+                        <li key={it.id} className="flex items-start justify-between text-sm text-slate-600">
+                          <span className="flex flex-col">
+                            <span>{it.name}</span>
+                            {it.remark && (
+                              <span data-testid="item-remark" className="text-xs text-slate-400">
+                                {it.remark}
+                              </span>
+                            )}
+                          </span>
                           <span className="tabular-nums text-slate-400">{formatMoney(it.amount, group.currency)}</span>
                         </li>
                       ))}
