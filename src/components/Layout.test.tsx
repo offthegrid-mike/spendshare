@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Layout from './Layout';
@@ -11,6 +12,21 @@ vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
 vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
 vi.mock('./MonthPicker', () => ({ default: () => <div data-testid="month-picker" /> }));
 vi.mock('../features/invites/PendingInvites', () => ({ default: () => null }));
+vi.mock('./MobileHeader', () => ({ default: () => <div data-testid="mobile-header" /> }));
+vi.mock('./BottomNav', () => ({ default: () => <nav data-testid="bottom-nav" /> }));
+vi.mock('./BottomSheet', () => ({
+  default: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div data-testid="bottom-sheet">{children}</div> : null,
+}));
+vi.mock('../features/expenses/ExpenseEditor', () => ({
+  default: () => <div data-testid="expense-editor" />,
+}));
+vi.mock('../hooks/useGroup', () => ({
+  useGroup: () => ({ group: { id: 'g1', name: 'Family', currency: 'AUD', ownerUid: 'u1', members: {}, memberUids: [] } }),
+}));
+vi.mock('../stores/uiStore', () => ({
+  useUIStore: () => ({ selectedGroupId: 'g1', selectedMonth: '2026-06' }),
+}));
 
 import type { GroupDoc } from '../types/models';
 import type { User } from 'firebase/auth';
@@ -56,5 +72,20 @@ describe('Layout', () => {
     renderLayout();
     const header = document.querySelector('header');
     expect(header?.className).toContain('bg-brand-gradient');
+  });
+
+  it('renders mobile header', () => {
+    renderLayout();
+    expect(screen.getByTestId('mobile-header')).toBeTruthy();
+  });
+
+  it('renders bottom nav', () => {
+    renderLayout();
+    expect(screen.getByTestId('bottom-nav')).toBeTruthy();
+  });
+
+  it('bottom sheet is closed by default', () => {
+    renderLayout();
+    expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
 });

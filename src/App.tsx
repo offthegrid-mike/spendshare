@@ -17,6 +17,7 @@ import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
 import Summary from './features/summary/Summary';
+import MoreScreen from './features/more/MoreScreen';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
 
@@ -124,6 +125,7 @@ function App() {
           path="/summary"
           element={group ? <SummaryRouteWrapper group={group} user={user} /> : <div>Loading…</div>}
         />
+        <Route path="/more" element={<MoreScreen />} />
       </Route>
     </Routes>
   );

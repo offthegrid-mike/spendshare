@@ -72,12 +72,55 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Summary — {selectedMonth}</h1>
+      <h1 className="hidden text-2xl font-extrabold tracking-tight text-slate-900 sm:block">Summary — {selectedMonth}</h1>
 
       {/* Per-person section */}
       <section className="card overflow-hidden p-5">
         <h2 className="mb-3 text-base font-semibold text-slate-900">Per person</h2>
-        <div className="overflow-x-auto">
+
+        {/* Mobile: stacked balance cards (hidden on sm+) */}
+        <div className="space-y-3 sm:hidden">
+          {group.memberUids.map((uid) => {
+            const memberIncome = income.find((i) => i.uid === uid);
+            const balance = summary.balance[uid] ?? 0;
+            const isPositive = balance > 0;
+            const isNegative = balance < 0;
+            return (
+              <div
+                key={uid}
+                data-testid="balance-card"
+                className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
+              >
+                <p className="mb-1 font-semibold text-slate-900">{memberName(uid)}</p>
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Paid {formatMoney(summary.paidTotal[uid] ?? 0, group.currency)}</span>
+                  <span>Share {formatMoney(summary.shareOf[uid] ?? 0, group.currency)}</span>
+                  {memberIncome && (
+                    <span>Income {formatMoney(memberIncome.amount, group.currency)}</span>
+                  )}
+                </div>
+                <p
+                  className={`mt-1 text-sm font-bold tabular-nums ${
+                    isPositive
+                      ? 'text-brand-700'
+                      : isNegative
+                        ? 'text-rose-600'
+                        : 'text-slate-500'
+                  }`}
+                >
+                  {isPositive
+                    ? `+${formatMoney(balance, group.currency)} owed to you`
+                    : isNegative
+                      ? `${formatMoney(balance, group.currency)} owes you`
+                      : 'Settled'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: table (hidden on mobile) */}
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { Outlet, NavLink } from 'react-router-dom';
@@ -14,7 +15,13 @@ import {
 import { auth } from '../lib/firebase';
 import GroupSwitcher from './GroupSwitcher';
 import MonthPicker from './MonthPicker';
+import MobileHeader from './MobileHeader';
+import BottomNav from './BottomNav';
+import BottomSheet from './BottomSheet';
 import PendingInvites from '../features/invites/PendingInvites';
+import ExpenseEditor from '../features/expenses/ExpenseEditor';
+import { useGroup } from '../hooks/useGroup';
+import { useUIStore } from '../stores/uiStore';
 import type { GroupDoc } from '../types/models';
 
 interface Props { groups: GroupDoc[]; user: User; }
@@ -33,10 +40,17 @@ const navLink =
   '[&.active]:bg-white [&.active]:text-brand-700 [&.active]:shadow-sm';
 
 export default function Layout({ groups, user }: Props) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const { selectedGroupId } = useUIStore();
+  const { group } = useGroup(selectedGroupId);
 
   return (
     <div className="min-h-screen text-slate-900">
-      <header className="sticky top-0 z-20 bg-brand-gradient shadow-lg shadow-brand-900/10 ring-1 ring-black/5">
+      {/* Mobile header — hidden on sm+ */}
+      <MobileHeader groups={groups} user={user} />
+
+      {/* Desktop header — hidden on mobile */}
+      <header className="sticky top-0 z-20 hidden bg-brand-gradient shadow-lg shadow-brand-900/10 ring-1 ring-black/5 sm:block">
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-white">
@@ -60,9 +74,10 @@ export default function Layout({ groups, user }: Props) {
               type="button"
               onClick={() => void signOut(auth)}
               title={user.displayName ?? 'Sign out'}
+              aria-label="Sign out"
               className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-white/80 hover:bg-white/15 hover:text-white transition-colors"
             >
-              <LogOut size={15} />
+              <LogOut size={15} aria-hidden="true" />
               <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
@@ -80,12 +95,42 @@ export default function Layout({ groups, user }: Props) {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+
+      <main className="mx-auto max-w-3xl px-4 py-6 pb-24 sm:pb-6 sm:px-6">
         <div className="mb-5 empty:mb-0">
           <PendingInvites user={user} />
         </div>
         <Outlet />
       </main>
+
+      {/* Mobile FAB — hidden on sm+ */}
+      <button
+        type="button"
+        aria-label="Add expense"
+        onClick={() => setSheetOpen(true)}
+        className="fixed bottom-20 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-white shadow-brand shadow-lg transition hover:brightness-105 active:scale-95 sm:hidden"
+      >
+        <Plus size={26} strokeWidth={2} aria-hidden="true" />
+      </button>
+
+      {/* Mobile bottom nav — hidden on sm+ */}
+      <BottomNav />
+
+      {/* Add expense bottom sheet (mobile only — BottomSheet is sm:hidden) */}
+      <BottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Add Expense"
+      >
+        {group && (
+          <ExpenseEditor
+            key={sheetOpen ? 'open' : 'closed'}
+            group={group}
+            currentUserUid={user.uid}
+            onSuccess={() => setSheetOpen(false)}
+          />
+        )}
+      </BottomSheet>
     </div>
   );
 }
