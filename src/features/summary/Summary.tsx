@@ -81,7 +81,9 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
         {/* Mobile: stacked balance cards (hidden on sm+) */}
         <div className="space-y-3 sm:hidden">
           {group.memberUids.map((uid) => {
-            const memberIncome = income.find((i) => i.uid === uid);
+            const memberIncomeTotal = income
+              .filter((i) => i.uid === uid)
+              .reduce((sum, i) => sum + i.amount, 0);
             const balance = summary.balance[uid] ?? 0;
             const isPositive = balance > 0;
             const isNegative = balance < 0;
@@ -95,8 +97,8 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>Paid {formatMoney(summary.paidTotal[uid] ?? 0, group.currency)}</span>
                   <span>Share {formatMoney(summary.shareOf[uid] ?? 0, group.currency)}</span>
-                  {memberIncome && (
-                    <span>Income {formatMoney(memberIncome.amount, group.currency)}</span>
+                  {memberIncomeTotal > 0 && (
+                    <span>Income {formatMoney(memberIncomeTotal, group.currency)}</span>
                   )}
                 </div>
                 <p
@@ -133,7 +135,9 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
             </thead>
             <tbody>
               {group.memberUids.map((uid) => {
-                const memberIncome = income.find((i) => i.uid === uid);
+                const memberIncomeTotal = income
+                  .filter((i) => i.uid === uid)
+                  .reduce((sum, i) => sum + i.amount, 0);
                 const balance = summary.balance[uid] ?? 0;
                 return (
                   <tr key={uid} className="border-b border-slate-100 last:border-0">
@@ -145,7 +149,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
                       {formatMoney(summary.shareOf[uid] ?? 0, group.currency)}
                     </td>
                     <td className="py-2.5 text-right tabular-nums text-slate-600">
-                      {memberIncome ? formatMoney(memberIncome.amount, group.currency) : '—'}
+                      {memberIncomeTotal > 0 ? formatMoney(memberIncomeTotal, group.currency) : '—'}
                     </td>
                     <td className="py-2.5 text-right">
                       <span

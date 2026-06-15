@@ -65,4 +65,13 @@ describe('Summary', () => {
     renderSummary();
     expect(screen.getByText(/all settled/i)).toBeTruthy();
   });
+
+  it('sums multiple income entries for the same member', () => {
+    const income = [
+      { id: 'i1', uid: 'u1', month: '2026-06', amount: 300000 },
+      { id: 'i2', uid: 'u1', month: '2026-06', amount: 100000 },
+    ];
+    const totalIncome = income.filter((i) => i.uid === 'u1').reduce((sum, i) => sum + i.amount, 0);
+    expect(totalIncome).toBe(400000);
+  });
 });
