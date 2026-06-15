@@ -38,7 +38,7 @@ const mockGroup = {
     u2: { displayName: 'Bob', email: '', role: 'member', joinedAt: null },
   },
   memberUids: ['u1', 'u2'], createdAt: null,
-} as any;
+} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 function renderSummary() {
   return render(
