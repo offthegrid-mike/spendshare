@@ -29,8 +29,9 @@ export function writeCache(groupId: string, items: SuggestionEntry[]): void {
   }
 }
 
-export function useItemSuggestions(groupId: string): SuggestionEntry[] {
+export function useItemSuggestions(groupId: string): [SuggestionEntry[], boolean] {
   const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,11 +46,11 @@ export function useItemSuggestions(groupId: string): SuggestionEntry[] {
         });
 
     load
-      .then((items) => { if (!cancelled) setSuggestions(items); })
-      .catch(() => {});
+      .then((items) => { if (!cancelled) { setSuggestions(items); setLoaded(true); } })
+      .catch(() => { if (!cancelled) setLoaded(true); });
 
     return () => { cancelled = true; };
   }, [groupId]);
 
-  return suggestions;
+  return [suggestions, loaded];
 }

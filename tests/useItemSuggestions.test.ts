@@ -38,16 +38,18 @@ describe('useItemSuggestions', () => {
     vi.clearAllMocks();
   });
 
-  it('returns [] synchronously before async load completes', () => {
+  it('returns [[], false] synchronously before async load completes', () => {
     getDoc.mockReturnValue(new Promise(() => {})); // never resolves
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    expect(result.current).toEqual([]);
+    expect(result.current[0]).toEqual([]);
+    expect(result.current[1]).toBe(false);
   });
 
-  it('fetches from Firestore on cache miss and returns suggestions', async () => {
+  it('fetches from Firestore on cache miss and returns suggestions with loaded=true', async () => {
     getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current).toEqual(suggestions));
+    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
+    expect(result.current[1]).toBe(true);
     expect(getDoc).toHaveBeenCalledTimes(1);
   });
 
@@ -55,7 +57,8 @@ describe('useItemSuggestions', () => {
     writeCache('g1', suggestions);
     getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [] }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current).toEqual(suggestions));
+    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
+    expect(result.current[1]).toBe(true);
     expect(getDoc).not.toHaveBeenCalled();
   });
 
@@ -64,28 +67,31 @@ describe('useItemSuggestions', () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify(stale));
     getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current).toEqual(suggestions));
+    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
+    expect(result.current[1]).toBe(true);
     expect(getDoc).toHaveBeenCalledTimes(1);
   });
 
-  it('returns [] and does not throw when Firestore errors', async () => {
+  it('returns [[], true] and does not throw when Firestore errors', async () => {
     getDoc.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    // Should not throw; state stays []
-    await waitFor(() => expect(result.current).toEqual([]));
+    await waitFor(() => expect(result.current[1]).toBe(true));
+    expect(result.current[0]).toEqual([]);
   });
 
-  it('returns [] when Firestore doc does not exist yet', async () => {
+  it('returns [[], true] when Firestore doc does not exist yet', async () => {
     getDoc.mockResolvedValue({ exists: () => false });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current).toEqual([]));
+    await waitFor(() => expect(result.current[1]).toBe(true));
+    expect(result.current[0]).toEqual([]);
   });
 
   it('writeCache stores items and is readable by the hook', async () => {
     writeCache('g1', suggestions);
     getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [] }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current).toEqual(suggestions));
+    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
+    expect(result.current[1]).toBe(true);
     expect(getDoc).not.toHaveBeenCalled();
   });
 });

@@ -86,13 +86,13 @@ export default function ItemNameCombobox({
         e.preventDefault();
         break;
       case 'Enter':
-        if (activeIndex >= 0) {
+        if (activeIndex >= 0 && activeIndex < filtered.length) {
           handleSelect(filtered[activeIndex]);
-          e.preventDefault();
         }
+        e.preventDefault();
         break;
       case 'Tab':
-        if (activeIndex >= 0) handleSelect(filtered[activeIndex]);
+        if (activeIndex >= 0 && activeIndex < filtered.length) handleSelect(filtered[activeIndex]);
         break;
       case 'Escape':
         setOpen(false);

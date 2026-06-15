@@ -11,7 +11,7 @@ import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { computeSuggestionsDelta } from '../../lib/suggestions';
-import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc } from '../../types/models';
+import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
@@ -66,7 +66,7 @@ interface Props {
 export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess }: Props) {
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
-  const suggestions = useItemSuggestions(group.id);
+  const [suggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
   const defaultItems: FormValues['items'] =
     expense && items && items.length > 0
@@ -185,25 +185,29 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       } as WithFieldValue<ItemDoc>);
     }
 
-    // Suggestions delta — written as part of this batch so it's atomic.
-    const oldItemInputs = (items ?? []).map((it) => ({
-      name: it.name,
-      categoryId: it.categoryId,
-      category: it.category,
-    }));
-    const newItemInputs = data.items.map((it) => ({
-      name: it.name,
-      categoryId: it.categoryId,
-      category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
-    }));
-    const newSuggestions = computeSuggestionsDelta(suggestions, oldItemInputs, newItemInputs);
-    batch.set(suggestionsDocRef(group.id), {
-      items: newSuggestions,
-      updatedAt: serverTimestamp(),
-    } as WithFieldValue<SuggestionsDoc>);
+    // Suggestions delta — only written when the hook has finished loading to avoid
+    // overwriting Firestore with a stale [] baseline on fast submits.
+    let newSuggestions: SuggestionEntry[] | null = null;
+    if (suggestionsLoaded) {
+      const oldItemInputs = (items ?? []).map((it) => ({
+        name: it.name,
+        categoryId: it.categoryId,
+        category: it.category,
+      }));
+      const newItemInputs = data.items.map((it) => ({
+        name: it.name,
+        categoryId: it.categoryId,
+        category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
+      }));
+      newSuggestions = computeSuggestionsDelta(suggestions, oldItemInputs, newItemInputs);
+      batch.set(suggestionsDocRef(group.id), {
+        items: newSuggestions,
+        updatedAt: serverTimestamp(),
+      } as WithFieldValue<SuggestionsDoc>);
+    }
 
     await batch.commit();
-    writeCache(group.id, newSuggestions);
+    if (newSuggestions !== null) writeCache(group.id, newSuggestions);
     navigate('/');
     onSuccess?.();
   }

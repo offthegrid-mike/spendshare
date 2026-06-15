@@ -146,7 +146,8 @@ describe('ExpenseEditor', () => {
     vi.clearAllMocks();
     useCategories.mockReturnValue({ all: categories, active: categories, loading: false });
     useItemSuggestions.mockReturnValue([
-      { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 },
+      [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 }],
+      true,
     ]);
     makeBatchMock();
   });
