@@ -5,14 +5,17 @@ import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
 import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { expensesCol, itemsCol } from '../../lib/converters';
+import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
-import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
+import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
+import { computeSuggestionsDelta } from '../../lib/suggestions';
+import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
+import ItemNameCombobox from './ItemNameCombobox';
 
 function useSafeNavigate(): NavigateFunction {
   try {
@@ -63,6 +66,7 @@ interface Props {
 export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess }: Props) {
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
+  const suggestions = useItemSuggestions(group.id);
 
   const defaultItems: FormValues['items'] =
     expense && items && items.length > 0
@@ -181,7 +185,25 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       } as WithFieldValue<ItemDoc>);
     }
 
+    // Suggestions delta — written as part of this batch so it's atomic.
+    const oldItemInputs = (items ?? []).map((it) => ({
+      name: it.name,
+      categoryId: it.categoryId,
+      category: it.category,
+    }));
+    const newItemInputs = data.items.map((it) => ({
+      name: it.name,
+      categoryId: it.categoryId,
+      category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
+    }));
+    const newSuggestions = computeSuggestionsDelta(suggestions, oldItemInputs, newItemInputs);
+    batch.set(suggestionsDocRef(group.id), {
+      items: newSuggestions,
+      updatedAt: serverTimestamp(),
+    } as WithFieldValue<SuggestionsDoc>);
+
     await batch.commit();
+    writeCache(group.id, newSuggestions);
     navigate('/');
     onSuccess?.();
   }
@@ -280,11 +302,22 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         {fields.map((field, index) => (
           <div key={field.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
             {/* Item name */}
-            <input
-              type="text"
-              placeholder="Item name"
-              {...register(`items.${index}.name`)}
-              className="field"
+            <Controller
+              control={control}
+              name={`items.${index}.name`}
+              render={({ field }) => (
+                <ItemNameCombobox
+                  id={`items.${index}.name`}
+                  value={field.value}
+                  suggestions={suggestions}
+                  onChange={(name, suggestion) => {
+                    field.onChange(name);
+                    if (suggestion) {
+                      setValue(`items.${index}.categoryId`, suggestion.categoryId);
+                    }
+                  }}
+                />
+              )}
             />
             {errors.items?.[index]?.name && (
               <p className="text-rose-600 text-sm">{errors.items[index].name?.message}</p>
