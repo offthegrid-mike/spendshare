@@ -61,7 +61,7 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
 
       for (const entry of entries) {
         const amount = toCents(entry.amount && entry.amount !== '' ? entry.amount : '0');
-        if (amount <= 0) continue;
+        if (isNaN(amount) || amount <= 0) continue;
         const newRef = doc(incomeCol(group.id));
         const payload: Omit<IncomeDoc, 'id'> = { uid: currentUserUid, month: selectedMonth, amount };
         if (entry.description.trim()) payload.description = entry.description.trim();
