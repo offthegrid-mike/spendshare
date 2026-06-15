@@ -47,6 +47,12 @@ vi.mock('../src/hooks/useCategories', () => ({
   useCategories: (...args: unknown[]) => useCategories(...args),
 }));
 
+vi.mock('react-day-picker', () => ({
+  DayPicker: () => <div data-testid="mock-day-picker" />,
+}));
+
+vi.mock('react-day-picker/style.css', () => ({}));
+
 // Import the component AFTER mocks are registered.
 import ExpenseEditor from '../src/features/expenses/ExpenseEditor';
 
@@ -250,5 +256,171 @@ describe('ExpenseEditor', () => {
 
     // Both items appear in the DOM
     expect(itemNameInputs).toHaveLength(2);
+  });
+
+  // 7. Gift card — collapsed by default ----------------------------------------
+  it('gift card section is collapsed by default', () => {
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+    expect(screen.queryByLabelText(/gift card amount/i)).not.toBeInTheDocument();
+  });
+
+  // 8. Gift card — expands on toggle -------------------------------------------
+  it('gift card section expands when the toggle button is clicked', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    expect(screen.getByLabelText(/gift card amount/i)).toBeInTheDocument();
+  });
+
+  // 9. Gift card — live totals footer ------------------------------------------
+  it('totals footer shows receipt total, gift card deduction, and net-to-split when amount is entered', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
+    await u.clear(amountInput);
+    await u.type(amountInput, '10.00');
+
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    const gcInput = screen.getByLabelText(/gift card amount/i);
+    await u.clear(gcInput);
+    await u.type(gcInput, '5.30');
+
+    expect(screen.getByText(/10\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/5\.30/)).toBeInTheDocument();
+    expect(screen.getByText(/4\.70/)).toBeInTheDocument();
+  });
+
+  // 10. Gift card — clears on collapse -----------------------------------------
+  it('hides the paid-to-split line when the gift card section is collapsed', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    await u.type(screen.getByLabelText(/gift card amount/i), '5.30');
+    // collapse
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+
+    expect(screen.queryByText(/paid.*to split/i)).not.toBeInTheDocument();
+  });
+
+  // 11. Gift card — submitted as cents -----------------------------------------
+  it('submits giftCardAmount in cents when a gift card amount is entered', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'FairPrice');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Milk');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '10.00');
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    await u.type(screen.getByLabelText(/gift card amount/i), '5.30');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((expCall as any)?.[1]).toMatchObject({ giftCardAmount: 530 });
+  });
+
+  // 12. Gift card — omitted when not set ----------------------------------------
+  it('does not include giftCardAmount in Firestore doc when gift card is not used', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Bread');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '5.00');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((expCall as any)?.[1]).not.toHaveProperty('giftCardAmount');
+  });
+
+  // 13. Remark — field present per item row ------------------------------------
+  it('renders a remark input for each item row', () => {
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+    expect(screen.getByPlaceholderText(/e\.g\. on sale/i)).toBeInTheDocument();
+  });
+
+  // 14. Remark — submitted to Firestore ----------------------------------------
+  it('includes remark in item doc when a remark is entered', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'FairPrice');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Milk');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.50');
+    await u.type(screen.getByPlaceholderText(/e\.g\. on sale/i), 'on sale');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => d?.name === 'Milk');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((itemCall as any)?.[1]).toMatchObject({ remark: 'on sale' });
+  });
+
+  // 15. Remark — omitted when empty --------------------------------------------
+  it('does not include remark in item doc when remark is empty', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Bread');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '5.00');
+    // remark left empty
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => d?.name === 'Bread');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((itemCall as any)?.[1]).not.toHaveProperty('remark');
+  });
+
+  // 16. Edit mode — prefills remark --------------------------------------------
+  it('prefills item remark when editing an expense whose items have remarks', () => {
+    const itemsWithRemark: ItemDoc[] = [
+      { ...savedItems[0], remark: 'on sale' },
+      savedItems[1],
+    ];
+    render(
+      <ExpenseEditor
+        group={group}
+        currentUserUid="u1"
+        expense={savedExpense}
+        items={itemsWithRemark}
+      />,
+    );
+
+    const remarkInputs = screen.getAllByPlaceholderText(/e\.g\. on sale/i);
+    expect((remarkInputs[0] as HTMLInputElement).value).toBe('on sale');
+    expect((remarkInputs[1] as HTMLInputElement).value).toBe('');
+  });
+
+  // 17. Edit mode — prefills gift card -----------------------------------------
+  it('opens gift card section and prefills amount when editing an expense with giftCardAmount', () => {
+    const expenseWithGc: ExpenseDoc = { ...savedExpense, giftCardAmount: 530 };
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={expenseWithGc} items={savedItems} />,
+    );
+
+    // Gift card section should be open
+    const gcInput = screen.getByLabelText(/gift card amount/i) as HTMLInputElement;
+    expect(gcInput).toBeInTheDocument();
+    expect(gcInput.value).toBe('5.30');
   });
 });

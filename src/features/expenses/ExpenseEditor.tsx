@@ -1,7 +1,9 @@
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
+import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
@@ -10,8 +12,8 @@ import { useCategories } from '../../hooks/useCategories';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
+import DatePicker from './DatePicker';
 
-// Safe navigate: returns a no-op when rendered outside a Router (e.g. in tests)
 function useSafeNavigate(): NavigateFunction {
   try {
     return useNavigate();
@@ -28,24 +30,18 @@ const lineItemSchema = z.object({
   categoryId: z.string(),
   amount: z.string().min(1),
   shared: z.boolean(),
+  remark: z.string().optional(),
 });
 
 const schema = z.object({
   date: z.string().min(1, 'Date required'),
   shopName: z.string().min(1, 'Shop name is required'),
   payerUid: z.string().min(1),
+  giftCardAmount: z.string().optional(),
   items: z.array(lineItemSchema).min(1),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-// ---------------------------------------------------------------------------
-// Helper: convert Timestamp seconds to YYYY-MM-DD string for date input
-// ---------------------------------------------------------------------------
-function timestampToDateString(ts: Timestamp): string {
-  const d = new Date(ts.seconds * 1000);
-  return d.toISOString().slice(0, 10);
-}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -65,7 +61,6 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
 
-  // Build default values for edit mode
   const defaultItems: FormValues['items'] =
     expense && items && items.length > 0
       ? items.map((it) => ({
@@ -73,32 +68,54 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
           categoryId: it.categoryId,
           amount: (it.amount / 100).toFixed(2),
           shared: it.shared,
+          remark: it.remark ?? '',
         }))
-      : [{ name: '', categoryId: '', amount: '', shared: true }];
+      : [{ name: '', categoryId: '', amount: '', shared: true, remark: '' }];
 
   const {
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: expense ? timestampToDateString(expense.date) : new Date().toISOString().slice(0, 10),
+      date: expense
+        ? new Date(expense.date.seconds * 1000).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
       shopName: expense?.shopName ?? '',
       payerUid: expense?.payerUid ?? group.memberUids[0] ?? '',
+      giftCardAmount: expense?.giftCardAmount ? (expense.giftCardAmount / 100).toFixed(2) : '',
       items: defaultItems,
     },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
-  // Watch items for running total
+  // Gift card panel state — open by default in edit mode when expense has one
+  const [giftCardOpen, setGiftCardOpen] = useState(() => !!expense?.giftCardAmount);
+
+  function handleGiftCardToggle() {
+    if (giftCardOpen) setValue('giftCardAmount', '');
+    setGiftCardOpen((o) => !o);
+  }
+
+  // Live totals
   const watchedItems = useWatch({ control, name: 'items' });
+  const watchedGiftCard = useWatch({ control, name: 'giftCardAmount' });
+
   const totalCents = (watchedItems ?? []).reduce((sum, it) => {
     const c = toCents(it?.amount ?? '0');
     return sum + (isNaN(c) ? 0 : c);
   }, 0);
+
+  const gcCents = (() => {
+    const v = toCents(watchedGiftCard ?? '0');
+    return !isNaN(v) && v > 0 ? v : 0;
+  })();
+
+  const netCents = totalCents - gcCents;
 
   // ---------------------------------------------------------------------------
   // Submit
@@ -112,8 +129,12 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     const expDate = new Date(data.date);
     const month = monthKey(expDate);
     const total = data.items.reduce((s, it) => s + toCents(it.amount), 0);
+    const giftCardAmountCents =
+      data.giftCardAmount && data.giftCardAmount.trim() !== ''
+        ? toCents(data.giftCardAmount)
+        : undefined;
 
-    batch.set(expRef, {
+    const expenseData = {
       groupId: group.id,
       date: Timestamp.fromDate(expDate),
       month,
@@ -124,9 +145,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       createdByUid: currentUserUid,
       createdAt: expense ? (expense.createdAt ?? serverTimestamp()) : serverTimestamp(),
       updatedAt: serverTimestamp(),
-    } as WithFieldValue<ExpenseDoc>);
+      ...(giftCardAmountCents !== undefined ? { giftCardAmount: giftCardAmountCents } : {}),
+    } as WithFieldValue<ExpenseDoc>;
 
-    // Delete old items before rewriting (edit mode only)
+    batch.set(expRef, expenseData);
+
     if (items && items.length > 0) {
       for (const oldItem of items) {
         batch.delete(doc(itemsCol(group.id, expRef.id), oldItem.id));
@@ -146,6 +169,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         amount: toCents(it.amount),
         shared: it.shared,
         payerUid: data.payerUid,
+        ...(it.remark ? { remark: it.remark } : {}),
       } as WithFieldValue<ItemDoc>);
     }
 
@@ -162,18 +186,24 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       <h1 className="text-xl font-bold tracking-tight text-slate-900">
         {expense ? 'Edit expense' : 'New expense'}
       </h1>
+
       {/* Date */}
       <div>
-        <label htmlFor="date" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="date-picker" className="mb-1 block text-sm font-medium text-slate-700">
           Date
         </label>
-        <input
-          id="date"
-          type="date"
-          {...register('date')}
-          className="field"
+        <Controller
+          control={control}
+          name="date"
+          render={({ field }) => (
+            <DatePicker
+              id="date-picker"
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.date?.message}
+            />
+          )}
         />
-        {errors.date && <p className="text-rose-600 text-sm">{errors.date.message}</p>}
       </div>
 
       {/* Shop Name */}
@@ -181,15 +211,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         <label htmlFor="shopName" className="mb-1 block text-sm font-medium text-slate-700">
           Shop Name
         </label>
-        <input
-          id="shopName"
-          type="text"
-          {...register('shopName')}
-          className="field"
-        />
-        {errors.shopName && (
-          <p className="text-rose-600 text-sm">{errors.shopName.message}</p>
-        )}
+        <input id="shopName" type="text" {...register('shopName')} className="field" />
+        {errors.shopName && <p className="text-rose-600 text-sm">{errors.shopName.message}</p>}
       </div>
 
       {/* Paid by */}
@@ -197,17 +220,47 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         <label htmlFor="payerUid" className="mb-1 block text-sm font-medium text-slate-700">
           Paid by
         </label>
-        <select
-          id="payerUid"
-          {...register('payerUid')}
-          className="field"
-        >
+        <select id="payerUid" {...register('payerUid')} className="field">
           {group.memberUids.map((uid) => (
             <option key={uid} value={uid}>
               {group.members[uid]?.displayName ?? uid}
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Gift card */}
+      <div className="rounded-xl border border-slate-200">
+        <button
+          type="button"
+          aria-label="Gift card"
+          onClick={handleGiftCardToggle}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Gift size={16} className="text-emerald-600" />
+            <span className="text-sm font-medium text-emerald-700">Gift Card</span>
+            <span className="text-xs text-slate-400">(optional)</span>
+          </div>
+          {giftCardOpen
+            ? <ChevronUp size={16} className="text-slate-400" />
+            : <ChevronDown size={16} className="text-slate-400" />}
+        </button>
+        {giftCardOpen && (
+          <div className="border-t border-slate-100 px-4 pb-3 pt-2">
+            <label htmlFor="giftCardAmount" className="mb-1 block text-sm font-medium text-slate-700">
+              Gift card amount
+            </label>
+            <input
+              id="giftCardAmount"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              {...register('giftCardAmount')}
+              className="field"
+            />
+          </div>
+        )}
       </div>
 
       {/* Line items */}
@@ -226,15 +279,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             )}
 
             {/* Category */}
-            <select
-              {...register(`items.${index}.categoryId`)}
-              className="field"
-            >
+            <select {...register(`items.${index}.categoryId`)} className="field">
               <option value="">No category</option>
               {cats.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
 
@@ -255,6 +303,24 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
               />
             </div>
 
+            {/* Remark */}
+            <div>
+              <label
+                htmlFor={`items.${index}.remark`}
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Remark{' '}
+                <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <input
+                id={`items.${index}.remark`}
+                type="text"
+                placeholder="e.g. on sale, for party…"
+                {...register(`items.${index}.remark`)}
+                className="field"
+              />
+            </div>
+
             {/* Shared */}
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -265,7 +331,6 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
               Shared
             </label>
 
-            {/* Remove row */}
             {fields.length > 1 && (
               <button
                 type="button"
@@ -282,16 +347,36 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       {/* Add item */}
       <button
         type="button"
-        onClick={() => append({ name: '', categoryId: '', amount: '', shared: true })}
+        onClick={() => append({ name: '', categoryId: '', amount: '', shared: true, remark: '' })}
         className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
       >
         + Add item
       </button>
 
-      {/* Running total */}
-      <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-right">
-        <span className="text-sm text-slate-500">Total</span>
-        <span className="text-lg font-bold tabular-nums text-slate-900">{formatMoney(totalCents, group.currency)}</span>
+      {/* Totals footer */}
+      <div className="space-y-1.5 border-t border-slate-100 pt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-slate-500">Receipt total</span>
+          <span className="text-base font-semibold tabular-nums text-slate-700">
+            {formatMoney(totalCents, group.currency)}
+          </span>
+        </div>
+        {gcCents > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">🎁 Gift card</span>
+              <span className="text-sm tabular-nums text-emerald-600">
+                − {formatMoney(gcCents, group.currency)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
+              <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
+              <span className="text-lg font-bold tabular-nums text-slate-900">
+                {formatMoney(netCents, group.currency)}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Submit */}
