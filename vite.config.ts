@@ -38,19 +38,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Firestore is excluded: its SDK manages offline persistence internally.
+        // Intercepting Firestore's streaming channels (/Write/channel, /Listen/channel)
+        // with a Workbox cache strategy breaks real-time listeners.
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'firestore-cache',
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-            },
-          },
           {
             urlPattern: /^https:\/\/identitytoolkit\.googleapis\.com\/.*/i,
             handler: 'NetworkFirst',
