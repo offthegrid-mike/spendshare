@@ -15,9 +15,11 @@ function readCache(groupId: string): CacheData | null {
   try {
     const raw = localStorage.getItem(cacheKey(groupId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { items: SuggestionEntry[]; shops?: ShopEntry[]; cachedAt: number };
+    const parsed = JSON.parse(raw) as { items: unknown; shops?: ShopEntry[]; cachedAt: unknown };
+    if (!Array.isArray(parsed.items)) return null;
+    if (typeof parsed.cachedAt !== 'number' || isNaN(parsed.cachedAt)) return null;
     if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) return null;
-    return { items: parsed.items, shops: parsed.shops ?? [] };
+    return { items: parsed.items as SuggestionEntry[], shops: Array.isArray(parsed.shops) ? parsed.shops : [] };
   } catch {
     return null;
   }
