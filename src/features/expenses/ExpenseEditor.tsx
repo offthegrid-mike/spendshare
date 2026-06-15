@@ -55,12 +55,13 @@ interface Props {
   currentUserUid: string;
   expense?: ExpenseDoc;
   items?: ItemDoc[];
+  onSuccess?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function ExpenseEditor({ group, currentUserUid, expense, items }: Props) {
+export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess }: Props) {
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
 
@@ -150,6 +151,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items }:
 
     await batch.commit();
     navigate('/');
+    onSuccess?.();
   }
 
   // ---------------------------------------------------------------------------
