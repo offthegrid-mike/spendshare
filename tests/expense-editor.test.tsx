@@ -462,6 +462,7 @@ describe('ExpenseEditor', () => {
     // The item doc in the batch should carry the pre-filled categoryId
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const itemCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => d?.name === 'Milk');
+    expect(itemCall).toBeDefined();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((itemCall as any)?.[1]).toMatchObject({ categoryId: 'cat1' });
   });
