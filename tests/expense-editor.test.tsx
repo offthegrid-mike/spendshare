@@ -27,6 +27,11 @@ const { useCategories } = vi.hoisted(() => ({
   useCategories: vi.fn(),
 }));
 
+const { useItemSuggestions, writeCache } = vi.hoisted(() => ({
+  useItemSuggestions: vi.fn(),
+  writeCache: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // vi.mock calls
 // ---------------------------------------------------------------------------
@@ -45,6 +50,11 @@ vi.mock('../src/lib/firebase', () => ({
 
 vi.mock('../src/hooks/useCategories', () => ({
   useCategories: (...args: unknown[]) => useCategories(...args),
+}));
+
+vi.mock('../src/hooks/useItemSuggestions', () => ({
+  useItemSuggestions: (...args: unknown[]) => useItemSuggestions(...args),
+  writeCache: (...args: unknown[]) => writeCache(...args),
 }));
 
 vi.mock('react-day-picker', () => ({
@@ -135,6 +145,10 @@ describe('ExpenseEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCategories.mockReturnValue({ all: categories, active: categories, loading: false });
+    useItemSuggestions.mockReturnValue([
+      [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 }],
+      true,
+    ]);
     makeBatchMock();
   });
 
@@ -422,5 +436,58 @@ describe('ExpenseEditor', () => {
     const gcInput = screen.getByLabelText(/gift card amount/i) as HTMLInputElement;
     expect(gcInput).toBeInTheDocument();
     expect(gcInput.value).toBe('5.30');
+  });
+
+  // 18. Autocomplete — category pre-fill ------------------------------------
+  it('pre-fills the category when an autocomplete suggestion is selected', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+
+    // Type to trigger the suggestion dropdown
+    const nameInput = screen.getByPlaceholderText(/item name/i);
+    await u.type(nameInput, 'Mi');
+
+    // Select the 'Milk' suggestion (categoryId: 'cat1')
+    const option = await screen.findByRole('option', { name: /Milk/i });
+    await u.click(option);
+
+    // Fill amount to satisfy validation
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.50');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // The item doc in the batch should carry the pre-filled categoryId
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => d?.name === 'Milk');
+    expect(itemCall).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((itemCall as any)?.[1]).toMatchObject({ categoryId: 'cat1' });
+  });
+
+  // 19. Autocomplete — suggestions doc written in batch --------------------
+  it('includes a suggestions doc write in writeBatch when expense is saved', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.00');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // One of the batch.set() calls should be for the suggestions document
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const suggestionsCall = setSpy.mock.calls.find(([ref]: [any]) =>
+      String(ref?.path ?? '').includes('suggestions'),
+    );
+    expect(suggestionsCall).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((suggestionsCall as any)[1]).toMatchObject({ items: expect.any(Array) });
   });
 });

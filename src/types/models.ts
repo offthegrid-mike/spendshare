@@ -36,6 +36,18 @@ export interface SettlementDoc {
   paid: boolean; paidAt?: Timestamp; markedByUid?: Uid;
 }
 
+export interface SuggestionEntry {
+  name: string;
+  categoryId: string;
+  category: string;
+  count: number;
+}
+
+export interface SuggestionsDoc {
+  items: SuggestionEntry[];
+  updatedAt: Timestamp;
+}
+
 export const itemSchema = z.object({
   groupId: z.string(), expenseId: z.string(), month: z.string().regex(/^\d{4}-\d{2}$/),
   name: z.string().min(1), categoryId: z.string(), category: z.string(),

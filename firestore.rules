@@ -114,6 +114,10 @@ service cloud.firestore {
           && (!('amount' in request.resource.data)
               || (request.resource.data.amount is number && request.resource.data.amount >= 0));
       }
+      match /suggestions/{doc} {
+        allow read: if isMember(groupId);
+        allow write: if isMember(groupId);
+      }
     }
 
     match /{path=**}/items/{itemId} {
