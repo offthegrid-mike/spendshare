@@ -7,6 +7,8 @@ interface ShopNameComboboxProps {
   onChange: (name: string) => void;
   suggestions: ShopEntry[];
   placeholder?: string;
+  id?: string;
+  'aria-label'?: string;
 }
 
 export default function ShopNameCombobox({
@@ -14,6 +16,8 @@ export default function ShopNameCombobox({
   onChange,
   suggestions,
   placeholder = 'Shop name',
+  id,
+  'aria-label': ariaLabel,
 }: ShopNameComboboxProps) {
   // Internal display value tracks what the user has typed; syncs with prop on external changes.
   const [inputValue, setInputValue] = useState(value);
@@ -102,6 +106,7 @@ export default function ShopNameCombobox({
     <div ref={containerRef} className="relative">
       <input
         ref={inputRef}
+        id={id}
         type="text"
         dir="auto"
         role="combobox"
@@ -109,6 +114,7 @@ export default function ShopNameCombobox({
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}
         aria-activedescendant={activeId}
+        aria-label={ariaLabel}
         value={inputValue}
         placeholder={placeholder}
         className="field"

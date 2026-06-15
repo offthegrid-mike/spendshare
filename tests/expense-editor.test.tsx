@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Timestamp } from 'firebase/firestore';
-import type { GroupDoc, ExpenseDoc, ItemDoc, CategoryDoc } from '../src/types/models';
+import type { GroupDoc, ExpenseDoc, ItemDoc, CategoryDoc, ShopEntry } from '../src/types/models';
 
 const nullTs = null as unknown as Timestamp;
 
@@ -437,6 +437,31 @@ describe('ExpenseEditor', () => {
     const gcInput = screen.getByLabelText(/gift card amount/i) as HTMLInputElement;
     expect(gcInput).toBeInTheDocument();
     expect(gcInput.value).toBe('5.30');
+  });
+
+  // 20. Shop autocomplete — combobox rendered ---------------------------------
+  it('renders ShopNameCombobox for shop name field', () => {
+    render(<ExpenseEditor group={group} currentUserUid="u1" onClose={vi.fn()} />);
+    // ShopNameCombobox renders an input with role="combobox" labelled "Shop Name"
+    expect(screen.getByRole('combobox', { name: /shop name/i })).toBeInTheDocument();
+  });
+
+  // 21. Shop autocomplete — suggestions passed to ShopNameCombobox -----------
+  it('passes shop suggestions from useItemSuggestions to ShopNameCombobox', () => {
+    const mockShops: ShopEntry[] = [{ name: 'Woolworths', count: 5 }];
+    // Override the mock persistently for this test to return shop suggestions
+    (useItemSuggestions as ReturnType<typeof vi.fn>).mockReturnValue([
+      [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 }],
+      mockShops,
+      true,
+    ]);
+    render(<ExpenseEditor group={group} currentUserUid="u1" onClose={vi.fn()} />);
+    // Type in the shop combobox to trigger suggestions
+    const combobox = screen.getByRole('combobox', { name: /shop name/i });
+    act(() => {
+      fireEvent.change(combobox, { target: { value: 'W' } });
+    });
+    expect(screen.getByText(/Woolworths/i)).toBeInTheDocument();
   });
 
   // 18. Autocomplete — category pre-fill ------------------------------------

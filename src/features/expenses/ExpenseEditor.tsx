@@ -10,12 +10,13 @@ import { toCents, formatMoney } from '../../lib/money';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
-import { computeSuggestionsDelta } from '../../lib/suggestions';
-import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry } from '../../types/models';
+import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
+import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ItemNameCombobox from './ItemNameCombobox';
+import ShopNameCombobox from './ShopNameCombobox';
 
 function useSafeNavigate(): NavigateFunction {
   try {
@@ -66,7 +67,7 @@ interface Props {
 export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess }: Props) {
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
-  const [suggestions, suggestionsLoaded] = useItemSuggestions(group.id);
+  const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
   const defaultItems: FormValues['items'] =
     expense && items && items.length > 0
@@ -188,6 +189,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     // Suggestions delta — only written when the hook has finished loading to avoid
     // overwriting Firestore with a stale [] baseline on fast submits.
     let newSuggestions: SuggestionEntry[] | null = null;
+    let newShops: ShopEntry[] | null = null;
     if (suggestionsLoaded) {
       const oldItemInputs = (items ?? []).map((it) => ({
         name: it.name,
@@ -200,14 +202,22 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
       }));
       newSuggestions = computeSuggestionsDelta(suggestions, oldItemInputs, newItemInputs);
+
+      const oldShop = expense?.shopName?.trim() ?? '';
+      const newShop = data.shopName?.trim() ?? '';
+      const removedShops = oldShop && oldShop !== newShop ? [oldShop] : [];
+      const addedShops = newShop && newShop !== oldShop ? [newShop] : [];
+      newShops = computeShopsDelta(shopSuggestions, removedShops, addedShops);
+
       batch.set(suggestionsDocRef(group.id), {
         items: newSuggestions,
+        shops: newShops,
         updatedAt: serverTimestamp(),
       } as WithFieldValue<SuggestionsDoc>);
     }
 
     await batch.commit();
-    if (newSuggestions !== null) writeCache(group.id, newSuggestions);
+    if (newSuggestions !== null && newShops !== null) writeCache(group.id, newSuggestions, newShops);
     navigate('/');
     onSuccess?.();
   }
@@ -245,7 +255,19 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         <label htmlFor="shopName" className="mb-1 block text-sm font-medium text-slate-700">
           Shop Name
         </label>
-        <input id="shopName" type="text" {...register('shopName')} className="field" />
+        <Controller
+          control={control}
+          name="shopName"
+          render={({ field }) => (
+            <ShopNameCombobox
+              id="shopName"
+              value={field.value ?? ''}
+              suggestions={shopSuggestions}
+              onChange={field.onChange}
+              placeholder="Shop name (optional)"
+            />
+          )}
+        />
         {errors.shopName && <p className="text-rose-600 text-sm">{errors.shopName.message}</p>}
       </div>
 
