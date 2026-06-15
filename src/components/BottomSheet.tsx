@@ -11,7 +11,8 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
   const startYRef = useRef<number | null>(null);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
+    if (!open || window.innerWidth >= 640) return;
+    document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
@@ -38,18 +39,21 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
       />
       <div
         className="absolute bottom-0 left-0 right-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sheet-title"
       >
         <div className="flex justify-center pt-3 pb-1">
           <div
             className="h-1 w-10 rounded-full bg-slate-300"
             data-testid="sheet-handle"
             aria-hidden="true"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           />
         </div>
-        <div className="px-4 pb-safe-bottom pb-6">
-          <h2 className="mb-4 text-lg font-bold text-slate-900">{title}</h2>
+        <div className="px-4 pb-8">
+          <h2 id="sheet-title" className="mb-4 text-lg font-bold text-slate-900">{title}</h2>
           {children}
         </div>
       </div>
