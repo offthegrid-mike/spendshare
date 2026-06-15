@@ -67,7 +67,7 @@ export default function ExpenseList({ group }: Props) {
   const grouped: { label: string; exps: ExpenseDoc[] }[] = [];
   for (const exp of expenses) {
     const label = exp.date
-      ? format(new Date(exp.date.seconds * 1000), 'MMM d')
+      ? format(exp.date.toDate(), 'MMM d')
       : '';
     const last = grouped[grouped.length - 1];
     if (last && last.label === label) {

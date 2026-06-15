@@ -80,7 +80,7 @@ describe('ExpenseList', () => {
       ...mockExpense,
       id: 'e2',
       // 2026-06-12 noon UTC — safe for all UTC+ and UTC-8 timezones
-      date: { seconds: 1781352000, nanoseconds: 0 },
+      date: { seconds: 1781352000, nanoseconds: 0, toDate: () => new Date(1781352000 * 1000) },
     } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     mockUseMonthExpenses.mockReturnValue({
       expenses: [expWithDate],
@@ -97,7 +97,7 @@ describe('ExpenseList', () => {
     const expWithDate = {
       ...mockExpense,
       id: 'e3',
-      date: { seconds: 1781352000, nanoseconds: 0 },
+      date: { seconds: 1781352000, nanoseconds: 0, toDate: () => new Date(1781352000 * 1000) },
     } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     const itemWithCat = {
       id: 'i1', name: 'Milk', amount: 350, categoryId: 'c1',
