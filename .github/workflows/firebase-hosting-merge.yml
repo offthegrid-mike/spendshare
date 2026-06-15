@@ -11,6 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      VITE_FB_API_KEY: ${{ secrets.VITE_FB_API_KEY }}
+      VITE_FB_AUTH_DOMAIN: ${{ secrets.VITE_FB_AUTH_DOMAIN }}
+      VITE_FB_PROJECT_ID: ${{ secrets.VITE_FB_PROJECT_ID }}
+      VITE_FB_STORAGE_BUCKET: ${{ secrets.VITE_FB_STORAGE_BUCKET }}
+      VITE_FB_SENDER_ID: ${{ secrets.VITE_FB_SENDER_ID }}
+      VITE_FB_APP_ID: ${{ secrets.VITE_FB_APP_ID }}
     steps:
       - uses: actions/checkout@v4
       - run: npm ci && npm run build
