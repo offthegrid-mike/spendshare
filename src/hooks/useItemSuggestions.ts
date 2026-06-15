@@ -33,20 +33,22 @@ export function useItemSuggestions(groupId: string): SuggestionEntry[] {
   const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const cached = readCache(groupId);
-    if (cached) {
-      setSuggestions(cached);
-      return;
-    }
-    getDoc(suggestionsDocRef(groupId))
-      .then((snap) => {
-        const items: SuggestionEntry[] = snap.exists() ? (snap.data().items ?? []) : [];
-        setSuggestions(items);
-        writeCache(groupId, items);
-      })
-      .catch(() => {
-        // offline or permission error — stay empty, form still works
-      });
+    const load: Promise<SuggestionEntry[]> = cached
+      ? Promise.resolve(cached)
+      : getDoc(suggestionsDocRef(groupId)).then((snap) => {
+          const items: SuggestionEntry[] = snap.exists() ? (snap.data().items ?? []) : [];
+          writeCache(groupId, items);
+          return items;
+        });
+
+    load
+      .then((items) => { if (!cancelled) setSuggestions(items); })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
   }, [groupId]);
 
   return suggestions;

@@ -61,8 +61,6 @@ export default function ItemNameCombobox({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  useEffect(() => { setActiveIndex(-1); }, [value]);
-
   function handleSelect(suggestion: SuggestionEntry) {
     onChange(suggestion.name, suggestion);
     setOpen(false);
@@ -121,7 +119,7 @@ export default function ItemNameCombobox({
         placeholder={placeholder}
         className="field"
         autoComplete="off"
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setActiveIndex(-1); }}
         onFocus={() => { if (filtered.length > 0) setOpen(true); }}
         onKeyDown={handleKeyDown}
       />
