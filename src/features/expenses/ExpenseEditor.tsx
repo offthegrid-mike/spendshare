@@ -37,7 +37,10 @@ const schema = z.object({
   date: z.string().min(1, 'Date required'),
   shopName: z.string().min(1, 'Shop name is required'),
   payerUid: z.string().min(1),
-  giftCardAmount: z.string().optional(),
+  giftCardAmount: z.string().optional().refine(
+    (v) => !v || !isNaN(parseFloat(v)),
+    { message: 'Enter a valid amount' }
+  ),
   items: z.array(lineItemSchema).min(1),
 });
 
@@ -133,6 +136,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       data.giftCardAmount && data.giftCardAmount.trim() !== ''
         ? toCents(data.giftCardAmount)
         : undefined;
+
+    if (giftCardAmountCents !== undefined && giftCardAmountCents > total) {
+      // Caught by live UI warning, but guard at submit too
+      return;
+    }
 
     const expenseData = {
       groupId: group.id,
@@ -234,6 +242,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         <button
           type="button"
           aria-label="Gift card"
+          aria-expanded={giftCardOpen}
           onClick={handleGiftCardToggle}
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
@@ -259,6 +268,9 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
               {...register('giftCardAmount')}
               className="field"
             />
+            {errors.giftCardAmount && (
+              <p className="mt-1 text-sm text-rose-600">{errors.giftCardAmount.message}</p>
+            )}
           </div>
         )}
       </div>
@@ -361,6 +373,9 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             {formatMoney(totalCents, group.currency)}
           </span>
         </div>
+        {gcCents > 0 && netCents < 0 && (
+          <p className="text-sm text-rose-600">Gift card amount exceeds receipt total</p>
+        )}
         {gcCents > 0 && (
           <>
             <div className="flex items-center justify-between">

@@ -42,7 +42,7 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
       <button
         id={id}
         type="button"
-        aria-label={label}
+        aria-label={`Date: ${label}`}
         onClick={() => setOpen((o) => !o)}
         className="field flex w-full items-center justify-between text-left"
       >
