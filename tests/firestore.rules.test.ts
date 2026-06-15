@@ -394,32 +394,25 @@ describe('/groups financial sub-collection validation (M-2)', () => {
     await testEnv.cleanup();
   });
 
-  // --- Income author binding ---
-  it('denies a member writing income under another member uid (doc id)', async () => {
+  // --- Income author binding (auto-generated IDs) ---
+  it('allows a member creating their own income with auto-ID (uid field matches)', async () => {
     const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
-    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'userA_2026-06'), {
-      uid: 'userA', month: '2026-06', amount: 500000,
-    }));
-  });
-
-  it('denies income write whose uid field is another member', async () => {
-    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
-    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'userB_2026-06'), {
-      uid: 'userA', month: '2026-06', amount: 500000,
-    }));
-  });
-
-  it('denies negative income amount', async () => {
-    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
-    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'userB_2026-06'), {
-      uid: 'userB', month: '2026-06', amount: -100,
-    }));
-  });
-
-  it('allows a member writing their own income (with description)', async () => {
-    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
-    await assertSucceeds(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'userB_2026-06'), {
+    await assertSucceeds(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'randomAutoId1'), {
       uid: 'userB', month: '2026-06', amount: 500000, description: 'Salary',
+    }));
+  });
+
+  it('denies creating income when data.uid does not match auth uid', async () => {
+    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
+    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'randomAutoId2'), {
+      uid: 'userA', month: '2026-06', amount: 500000,
+    }));
+  });
+
+  it('denies income with negative amount', async () => {
+    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
+    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'randomAutoId3'), {
+      uid: 'userB', month: '2026-06', amount: -100,
     }));
   });
 
