@@ -1,4 +1,4 @@
-import type { SuggestionEntry } from '../types/models';
+import type { SuggestionEntry, ShopEntry } from '../types/models';
 
 type ItemInput = { name: string; categoryId: string; category: string };
 
@@ -39,6 +39,39 @@ export function computeSuggestionsDelta(
         category: item.category,
         count: 1,
       });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+export function computeShopsDelta(
+  current: ShopEntry[],
+  removed: string[],
+  added: string[],
+): ShopEntry[] {
+  const map = new Map<string, ShopEntry>();
+  for (const entry of current) {
+    map.set(entry.name.normalize('NFC').toLocaleLowerCase(), { ...entry });
+  }
+
+  for (const name of removed) {
+    const key = name.normalize('NFC').toLocaleLowerCase();
+    const entry = map.get(key);
+    if (entry) {
+      entry.count -= 1;
+      if (entry.count <= 0) map.delete(key);
+    }
+  }
+
+  for (const name of added) {
+    const key = name.normalize('NFC').toLocaleLowerCase();
+    const existing = map.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.name = name;
+    } else {
+      map.set(key, { name, count: 1 });
     }
   }
 

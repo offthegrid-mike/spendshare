@@ -84,3 +84,56 @@ describe('computeSuggestionsDelta', () => {
     expect(result.find((e) => e.name === 'Eggs')?.count).toBe(1);
   });
 });
+
+import { computeShopsDelta } from '../src/lib/suggestions';
+import type { ShopEntry } from '../src/types/models';
+
+describe('computeShopsDelta', () => {
+  it('adds a new shop at count 1', () => {
+    const result = computeShopsDelta([], [], ['Woolworths']);
+    expect(result).toEqual([{ name: 'Woolworths', count: 1 }]);
+  });
+
+  it('increments count for an existing shop', () => {
+    const current: ShopEntry[] = [{ name: 'Woolworths', count: 3 }];
+    const result = computeShopsDelta(current, [], ['Woolworths']);
+    expect(result[0].count).toBe(4);
+  });
+
+  it('decrements count for removed shop', () => {
+    const current: ShopEntry[] = [{ name: 'Woolworths', count: 2 }];
+    const result = computeShopsDelta(current, ['Woolworths'], []);
+    expect(result[0].count).toBe(1);
+  });
+
+  it('removes shop when count reaches zero', () => {
+    const current: ShopEntry[] = [{ name: 'Woolworths', count: 1 }];
+    const result = computeShopsDelta(current, ['Woolworths'], []);
+    expect(result.find((s) => s.name === 'Woolworths')).toBeUndefined();
+  });
+
+  it('is case-insensitive; most-recent casing wins', () => {
+    const current: ShopEntry[] = [{ name: 'ALDI', count: 1 }];
+    const result = computeShopsDelta(current, [], ['aldi']);
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(2);
+    expect(result[0].name).toBe('aldi');
+  });
+
+  it('handles simultaneous remove-old and add-new on edit', () => {
+    const current: ShopEntry[] = [{ name: 'Coles', count: 2 }];
+    const result = computeShopsDelta(current, ['Coles'], ['Woolworths']);
+    expect(result.find((s) => s.name === 'Coles')?.count).toBe(1);
+    expect(result.find((s) => s.name === 'Woolworths')?.count).toBe(1);
+  });
+
+  it('returns entries sorted by count descending', () => {
+    const current: ShopEntry[] = [
+      { name: 'Woolworths', count: 5 },
+      { name: 'Coles', count: 2 },
+    ];
+    const result = computeShopsDelta(current, [], ['Coles']);
+    expect(result[0].name).toBe('Woolworths');
+    expect(result[1].name).toBe('Coles');
+  });
+});
