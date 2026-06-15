@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Trash2, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { formatMoney } from '../../lib/money';
 import { useUIStore } from '../../stores/uiStore';
@@ -62,69 +63,102 @@ export default function ExpenseList({ group }: Props) {
     );
   }
 
+  // Group expenses by date label for section headers
+  const grouped: { label: string; exps: ExpenseDoc[] }[] = [];
+  for (const exp of expenses) {
+    const label = exp.date
+      ? format(new Date(exp.date.seconds * 1000), 'MMM d')
+      : '';
+    const last = grouped[grouped.length - 1];
+    if (last && last.label === label) {
+      last.exps.push(exp);
+    } else {
+      grouped.push({ label, exps: [exp] });
+    }
+  }
+
   return (
-    <div className="space-y-2.5">
-      {expenses.map((exp) => {
-        const items = itemsByExpense[exp.id] ?? [];
-        const isExpanded = expandedId === exp.id;
-        const isDeleting = deletingId === exp.id;
-        return (
-          <div
-            key={exp.id}
-            className="rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm transition-shadow hover:shadow-card-hover"
-          >
-            <div className="flex items-center gap-3 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setExpandedId(isExpanded ? null : exp.id)}
-                className="flex flex-1 items-center gap-3 text-left"
-              >
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                  <ShoppingBag size={18} />
+    <div className="space-y-4">
+      {grouped.map(({ label, exps }) => (
+        <div key={label || 'no-date'}>
+          {label && (
+            <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {label}
+            </p>
+          )}
+          <div className="space-y-2.5">
+            {exps.map((exp) => {
+              const items = itemsByExpense[exp.id] ?? [];
+              const isExpanded = expandedId === exp.id;
+              const isDeleting = deletingId === exp.id;
+              const primaryCategory = items[0]?.category;
+              return (
+                <div
+                  key={exp.id}
+                  className="rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm transition-shadow hover:shadow-card-hover"
+                >
+                  <div className="flex min-h-[44px] items-center gap-3 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isExpanded ? null : exp.id)}
+                      className="flex flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                        <ShoppingBag size={18} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">{exp.shopName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-400">
+                            {payerName(exp.payerUid)} · {exp.itemCount} item{exp.itemCount !== 1 ? 's' : ''}
+                          </p>
+                          {primaryCategory && (
+                            <span className="inline-flex items-center rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
+                              {primaryCategory}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-base font-bold tabular-nums text-slate-900">
+                        {formatMoney(exp.total, group.currency)}
+                      </span>
+                      {isExpanded
+                        ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
+                        : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
+                    </button>
+                    <Link
+                      to={`/expense/${exp.id}/edit`}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={15} />
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() => void handleDelete(exp, items)}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
+                      title="Delete"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  {isExpanded && items.length > 0 && (
+                    <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
+                      {items.map((it) => (
+                        <li key={it.id} className="flex items-center justify-between text-sm text-slate-600">
+                          <span>{it.name}</span>
+                          <span className="tabular-nums text-slate-400">{formatMoney(it.amount, group.currency)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-900">{exp.shopName}</p>
-                  <p className="text-xs text-slate-400">
-                    {payerName(exp.payerUid)} · {exp.itemCount} item{exp.itemCount !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <span className="text-base font-bold tabular-nums text-slate-900">
-                  {formatMoney(exp.total, group.currency)}
-                </span>
-                {isExpanded
-                  ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
-                  : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
-              </button>
-              <Link
-                to={`/expense/${exp.id}/edit`}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
-                title="Edit"
-              >
-                <Pencil size={15} />
-              </Link>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => void handleDelete(exp, items)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
-                title="Delete"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-            {isExpanded && items.length > 0 && (
-              <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
-                {items.map((it) => (
-                  <li key={it.id} className="flex items-center justify-between text-sm text-slate-600">
-                    <span>{it.name}</span>
-                    <span className="tabular-nums text-slate-400">{formatMoney(it.amount, group.currency)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
       {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
     </div>
   );
