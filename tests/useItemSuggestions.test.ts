@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import type { SuggestionEntry } from '../src/types/models';
+import type { SuggestionEntry, ShopEntry } from '../src/types/models';
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -15,12 +15,10 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('../src/lib/firebase', () => ({ db: { _mock: true } }));
-
 vi.mock('../src/lib/converters', () => ({
   suggestionsDocRef: vi.fn((gid: string) => ({ path: `groups/${gid}/suggestions/index` })),
 }));
 
-// Import AFTER mocks are registered.
 import { useItemSuggestions, writeCache } from '../src/hooks/useItemSuggestions';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +27,7 @@ import { useItemSuggestions, writeCache } from '../src/hooks/useItemSuggestions'
 const suggestions: SuggestionEntry[] = [
   { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 },
 ];
+const shops: ShopEntry[] = [{ name: 'Woolworths', count: 3 }];
 
 const CACHE_KEY = 'suggestions_g1';
 
@@ -38,60 +37,83 @@ describe('useItemSuggestions', () => {
     vi.clearAllMocks();
   });
 
-  it('returns [[], false] synchronously before async load completes', () => {
-    getDoc.mockReturnValue(new Promise(() => {})); // never resolves
+  it('returns [[], [], false] synchronously before async load completes', () => {
+    getDoc.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useItemSuggestions('g1'));
     expect(result.current[0]).toEqual([]);
-    expect(result.current[1]).toBe(false);
+    expect(result.current[1]).toEqual([]);
+    expect(result.current[2]).toBe(false);
   });
 
-  it('fetches from Firestore on cache miss and returns suggestions with loaded=true', async () => {
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions }) });
+  it('fetches from Firestore on cache miss and returns items+shops with loaded=true', async () => {
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ items: suggestions, shops }),
+    });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
-    expect(result.current[1]).toBe(true);
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    expect(result.current[0]).toEqual(suggestions);
+    expect(result.current[1]).toEqual(shops);
     expect(getDoc).toHaveBeenCalledTimes(1);
   });
 
-  it('reads from localStorage without calling Firestore when cache is fresh', async () => {
-    writeCache('g1', suggestions);
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [] }) });
+  it('returns empty shops array when Firestore doc has no shops field', async () => {
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ items: suggestions }), // no shops field
+    });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
-    expect(result.current[1]).toBe(true);
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    expect(result.current[1]).toEqual([]);
+  });
+
+  it('reads from localStorage without calling Firestore when cache is fresh', async () => {
+    writeCache('g1', suggestions, shops);
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [], shops: [] }) });
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    expect(result.current[0]).toEqual(suggestions);
+    expect(result.current[1]).toEqual(shops);
     expect(getDoc).not.toHaveBeenCalled();
   });
 
   it('fetches from Firestore when cache is stale (>24 h)', async () => {
-    const stale = { items: [{ name: 'Old', categoryId: 'x', category: 'X', count: 1 }], cachedAt: Date.now() - 25 * 60 * 60 * 1000 };
+    const stale = {
+      items: [{ name: 'Old', categoryId: 'x', category: 'X', count: 1 }],
+      shops: [],
+      cachedAt: Date.now() - 25 * 60 * 60 * 1000,
+    };
     localStorage.setItem(CACHE_KEY, JSON.stringify(stale));
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions }) });
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
-    expect(result.current[1]).toBe(true);
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    expect(result.current[0]).toEqual(suggestions);
     expect(getDoc).toHaveBeenCalledTimes(1);
   });
 
-  it('returns [[], true] and does not throw when Firestore errors', async () => {
+  it('returns [[], [], true] and does not throw when Firestore errors', async () => {
     getDoc.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[1]).toBe(true));
+    await waitFor(() => expect(result.current[2]).toBe(true));
     expect(result.current[0]).toEqual([]);
+    expect(result.current[1]).toEqual([]);
   });
 
-  it('returns [[], true] when Firestore doc does not exist yet', async () => {
+  it('returns [[], [], true] when Firestore doc does not exist', async () => {
     getDoc.mockResolvedValue({ exists: () => false });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[1]).toBe(true));
+    await waitFor(() => expect(result.current[2]).toBe(true));
     expect(result.current[0]).toEqual([]);
+    expect(result.current[1]).toEqual([]);
   });
 
-  it('writeCache stores items and is readable by the hook', async () => {
-    writeCache('g1', suggestions);
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [] }) });
+  it('writeCache stores items+shops and is readable by the hook', async () => {
+    writeCache('g1', suggestions, shops);
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [], shops: [] }) });
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[0]).toEqual(suggestions));
-    expect(result.current[1]).toBe(true);
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    expect(result.current[0]).toEqual(suggestions);
+    expect(result.current[1]).toEqual(shops);
     expect(getDoc).not.toHaveBeenCalled();
   });
 });

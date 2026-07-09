@@ -1,36 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Timestamp } from 'firebase/firestore';
 import type { GroupDoc, IncomeDoc } from '../src/types/models';
 
 const nullTs = null as unknown as Timestamp;
 
-// ---------------------------------------------------------------------------
-// Hoisted mocks
-// ---------------------------------------------------------------------------
-
-const { setDoc, doc } = vi.hoisted(() => ({
-  setDoc: vi.fn().mockResolvedValue(undefined),
-  doc: vi.fn((_col: unknown, id: string) => ({ _id: id })),
+const mockBatchSet = vi.fn();
+const mockBatchDelete = vi.fn();
+const mockBatchCommit = vi.fn().mockResolvedValue(undefined);
+const mockDoc = vi.fn(() => ({ _id: 'new-auto-id' }));
+const mockWriteBatch = vi.fn(() => ({
+  set: mockBatchSet,
+  delete: mockBatchDelete,
+  commit: mockBatchCommit,
 }));
 
-// ---------------------------------------------------------------------------
-// vi.mock calls
-// ---------------------------------------------------------------------------
-
 vi.mock('firebase/firestore', () => ({
-  setDoc: (...args: unknown[]) => setDoc(...args),
-  doc: (...args: unknown[]) => doc(...(args as Parameters<typeof doc>)),
+  writeBatch: (...args: unknown[]) => mockWriteBatch(...args),
+  doc: (...args: unknown[]) => mockDoc(...args),
   collection: vi.fn((_db: unknown, path: string) => ({ _path: path })),
   getFirestore: vi.fn(),
 }));
 
-vi.mock('../src/lib/firebase', () => ({
-  db: { _isMockDb: true },
-}));
+vi.mock('../src/lib/firebase', () => ({ db: { _isMockDb: true } }));
 
-// Mock converters — incomeCol returns a fake typed collection ref.
 vi.mock('../src/lib/converters', () => ({
   incomeCol: (gid: string) => ({ _path: `groups/${gid}/income` }),
   usersCol: {},
@@ -42,18 +36,10 @@ vi.mock('../src/lib/converters', () => ({
   settlementsCol: vi.fn(),
 }));
 
-// Import the component AFTER all mocks are in place.
 import IncomeEditor from '../src/features/income/IncomeEditor';
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
 const group: GroupDoc = {
-  id: 'g1',
-  name: 'Test Group',
-  currency: 'AUD',
-  ownerUid: 'u1',
+  id: 'g1', name: 'Test Group', currency: 'AUD', ownerUid: 'u1',
   members: {
     u1: { role: 'owner', displayName: 'Alice', email: 'alice@ex.com', joinedAt: nullTs },
     u2: { role: 'member', displayName: 'Bob', email: 'bob@ex.com', joinedAt: nullTs },
@@ -64,171 +50,136 @@ const group: GroupDoc = {
 
 const selectedMonth = '2026-06';
 
-const existingIncome: IncomeDoc[] = [
-  { uid: 'u1', month: '2026-06', amount: 500000 }, // $5 000.00 in cents
-  { uid: 'u2', month: '2026-06', amount: 300000 },
-];
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('IncomeEditor', () => {
+describe('IncomeEditor (multi-entry)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setDoc.mockResolvedValue(undefined);
+    mockWriteBatch.mockReturnValue({
+      set: mockBatchSet,
+      delete: mockBatchDelete,
+      commit: mockBatchCommit,
+    });
+    mockBatchCommit.mockResolvedValue(undefined);
   });
 
-  // 1. Renders one row per group member ----------------------------------------
-  it('renders one row per group member showing their display name', () => {
+  it('renders "Your income" section and other member names', () => {
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={[]}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
     );
-
-    // Current user (Alice) shows "Your income" section instead of their name
     expect(screen.getByText(/your income/i)).toBeInTheDocument();
     expect(screen.getByText(/Bob/i)).toBeInTheDocument();
   });
 
-  // 2. Only the current user's row has an editable input; others are read-only --
-  it('renders an editable input only for the current user, read-only display for others', () => {
+  it('starts with one empty amount input and one description input', () => {
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={[]}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
     );
-
-    // Only one editable input (for current user u1)
-    const amountInputs = screen.getAllByRole('spinbutton'); // <input type="number">
-    expect(amountInputs).toHaveLength(1);
-
-    // Bob's row should show a read-only placeholder
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('0.00')).toHaveLength(1);
+    expect(screen.getAllByPlaceholderText(/salary|freelance/i)).toHaveLength(1);
   });
 
-  // 3. Pre-fills existing income amounts for current user -----------------------
-  it('pre-fills the current user income input with their existing amount', () => {
+  it('pre-fills amount and description from a single existing income entry', () => {
+    const income: IncomeDoc[] = [
+      { id: 'doc1', uid: 'u1', month: selectedMonth, amount: 500000, description: 'My salary' },
+    ];
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={existingIncome}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={income} />,
     );
-
-    const amountInput = screen.getByRole('spinbutton') as HTMLInputElement;
-
-    // The input for u1 should be pre-filled with their amount (5000.00 from 500000 cents)
-    expect(parseFloat(amountInput.value)).toBeGreaterThan(0);
+    expect((screen.getByPlaceholderText('0.00') as HTMLInputElement).value).toBe('5000.00');
+    expect((screen.getByPlaceholderText(/salary|freelance/i) as HTMLInputElement).value).toBe('My salary');
   });
 
-  // 3b. Other member's existing income is shown as read-only text ---------------
-  it('shows other members existing income as read-only text', () => {
+  it('pre-fills two rows when user has two existing income entries', () => {
+    const income: IncomeDoc[] = [
+      { id: 'doc1', uid: 'u1', month: selectedMonth, amount: 500000, description: 'Salary' },
+      { id: 'doc2', uid: 'u1', month: selectedMonth, amount: 100000, description: 'Freelance' },
+    ];
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={existingIncome}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={income} />,
     );
+    expect(screen.getAllByPlaceholderText('0.00')).toHaveLength(2);
+    expect(screen.getAllByPlaceholderText(/salary|freelance/i)).toHaveLength(2);
+  });
 
-    // Bob's income (300000 cents = 3000.00) should be shown as display text with currency formatting
+  it('shows other members existing income total as formatted text', () => {
+    const income: IncomeDoc[] = [
+      { id: 'doc3', uid: 'u2', month: selectedMonth, amount: 300000 },
+    ];
+    render(
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={income} />,
+    );
     expect(screen.getByText(/3[,.]?000/)).toBeInTheDocument();
   });
 
-  // 4. On save, calls setDoc only for current user with deterministic id ---------
-  it('calls setDoc only for the current user with id ${uid}_${month} on save', async () => {
+  it('"+ Add income source" button appends a new empty entry row', async () => {
     const u = userEvent.setup();
-
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={[]}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
     );
-
-    // Fill in amount for current user (only one input)
-    const amountInput = screen.getByRole('spinbutton');
-    await u.clear(amountInput);
-    await u.type(amountInput, '5000');
-
-    // Submit the form
-    const saveButton = screen.getByRole('button', { name: /save|submit/i });
-    await u.click(saveButton);
-
-    // setDoc must have been called exactly once (only for current user)
-    expect(setDoc).toHaveBeenCalledTimes(1);
-
-    // doc() must have been called with the current user's deterministic id only
-    const docIds = doc.mock.calls.map((call) => call[1] as string);
-    expect(docIds).toContain(`u1_${selectedMonth}`);
-    expect(docIds).not.toContain(`u2_${selectedMonth}`);
+    await u.click(screen.getByRole('button', { name: /add income source/i }));
+    expect(screen.getAllByPlaceholderText('0.00')).toHaveLength(2);
   });
 
-  // 5. setDoc is called with merge:true -------------------------------------------
-  it('calls setDoc with merge: true option', async () => {
+  it('on save: deletes existing docs and batch.sets a new entry', async () => {
     const u = userEvent.setup();
-
+    const income: IncomeDoc[] = [
+      { id: 'old-doc-id', uid: 'u1', month: selectedMonth, amount: 200000 },
+    ];
     render(
-      <IncomeEditor
-        group={group}
-        currentUserUid="u1"
-        selectedMonth={selectedMonth}
-        income={[]}
-      />,
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={income} />,
     );
 
-    const amountInput = screen.getByRole('spinbutton');
+    const amountInput = screen.getByPlaceholderText('0.00');
     await u.clear(amountInput);
     await u.type(amountInput, '5000');
 
-    const saveButton = screen.getByRole('button', { name: /save|submit/i });
-    await u.click(saveButton);
+    await u.click(screen.getByRole('button', { name: /save income/i }));
+    await waitFor(() => expect(mockBatchCommit).toHaveBeenCalledTimes(1));
 
-    // At least one setDoc call should include { merge: true }
-    const mergeCallArgs = setDoc.mock.calls.find(
-      (call) => call[2] && (call[2] as Record<string, unknown>).merge === true,
-    );
-    expect(mergeCallArgs).toBeDefined();
+    expect(mockBatchDelete).toHaveBeenCalledTimes(1);
+    expect(mockBatchSet).toHaveBeenCalledTimes(1);
+    const [, payload] = mockBatchSet.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect(payload.uid).toBe('u1');
+    expect(payload.month).toBe(selectedMonth);
+    expect(typeof payload.amount).toBe('number');
+    expect((payload.amount as number)).toBeGreaterThan(0);
   });
 
-  // 6. setDoc payload contains uid, month, amount for current user ---------------
-  it('includes uid, month, and amount in the setDoc payload for current user', async () => {
-    const u = userEvent.setup();
-
+  it('shows error message when batch.commit rejects', async () => {
+    mockBatchCommit.mockRejectedValueOnce(new Error('network'));
     render(
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '3000' } });
+    fireEvent.click(screen.getByRole('button', { name: /save income/i }));
+    await waitFor(() => expect(screen.getByText(/failed to save/i)).toBeInTheDocument());
+  });
+
+  it('shows "Saved!" after successful save', async () => {
+    render(
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '3000' } });
+    fireEvent.click(screen.getByRole('button', { name: /save income/i }));
+    await waitFor(() => expect(screen.getByText(/saved/i)).toBeInTheDocument());
+  });
+
+  it("preserves the current user's in-progress draft when another member's income updates", () => {
+    const { rerender } = render(
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '4200' } });
+
+    // Another member (u2) saves income → the whole income array gets a new reference.
+    rerender(
       <IncomeEditor
         group={group}
         currentUserUid="u1"
         selectedMonth={selectedMonth}
-        income={[]}
+        income={[{ id: 'other', uid: 'u2', month: selectedMonth, amount: 300000 }]}
       />,
     );
 
-    const amountInput = screen.getByRole('spinbutton');
-    await u.clear(amountInput);
-    await u.type(amountInput, '5000');
-
-    const saveButton = screen.getByRole('button', { name: /save|submit/i });
-    await u.click(saveButton);
-
-    // The setDoc call should include a payload with uid, month, and amount fields
-    const payloads = setDoc.mock.calls.map((call) => call[1] as Record<string, unknown>);
-    const u1Payload = payloads.find((p) => p.uid === 'u1');
-    expect(u1Payload).toBeDefined();
-    expect(u1Payload?.month).toBe(selectedMonth);
-    expect(typeof u1Payload?.amount).toBe('number');
+    // u1's unsaved draft must survive the unrelated snapshot update.
+    expect((screen.getByPlaceholderText('0.00') as HTMLInputElement).value).toBe('4200');
   });
 });

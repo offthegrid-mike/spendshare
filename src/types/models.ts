@@ -30,7 +30,7 @@ export interface ItemDoc {
   payerUid: Uid; // denormalized from the expense (for collectionGroup summary)
   remark?: string;
 }
-export interface IncomeDoc { uid: Uid; month: string; amount: number; description?: string; }
+export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
   id: string; month: string; fromUid: Uid; toUid: Uid; amount: number;
   paid: boolean; paidAt?: Timestamp; markedByUid?: Uid;
@@ -43,8 +43,11 @@ export interface SuggestionEntry {
   count: number;
 }
 
+export interface ShopEntry { name: string; count: number; }
+
 export interface SuggestionsDoc {
   items: SuggestionEntry[];
+  shops: ShopEntry[];
   updatedAt: Timestamp;
 }
 

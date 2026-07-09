@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getDoc } from 'firebase/firestore';
 import { suggestionsDocRef } from '../lib/converters';
-import type { SuggestionEntry } from '../types/models';
+import type { SuggestionEntry, ShopEntry } from '../types/models';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -9,48 +9,64 @@ function cacheKey(groupId: string) {
   return `suggestions_${groupId}`;
 }
 
-function readCache(groupId: string): SuggestionEntry[] | null {
+type CacheData = { items: SuggestionEntry[]; shops: ShopEntry[] };
+
+function readCache(groupId: string): CacheData | null {
   try {
     const raw = localStorage.getItem(cacheKey(groupId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { items: SuggestionEntry[]; cachedAt: number };
+    const parsed = JSON.parse(raw) as { items: unknown; shops?: ShopEntry[]; cachedAt: unknown };
+    if (!Array.isArray(parsed.items)) return null;
+    if (typeof parsed.cachedAt !== 'number' || isNaN(parsed.cachedAt)) return null;
     if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) return null;
-    return parsed.items;
+    return { items: parsed.items as SuggestionEntry[], shops: Array.isArray(parsed.shops) ? parsed.shops : [] };
   } catch {
     return null;
   }
 }
 
-export function writeCache(groupId: string, items: SuggestionEntry[]): void {
+export function writeCache(groupId: string, items: SuggestionEntry[], shops: ShopEntry[]): void {
   try {
-    localStorage.setItem(cacheKey(groupId), JSON.stringify({ items, cachedAt: Date.now() }));
+    localStorage.setItem(cacheKey(groupId), JSON.stringify({ items, shops, cachedAt: Date.now() }));
   } catch {
     // ignore storage quota errors
   }
 }
 
-export function useItemSuggestions(groupId: string): [SuggestionEntry[], boolean] {
+export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEntry[], boolean] {
   const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
+  const [shops, setShops] = useState<ShopEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const cached = readCache(groupId);
-    const load: Promise<SuggestionEntry[]> = cached
+    const load: Promise<CacheData> = cached
       ? Promise.resolve(cached)
       : getDoc(suggestionsDocRef(groupId)).then((snap) => {
           const items: SuggestionEntry[] = snap.exists() ? (snap.data().items ?? []) : [];
-          writeCache(groupId, items);
-          return items;
+          const shopList: ShopEntry[] = snap.exists() ? (snap.data().shops ?? []) : [];
+          writeCache(groupId, items, shopList);
+          return { items, shops: shopList };
         });
 
     load
-      .then((items) => { if (!cancelled) { setSuggestions(items); setLoaded(true); } })
-      .catch(() => { if (!cancelled) setLoaded(true); });
+      .then((data) => {
+        if (!cancelled) {
+          setSuggestions(data.items);
+          setShops(data.shops);
+          setLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(true);
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupId]);
 
-  return [suggestions, loaded];
+  return [suggestions, shops, loaded];
 }

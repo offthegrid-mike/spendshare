@@ -54,13 +54,10 @@ describe('MonthPicker', () => {
 
   it('disables the Next button when selectedMonth equals the current month', () => {
     // Use a fixed "current" month that is the same as selectedMonth.
-    // We freeze Date so monthKey() inside the component returns '2026-06'.
-    const RealDate = Date;
-    vi.spyOn(globalThis, 'Date').mockImplementation((...args: unknown[]) => {
-      if (args.length === 0) return new RealDate('2026-06-08T12:00:00Z');
-      // @ts-expect-error forwarding args
-      return new RealDate(...args);
-    });
+    // Fake timers freeze both `new Date()` and `Date.now()`, which is what
+    // monthKey() inside the component relies on to compute the current month.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-08T12:00:00Z'));
 
     useUIStore.mockReturnValue({ selectedMonth: '2026-06', setMonth });
 
@@ -78,6 +75,6 @@ describe('MonthPicker', () => {
       expect(nextBtn).toBeNull();
     }
 
-    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 });

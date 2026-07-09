@@ -57,8 +57,8 @@ import { useIncome } from '../src/hooks/useIncome';
 // ---------------------------------------------------------------------------
 function makeSnap(docs: (IncomeDoc & { id?: string })[]) {
   return {
-    docs: docs.map((d) => ({
-      id: d.uid, // use uid as document id
+    docs: docs.map((d, i) => ({
+      id: d.id ?? `doc-${d.uid}-${i}`, // auto-generated Firestore doc id
       data: () => ({ uid: d.uid, month: d.month, amount: d.amount }),
     })),
   };
@@ -112,6 +112,23 @@ describe('useIncome', () => {
     expect(result.current.income).toHaveLength(2);
     expect(result.current.income[0]).toMatchObject({ uid: 'u1', month: '2026-06', amount: 500000 });
     expect(result.current.income[1]).toMatchObject({ uid: 'u2', month: '2026-06', amount: 300000 });
+  });
+
+  it('exposes each Firestore document id on the mapped income entries', () => {
+    const { result } = renderHook(() => useIncome('g1', '2026-06'));
+
+    act(() => {
+      snapshotCallback?.(
+        makeSnap([
+          { id: 'auto-id-1', uid: 'u1', month: '2026-06', amount: 500000 },
+          { id: 'auto-id-2', uid: 'u1', month: '2026-06', amount: 100000 },
+        ]),
+      );
+    });
+
+    // The multi-entry IncomeEditor delete-then-recreate flow depends on this id.
+    expect(result.current.income[0].id).toBe('auto-id-1');
+    expect(result.current.income[1].id).toBe('auto-id-2');
   });
 
   it('subscribes with a query filtered by the selected month', () => {

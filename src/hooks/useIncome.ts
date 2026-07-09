@@ -19,7 +19,7 @@ export function useIncome(
 
     const q = query(incomeCol(gid), where('month', '==', selectedMonth));
     const unsub = onSnapshot(q, (snap) => {
-      setIncome(snap.docs.map((d) => d.data()));
+      setIncome(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoadedKey(`${gid}:${selectedMonth}`);
     });
 
