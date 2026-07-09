@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createElement, Fragment } from 'react';
+import { createElement } from 'react';
 
 export const collator = new Intl.Collator(undefined, { sensitivity: 'base', usage: 'search' });
 

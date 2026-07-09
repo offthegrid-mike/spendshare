@@ -21,6 +21,7 @@ export default function ShopNameCombobox({
 }: ShopNameComboboxProps) {
   // Internal display value tracks what the user has typed; syncs with prop on external changes.
   const [inputValue, setInputValue] = useState(value);
+  const [lastSyncedValue, setLastSyncedValue] = useState(value);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,10 +29,12 @@ export default function ShopNameCombobox({
   const listboxId = useId();
   const optionPrefix = useId();
 
-  // Sync prop → internal when controlled parent updates (e.g. after selection)
-  useEffect(() => {
+  // Sync prop → internal when the parent updates it externally (e.g. after selection).
+  // Adjusted during render (not an effect) per React's "adjusting state on prop change" pattern.
+  if (value !== lastSyncedValue) {
+    setLastSyncedValue(value);
     setInputValue(value);
-  }, [value]);
+  }
 
   const filtered = inputValue.length > 0
     ? suggestions.filter((s) => findMatchIndex(s.name, inputValue) !== -1).slice(0, 5)

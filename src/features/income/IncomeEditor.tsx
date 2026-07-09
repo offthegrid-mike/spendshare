@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { writeBatch, doc } from 'firebase/firestore';
 import { Check, AlertCircle, Trash2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
@@ -32,12 +32,14 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
 
   // Re-sync the draft only when *this user's* income actually changes — not on every
   // snapshot fire (e.g. another member saving their income), which would discard an
-  // in-progress draft.
+  // in-progress draft. Adjusted during render (not an effect) per React's
+  // "adjusting state on prop change" pattern.
   const myIncomeKey = myIncome.map((d) => `${d.id}:${d.amount}:${d.description ?? ''}`).join('|');
-  useEffect(() => {
+  const [lastSyncedKey, setLastSyncedKey] = useState(myIncomeKey);
+  if (myIncomeKey !== lastSyncedKey) {
+    setLastSyncedKey(myIncomeKey);
     setEntries(toEntries(myIncome));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myIncomeKey]);
+  }
 
   function updateEntry(index: number, field: keyof EntryDraft, value: string) {
     setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, [field]: value } : e)));

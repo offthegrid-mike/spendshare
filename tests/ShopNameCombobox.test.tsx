@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ShopNameCombobox from '../src/features/expenses/ShopNameCombobox';
 import type { ShopEntry } from '../src/types/models';
@@ -73,8 +73,7 @@ describe('ShopNameCombobox', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('does not show category badge (no categoryId display)', async () => {
-    const u = userEvent.setup();
+  it('does not show category badge (no categoryId display)', () => {
     render(<ShopNameCombobox value="w" suggestions={shops} onChange={vi.fn()} />);
     // ItemNameCombobox would show a category badge; ShopNameCombobox should not
     expect(screen.queryByText(/groceries/i)).not.toBeInTheDocument();
