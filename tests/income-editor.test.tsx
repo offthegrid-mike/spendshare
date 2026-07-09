@@ -162,4 +162,24 @@ describe('IncomeEditor (multi-entry)', () => {
     fireEvent.click(screen.getByRole('button', { name: /save income/i }));
     await waitFor(() => expect(screen.getByText(/saved/i)).toBeInTheDocument());
   });
+
+  it("preserves the current user's in-progress draft when another member's income updates", () => {
+    const { rerender } = render(
+      <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={[]} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '4200' } });
+
+    // Another member (u2) saves income → the whole income array gets a new reference.
+    rerender(
+      <IncomeEditor
+        group={group}
+        currentUserUid="u1"
+        selectedMonth={selectedMonth}
+        income={[{ id: 'other', uid: 'u2', month: selectedMonth, amount: 300000 }]}
+      />,
+    );
+
+    // u1's unsaved draft must survive the unrelated snapshot update.
+    expect((screen.getByPlaceholderText('0.00') as HTMLInputElement).value).toBe('4200');
+  });
 });

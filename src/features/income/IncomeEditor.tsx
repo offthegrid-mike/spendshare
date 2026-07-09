@@ -30,9 +30,14 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
+  // Re-sync the draft only when *this user's* income actually changes — not on every
+  // snapshot fire (e.g. another member saving their income), which would discard an
+  // in-progress draft.
+  const myIncomeKey = myIncome.map((d) => `${d.id}:${d.amount}:${d.description ?? ''}`).join('|');
   useEffect(() => {
-    setEntries(toEntries(income.filter((d) => d.uid === currentUserUid)));
-  }, [income, currentUserUid]);
+    setEntries(toEntries(myIncome));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myIncomeKey]);
 
   function updateEntry(index: number, field: keyof EntryDraft, value: string) {
     setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, [field]: value } : e)));

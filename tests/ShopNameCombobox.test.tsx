@@ -36,6 +36,7 @@ describe('ShopNameCombobox', () => {
     const onChange = vi.fn();
     const u = userEvent.setup();
     render(<ShopNameCombobox value="W" suggestions={shops} onChange={onChange} />);
+    await u.click(screen.getByRole('combobox'));
     const option = screen.getByText(/Woolworths/i);
     await u.click(option);
     expect(onChange).toHaveBeenCalledWith('Woolworths');
@@ -46,9 +47,16 @@ describe('ShopNameCombobox', () => {
     const u = userEvent.setup();
     render(<ShopNameCombobox value="o" suggestions={shops} onChange={onChange} />);
     const input = screen.getByRole('combobox');
+    await u.click(input);
     await u.keyboard('{ArrowDown}');
     await u.keyboard('{Enter}');
     expect(onChange).toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('does not open the dropdown or steal focus on mount with an initial value', () => {
+    render(<ShopNameCombobox value="Woolworths" suggestions={shops} onChange={vi.fn()} />);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox')).not.toHaveFocus();
   });
 
   it('hides dropdown when Escape is pressed', async () => {

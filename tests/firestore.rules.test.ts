@@ -416,6 +416,33 @@ describe('/groups financial sub-collection validation (M-2)', () => {
     }));
   });
 
+  it("denies a member overwriting another member's existing income doc (update hijack)", async () => {
+    // Seed an income doc owned by userA.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'group6', 'income', 'incomeA'), {
+        uid: 'userA', month: '2026-06', amount: 500000,
+      });
+    });
+    // userB tries to overwrite userA's doc, claiming it as their own income.
+    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
+    await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'incomeA'), {
+      uid: 'userB', month: '2026-06', amount: 999999,
+    }));
+  });
+
+  it('allows a member updating their own existing income doc', async () => {
+    // Seed an income doc owned by userB.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'group6', 'income', 'incomeB'), {
+        uid: 'userB', month: '2026-06', amount: 400000,
+      });
+    });
+    const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
+    await assertSucceeds(updateDoc(doc(userB.firestore(), 'groups', 'group6', 'income', 'incomeB'), {
+      amount: 450000,
+    }));
+  });
+
   // --- Expense numeric checks ---
   it('denies expense with negative total', async () => {
     const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });

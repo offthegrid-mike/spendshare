@@ -21,7 +21,7 @@ export default function ShopNameCombobox({
 }: ShopNameComboboxProps) {
   // Internal display value tracks what the user has typed; syncs with prop on external changes.
   const [inputValue, setInputValue] = useState(value);
-  const [open, setOpen] = useState(value.length > 0);
+  const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,15 +32,6 @@ export default function ShopNameCombobox({
   useEffect(() => {
     setInputValue(value);
   }, [value]);
-
-  // Focus input on mount when it has an initial value so keyboard events work immediately
-  useEffect(() => {
-    if (value.length > 0) {
-      inputRef.current?.focus();
-    }
-    // intentionally run only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const filtered = inputValue.length > 0
     ? suggestions.filter((s) => findMatchIndex(s.name, inputValue) !== -1).slice(0, 5)
