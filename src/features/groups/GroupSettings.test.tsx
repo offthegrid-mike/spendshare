@@ -90,4 +90,18 @@ describe('GroupSettings', () => {
       );
     });
   });
+
+  it('disables the remove button while the removal is pending, then re-enables once it resolves', async () => {
+    let resolveUpdate!: () => void;
+    mockUpdateDoc.mockReturnValue(new Promise<void>((resolve) => { resolveUpdate = resolve; }));
+
+    render(<GroupSettings group={group} currentUserUid="u1" />);
+    const removeButton = screen.getByTitle('Remove member');
+    fireEvent.click(removeButton);
+
+    await waitFor(() => expect(removeButton).toBeDisabled());
+
+    resolveUpdate();
+    await waitFor(() => expect(removeButton).not.toBeDisabled());
+  });
 });

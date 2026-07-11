@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { UserPlus, Trash2, Crown } from 'lucide-react';
 import { groupsCol } from '../../lib/converters';
+import LoadingButton from '../../components/LoadingButton';
 import type { GroupDoc } from '../../types/models';
 
 const CURRENCIES = ['AUD', 'USD', 'EUR', 'GBP'];
@@ -20,6 +21,7 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
   const [addingMember, setAddingMember] = useState(false);
   const [addError, setAddError] = useState('');
   const [removeError, setRemoveError] = useState('');
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
 
   const isOwner = group.ownerUid === currentUserUid;
 
@@ -66,6 +68,7 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
 
   async function handleRemoveMember(uid: string) {
     setRemoveError('');
+    setRemovingIds((prev) => new Set(prev).add(uid));
     try {
       await updateDoc(doc(groupsCol, group.id), {
         [`members.${uid}`]: deleteField(),
@@ -73,6 +76,12 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
       });
     } catch {
       setRemoveError('Failed to remove member. Please try again.');
+    } finally {
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(uid);
+        return next;
+      });
     }
   }
 
@@ -138,14 +147,17 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
                     )}
                   </div>
                   {canRemove && (
-                    <button
-                      type="button"
+                    <LoadingButton
+                      loading={removingIds.has(uid)}
+                      // Empty string (not omitted) so LoadingButton's `loadingText ?? children`
+                      // shows just the spinner instead of falling back to the Trash2 icon.
+                      loadingText=""
                       onClick={() => void handleRemoveMember(uid)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                       title="Remove member"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </LoadingButton>
                   )}
                 </li>
               );

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Tag, UserPlus, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import LoadingButton from '../../components/LoadingButton';
 
 const manageItems = [
   { to: '/categories',     icon: Tag,      label: 'Categories'    },
@@ -10,6 +12,19 @@ const manageItems = [
 ];
 
 export default function MoreScreen() {
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut(auth);
+    } catch {
+      // Swallowed: no error UX exists for sign-out failures yet.
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section>
@@ -34,14 +49,15 @@ export default function MoreScreen() {
         <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Account
         </p>
-        <button
-          type="button"
-          onClick={() => void signOut(auth)}
-          className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white"
+        <LoadingButton
+          loading={signingOut}
+          loadingText="Signing out…"
+          onClick={() => void handleSignOut()}
+          className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <LogOut size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
           <span className="flex-1 text-left text-sm font-medium text-slate-800">Sign out</span>
-        </button>
+        </LoadingButton>
       </section>
     </div>
   );
