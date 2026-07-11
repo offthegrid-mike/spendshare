@@ -3,11 +3,11 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-function commitSha(): string {
+function commitSha(): string | null {
   try {
     return execSync('git rev-parse --short HEAD').toString().trim();
   } catch {
-    return 'dev';
+    return null;
   }
 }
 

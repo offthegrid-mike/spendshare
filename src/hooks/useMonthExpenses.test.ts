@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMonthExpenses } from './useMonthExpenses';
 
-const { callbacks } = vi.hoisted(() => ({
+const { callbacks, errorCallbacks } = vi.hoisted(() => ({
   callbacks: new Map<string, (snap: unknown) => void>(),
+  errorCallbacks: new Map<string, () => void>(),
 }));
 
 vi.mock('../lib/converters', () => ({ expensesCol: () => 'EXPENSES_COL' }));
@@ -13,8 +14,9 @@ vi.mock('firebase/firestore', () => ({
   where: () => ({}),
   orderBy: () => ({}),
   collectionGroup: () => 'ITEMS_COL',
-  onSnapshot: (q: string, cb: (snap: unknown) => void) => {
+  onSnapshot: (q: string, cb: (snap: unknown) => void, onError?: () => void) => {
     callbacks.set(q, cb);
+    if (onError) errorCallbacks.set(q, onError);
     return () => callbacks.delete(q);
   },
 }));
@@ -26,38 +28,50 @@ function fakeSnap(docs: Array<Record<string, unknown>>) {
 describe('useMonthExpenses', () => {
   beforeEach(() => {
     callbacks.clear();
+    errorCallbacks.clear();
   });
 
-  it('stays loading until both the expenses and items snapshots have fired', () => {
+  it('flips `loading` false as soon as the expenses snapshot fires, independent of items', () => {
     const { result } = renderHook(() => useMonthExpenses('g1', '2026-07'));
     expect(result.current.loading).toBe(true);
 
-    // Expenses snapshot arrives first (as it does in production) — items
-    // haven't loaded yet, so callers must keep waiting.
     act(() => {
       callbacks.get('EXPENSES_COL')!(fakeSnap([{ id: 'e1', month: '2026-07' }]));
     });
     expect(result.current.expenses.length).toBe(1);
-    expect(result.current.loading).toBe(true);
+    expect(result.current.loading).toBe(false);
+    // Items haven't arrived yet — a plain `loading` consumer (e.g. ExpenseList)
+    // isn't held back by them.
+    expect(result.current.itemsLoading).toBe(true);
+  });
 
-    // Items snapshot finally arrives — now it's safe to render.
+  it('flips `itemsLoading` false only once the items snapshot fires', () => {
+    const { result } = renderHook(() => useMonthExpenses('g1', '2026-07'));
+    expect(result.current.itemsLoading).toBe(true);
+
     act(() => {
       callbacks.get('ITEMS_COL')!(fakeSnap([]));
+    });
+    expect(result.current.itemsLoading).toBe(false);
+  });
+
+  it('unblocks `loading` on a transient expenses-listener error instead of hanging forever', () => {
+    const { result } = renderHook(() => useMonthExpenses('g1', '2026-07'));
+    expect(result.current.loading).toBe(true);
+
+    act(() => {
+      errorCallbacks.get('EXPENSES_COL')!();
     });
     expect(result.current.loading).toBe(false);
   });
 
-  it('is not loading once both snapshots have fired, regardless of order', () => {
+  it('unblocks `itemsLoading` on a transient items-listener error instead of hanging forever', () => {
     const { result } = renderHook(() => useMonthExpenses('g1', '2026-07'));
+    expect(result.current.itemsLoading).toBe(true);
 
     act(() => {
-      callbacks.get('ITEMS_COL')!(fakeSnap([]));
+      errorCallbacks.get('ITEMS_COL')!();
     });
-    expect(result.current.loading).toBe(true);
-
-    act(() => {
-      callbacks.get('EXPENSES_COL')!(fakeSnap([]));
-    });
-    expect(result.current.loading).toBe(false);
+    expect(result.current.itemsLoading).toBe(false);
   });
 });

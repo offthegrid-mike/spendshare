@@ -11,6 +11,7 @@ export function useMonthExpenses(
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
   loading: boolean;
+  itemsLoading: boolean;
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
@@ -29,6 +30,10 @@ export function useMonthExpenses(
     const unsubExp = onSnapshot(expQ, (snap) => {
       setExpenses(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
       setExpensesLoadedKey(`${gid}:${month}`);
+    }, () => {
+      // Transient permission-denied can occur while membership propagates;
+      // unblock loading and let the next snapshot resolve it.
+      setExpensesLoadedKey(`${gid}:${month}`);
     });
 
     // Subscribe to all items for this group+month via collectionGroup
@@ -46,6 +51,8 @@ export function useMonthExpenses(
       }
       setItemsByExpense(map);
       setItemsLoadedKey(`${gid}:${month}`);
+    }, () => {
+      setItemsLoadedKey(`${gid}:${month}`);
     });
 
     return () => {
@@ -57,11 +64,14 @@ export function useMonthExpenses(
     };
   }, [gid, month]);
 
-  // Both snapshots must have fired for the current key — callers (e.g. the
-  // edit-expense form) rely on itemsByExpense being fully hydrated before
-  // reading from it, since it arrives from an independent listener that can
-  // resolve after (or before) the expenses listener.
-  const loading = gid !== null && (expensesLoadedKey !== key || itemsLoadedKey !== key);
+  // `loading` tracks the expenses listener alone, matching the original
+  // semantics most callers (e.g. the expense list) rely on — they only need
+  // expense docs to render. `itemsLoading` is separate so a caller that also
+  // needs itemsByExpense fully hydrated before rendering (e.g. the
+  // edit-expense form, to avoid mounting react-hook-form with stale
+  // defaultValues) can wait on it explicitly without penalizing everyone else.
+  const loading = gid !== null && expensesLoadedKey !== key;
+  const itemsLoading = gid !== null && itemsLoadedKey !== key;
 
-  return { expenses, itemsByExpense, loading };
+  return { expenses, itemsByExpense, loading, itemsLoading };
 }
