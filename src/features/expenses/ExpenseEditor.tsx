@@ -18,6 +18,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ItemNameCombobox from './ItemNameCombobox';
 import ShopNameCombobox from './ShopNameCombobox';
+import LoadingButton from '../../components/LoadingButton';
 
 function useSafeNavigate(): NavigateFunction {
   try {
@@ -116,6 +117,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   const [giftCardOpen, setGiftCardOpen] = useState(
     () => !!expense?.giftCardAmount || !!restoredDraft?.giftCardAmount?.trim(),
   );
+  const [saving, setSaving] = useState(false);
 
   function handleGiftCardToggle() {
     if (giftCardOpen) setValue('giftCardAmount', '');
@@ -162,6 +164,15 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   // Submit
   // ---------------------------------------------------------------------------
   async function onSubmit(data: FormValues) {
+    setSaving(true);
+    try {
+      await submitExpense(data);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitExpense(data: FormValues) {
     const batch = writeBatch(db);
     const expRef = expense
       ? doc(expensesCol(group.id), expense.id)
@@ -504,9 +515,14 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       </div>
 
       {/* Submit */}
-      <button type="submit" className="btn-primary w-full py-2.5">
+      <LoadingButton
+        type="submit"
+        loading={saving}
+        loadingText={expense ? 'Saving changes…' : 'Saving…'}
+        className="btn-primary w-full py-2.5"
+      >
         {expense ? 'Save changes' : 'Save expense'}
-      </button>
+      </LoadingButton>
     </form>
   );
 }

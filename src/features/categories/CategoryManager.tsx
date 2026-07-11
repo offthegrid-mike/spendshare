@@ -3,6 +3,7 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { categoriesCol } from '../../lib/converters';
 import { useCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
+import LoadingButton from '../../components/LoadingButton';
 import type { CategoryDoc } from '../../types/models';
 
 export default function CategoryManager() {
@@ -14,6 +15,8 @@ export default function CategoryManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set());
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -46,18 +49,21 @@ export default function CategoryManager() {
   }
 
   async function saveEdit(cat: CategoryDoc) {
-    if (!gid) return;
+    if (!gid || savingEdit) return;
     const name = editName.trim();
     if (!name) {
       setError('Name cannot be empty.');
       return;
     }
     setError('');
+    setSavingEdit(true);
     try {
       await updateDoc(doc(categoriesCol(gid), cat.id), { name });
       setEditingId(null);
     } catch {
       setError('Failed to rename category.');
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -69,10 +75,17 @@ export default function CategoryManager() {
   async function toggleArchive(cat: CategoryDoc) {
     if (!gid) return;
     setError('');
+    setArchivingIds((prev) => new Set(prev).add(cat.id));
     try {
       await updateDoc(doc(categoriesCol(gid), cat.id), { archived: !cat.archived });
     } catch {
       setError('Failed to update category.');
+    } finally {
+      setArchivingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(cat.id);
+        return next;
+      });
     }
   }
 
@@ -105,19 +118,22 @@ export default function CategoryManager() {
                     if (e.key === 'Escape') cancelEdit();
                   }}
                   autoFocus
-                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  disabled={savingEdit}
+                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <button
-                  type="button"
+                <LoadingButton
+                  loading={savingEdit}
+                  loadingText="Saving…"
                   onClick={() => void saveEdit(cat)}
                   className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700"
                 >
                   Save
-                </button>
+                </LoadingButton>
                 <button
                   type="button"
+                  disabled={savingEdit}
                   onClick={cancelEdit}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -138,18 +154,20 @@ export default function CategoryManager() {
                 </span>
                 <button
                   type="button"
+                  disabled={savingEdit}
                   onClick={() => startEdit(cat)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Rename
                 </button>
-                <button
-                  type="button"
+                <LoadingButton
+                  loading={archivingIds.has(cat.id)}
+                  loadingText={cat.archived ? 'Unarchiving…' : 'Archiving…'}
                   onClick={() => void toggleArchive(cat)}
                   className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   {cat.archived ? 'Unarchive' : 'Archive'}
-                </button>
+                </LoadingButton>
               </>
             )}
           </li>

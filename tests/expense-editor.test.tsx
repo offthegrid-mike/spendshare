@@ -494,6 +494,34 @@ describe('ExpenseEditor', () => {
     expect((itemCall as any)?.[1]).toMatchObject({ categoryId: 'cat1' });
   });
 
+  // 22. Loading state — disables and shows a spinner while the batch commit is pending ---
+  it('disables the submit button and shows a loading indicator while saving, then re-enables after the save completes', async () => {
+    let resolveCommit!: () => void;
+    const commitSpy = vi.fn(
+      () => new Promise<void>((resolve) => { resolveCommit = resolve; }),
+    );
+    writeBatch.mockReturnValue({ set: vi.fn(), commit: commitSpy });
+
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.00');
+
+    const submitButton = screen.getByRole('button', { name: /save expense/i });
+    await u.click(submitButton);
+
+    expect(await screen.findByRole('button', { name: /saving/i })).toBeDisabled();
+
+    await act(async () => {
+      resolveCommit();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: /save expense/i })).not.toBeDisabled();
+  });
+
   // 19. Autocomplete — suggestions doc written in batch --------------------
   it('includes a suggestions doc write in writeBatch when expense is saved', async () => {
     const { setSpy, commitSpy } = makeBatchMock();

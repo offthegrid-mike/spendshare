@@ -4,13 +4,23 @@ import userEvent from '@testing-library/user-event';
 
 // Stub DayPicker so tests focus on wrapper behaviour only.
 vi.mock('react-day-picker', () => ({
-  DayPicker: ({ onSelect }: { onSelect: (d: Date) => void }) => (
-    <button
-      data-testid="mock-calendar"
-      onClick={() => onSelect(new Date('2026-06-20'))}
-    >
-      calendar
-    </button>
+  DayPicker: ({ onSelect }: { onSelect: (d: Date | undefined) => void }) => (
+    <>
+      <button
+        data-testid="mock-calendar"
+        onClick={() => onSelect(new Date('2026-06-20'))}
+      >
+        calendar
+      </button>
+      {/* react-day-picker mode="single" calls onSelect(undefined) when the
+          already-selected day is re-clicked (toggle-off semantics). */}
+      <button
+        data-testid="mock-calendar-reselect"
+        onClick={() => onSelect(undefined)}
+      >
+        calendar reselect
+      </button>
+    </>
   ),
 }));
 
@@ -53,6 +63,20 @@ describe('DatePicker', () => {
 
     await u.click(screen.getByRole('button', { name: /Jun 15, 2026/i }));
     await u.click(screen.getByTestId('mock-calendar'));
+
+    expect(screen.queryByTestId('mock-calendar')).not.toBeInTheDocument();
+  });
+
+  it('closes the calendar when the already-selected day is re-clicked', async () => {
+    const u = userEvent.setup();
+    render(<DatePicker id="dp" value="2026-06-15" onChange={vi.fn()} />);
+
+    await u.click(screen.getByRole('button', { name: /Jun 15, 2026/i }));
+    expect(screen.getByTestId('mock-calendar')).toBeInTheDocument();
+
+    // Simulates re-clicking the currently-selected day, which react-day-picker
+    // reports as onSelect(undefined).
+    await u.click(screen.getByTestId('mock-calendar-reselect'));
 
     expect(screen.queryByTestId('mock-calendar')).not.toBeInTheDocument();
   });
