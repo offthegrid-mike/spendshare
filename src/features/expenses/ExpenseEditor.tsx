@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { toCents, formatMoney } from '../../lib/money';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
+import { readDraft, writeDraft, clearDraft } from '../../hooks/useExpenseDraft';
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
@@ -69,44 +70,76 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   const { active: cats } = useCategories(group.id);
   const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
-  const defaultItems: FormValues['items'] =
-    expense && items && items.length > 0
-      ? items.map((it) => ({
-          name: it.name,
-          categoryId: it.categoryId,
-          amount: (it.amount / 100).toFixed(2),
-          shared: it.shared,
-          remark: it.remark ?? '',
-        }))
-      : [{ name: '', categoryId: '', amount: '', shared: true, remark: '' }];
+  // Only new expenses are drafted — editing an existing one is never cached.
+  const isNew = !expense;
+
+  const blankDefaults: FormValues = {
+    date: expense
+      ? new Date(expense.date.seconds * 1000).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10),
+    shopName: expense?.shopName ?? '',
+    payerUid: expense?.payerUid ?? group.memberUids[0] ?? '',
+    giftCardAmount: expense?.giftCardAmount ? (expense.giftCardAmount / 100).toFixed(2) : '',
+    items:
+      expense && items && items.length > 0
+        ? items.map((it) => ({
+            name: it.name,
+            categoryId: it.categoryId,
+            amount: (it.amount / 100).toFixed(2),
+            shared: it.shared,
+            remark: it.remark ?? '',
+          }))
+        : [{ name: '', categoryId: '', amount: '', shared: true, remark: '' }],
+  };
+
+  // Load a resumable draft once, on mount, for new expenses.
+  const [restoredDraft] = useState(() => (isNew ? readDraft(group.id) : null));
+  const [draftBannerOpen, setDraftBannerOpen] = useState(!!restoredDraft);
 
   const {
     register,
     control,
     handleSubmit,
     setValue,
+    reset,
+    getValues,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      date: expense
-        ? new Date(expense.date.seconds * 1000).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10),
-      shopName: expense?.shopName ?? '',
-      payerUid: expense?.payerUid ?? group.memberUids[0] ?? '',
-      giftCardAmount: expense?.giftCardAmount ? (expense.giftCardAmount / 100).toFixed(2) : '',
-      items: defaultItems,
-    },
+    defaultValues: restoredDraft ? { ...blankDefaults, ...restoredDraft } : blankDefaults,
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
-  // Gift card panel state — open by default in edit mode when expense has one
-  const [giftCardOpen, setGiftCardOpen] = useState(() => !!expense?.giftCardAmount);
+  // Gift card panel state — open by default when the expense (or a restored
+  // draft) already carries a gift card amount.
+  const [giftCardOpen, setGiftCardOpen] = useState(
+    () => !!expense?.giftCardAmount || !!restoredDraft?.giftCardAmount?.trim(),
+  );
 
   function handleGiftCardToggle() {
     if (giftCardOpen) setValue('giftCardAmount', '');
     setGiftCardOpen((o) => !o);
+  }
+
+  // Autosave the in-progress form so it can be resumed later. Watches every
+  // field and persists (debounced) to localStorage. New expenses only.
+  const allValues = useWatch({ control });
+
+  useEffect(() => {
+    if (!isNew) return;
+    const timer = setTimeout(() => {
+      writeDraft(group.id, getValues());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [allValues, isNew, group.id, getValues]);
+
+  // Discard the restored draft and start from a clean form.
+  function handleStartFresh() {
+    clearDraft(group.id);
+    reset(blankDefaults);
+    setGiftCardOpen(false);
+    setDraftBannerOpen(false);
   }
 
   // Live totals
@@ -218,6 +251,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
 
     await batch.commit();
     if (newSuggestions !== null && newShops !== null) writeCache(group.id, newSuggestions, newShops);
+    clearDraft(group.id);
     navigate('/');
     onSuccess?.();
   }
@@ -230,6 +264,22 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       <h1 className="text-xl font-bold tracking-tight text-slate-900">
         {expense ? 'Edit expense' : 'New expense'}
       </h1>
+
+      {/* Resumed draft notice */}
+      {draftBannerOpen && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-800">
+            Resumed your unsaved entry.
+          </p>
+          <button
+            type="button"
+            onClick={handleStartFresh}
+            className="shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
+          >
+            Start fresh
+          </button>
+        </div>
+      )}
 
       {/* Date */}
       <div>
