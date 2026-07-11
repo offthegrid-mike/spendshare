@@ -88,4 +88,9 @@ describe('Layout', () => {
     renderLayout();
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
+
+  it('renders the build version stamp regardless of route (visible on desktop too)', () => {
+    renderLayout();
+    expect(screen.getByText(/built \d{4}-\d{2}-\d{2}/)).toBeTruthy();
+  });
 });

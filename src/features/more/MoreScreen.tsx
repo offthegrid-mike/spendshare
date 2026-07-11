@@ -4,7 +4,6 @@ import { Tag, UserPlus, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import LoadingButton from '../../components/LoadingButton';
-import { formatVersionLabel } from '../../lib/appVersion';
 
 const manageItems = [
   { to: '/categories',     icon: Tag,      label: 'Categories'    },
@@ -60,9 +59,6 @@ export default function MoreScreen() {
           <span className="flex-1 text-left text-sm font-medium text-slate-800">Sign out</span>
         </LoadingButton>
       </section>
-      <p className="px-1 text-center text-xs text-slate-400">
-        {formatVersionLabel(__APP_COMMIT__, __APP_BUILT_AT__)}
-      </p>
     </div>
   );
 }

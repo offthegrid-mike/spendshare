@@ -37,11 +37,6 @@ describe('MoreScreen', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeTruthy();
   });
 
-  it('renders the build version stamp', () => {
-    renderMore();
-    expect(screen.getByText(/built \d{4}-\d{2}-\d{2}/)).toBeTruthy();
-  });
-
   it('disables the button and shows a loading indicator while signing out, then re-enables if it fails', async () => {
     let rejectSignOut!: (e: unknown) => void;
     signOut.mockReturnValue(new Promise((_resolve, reject) => { rejectSignOut = reject; }));
