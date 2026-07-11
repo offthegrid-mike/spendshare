@@ -59,6 +59,23 @@ describe('computeSuggestionsDelta', () => {
     expect(result[0].count).toBe(2);
   });
 
+  it('collapses whitespace before dedup: internal double-space and trailing space merge', () => {
+    const result = computeSuggestionsDelta([milk], [], [
+      { name: 'Milk ', categoryId: 'cat1', category: 'Groceries' },
+      { name: 'Milk',  categoryId: 'cat1', category: 'Groceries' },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(5);
+    expect(result[0].name).toBe('Milk');
+  });
+
+  it('stores a whitespace-collapsed name even for a brand-new entry', () => {
+    const result = computeSuggestionsDelta([], [], [
+      { name: 'Chinese  cabbage ', categoryId: 'cat1', category: 'Groceries' },
+    ]);
+    expect(result[0].name).toBe('Chinese cabbage');
+  });
+
   it('treats same name with different categoryId as distinct entries', () => {
     const result = computeSuggestionsDelta([milk], [], [
       { name: 'Milk', categoryId: 'cat2', category: 'Dairy' },

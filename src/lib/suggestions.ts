@@ -1,9 +1,10 @@
 import type { SuggestionEntry, ShopEntry } from '../types/models';
+import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 type ItemInput = { name: string; categoryId: string; category: string };
 
 function makeKey(name: string, categoryId: string): string {
-  return name.normalize('NFC').toLocaleLowerCase() + '|' + categoryId;
+  return normalizeNameKey(name) + '|' + categoryId;
 }
 
 export function computeSuggestionsDelta(
@@ -30,11 +31,11 @@ export function computeSuggestionsDelta(
     const existing = map.get(key);
     if (existing) {
       existing.count += 1;
-      existing.name = item.name;     // most-recent casing wins
+      existing.name = collapseWhitespace(item.name);     // most-recent casing wins
       existing.category = item.category;
     } else {
       map.set(key, {
-        name: item.name,
+        name: collapseWhitespace(item.name),
         categoryId: item.categoryId,
         category: item.category,
         count: 1,
@@ -52,11 +53,11 @@ export function computeShopsDelta(
 ): ShopEntry[] {
   const map = new Map<string, ShopEntry>();
   for (const entry of current) {
-    map.set(entry.name.normalize('NFC').toLocaleLowerCase(), { ...entry });
+    map.set(normalizeNameKey(entry.name), { ...entry });
   }
 
   for (const name of removed) {
-    const key = name.normalize('NFC').toLocaleLowerCase();
+    const key = normalizeNameKey(name);
     const entry = map.get(key);
     if (entry) {
       entry.count -= 1;
@@ -65,13 +66,13 @@ export function computeShopsDelta(
   }
 
   for (const name of added) {
-    const key = name.normalize('NFC').toLocaleLowerCase();
+    const key = normalizeNameKey(name);
     const existing = map.get(key);
     if (existing) {
       existing.count += 1;
-      existing.name = name;
+      existing.name = collapseWhitespace(name);
     } else {
-      map.set(key, { name, count: 1 });
+      map.set(key, { name: collapseWhitespace(name), count: 1 });
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { Timestamp } from 'firebase/firestore';
@@ -159,7 +159,7 @@ describe('ExpenseList', () => {
     expect(screen.getByText(/Bread/i)).toBeInTheDocument();
   });
 
-  it('calls writeBatch().commit() when the Delete button is clicked', async () => {
+  it('shows a confirmation dialog and does not delete before it is confirmed', async () => {
     useMonthExpenses.mockReturnValue({
       expenses: [expense1],
       itemsByExpense: { exp1: items1 },
@@ -171,6 +171,42 @@ describe('ExpenseList', () => {
 
     const deleteBtn = screen.getByRole('button', { name: /delete/i });
     await u.click(deleteBtn);
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(mockBatchCommit).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when the confirmation dialog is cancelled', async () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1],
+      itemsByExpense: { exp1: items1 },
+      loading: false,
+    });
+
+    const u = userEvent.setup();
+    renderExpenseList();
+
+    await u.click(screen.getByRole('button', { name: /delete/i }));
+    const dialog = screen.getByRole('alertdialog');
+    await u.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(mockBatchCommit).not.toHaveBeenCalled();
+  });
+
+  it('calls writeBatch().commit() when the deletion is confirmed', async () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1],
+      itemsByExpense: { exp1: items1 },
+      loading: false,
+    });
+
+    const u = userEvent.setup();
+    renderExpenseList();
+
+    await u.click(screen.getByRole('button', { name: /delete/i }));
+    const dialog = screen.getByRole('alertdialog');
+    await u.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     expect(mockBatchCommit).toHaveBeenCalled();
   });
