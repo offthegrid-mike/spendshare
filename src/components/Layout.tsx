@@ -13,7 +13,6 @@ import {
   Plus,
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
-import { formatVersionLabel } from '../lib/appVersion';
 import GroupSwitcher from './GroupSwitcher';
 import MonthPicker from './MonthPicker';
 import MobileHeader from './MobileHeader';
@@ -102,9 +101,6 @@ export default function Layout({ groups, user }: Props) {
           <PendingInvites user={user} />
         </div>
         <Outlet />
-        <p className="mt-6 px-1 text-center text-xs text-slate-400">
-          {formatVersionLabel(__APP_COMMIT__, __APP_BUILT_AT__)}
-        </p>
       </main>
 
       {/* Mobile FAB — hidden on sm+ */}
