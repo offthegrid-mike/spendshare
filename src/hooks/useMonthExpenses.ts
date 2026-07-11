@@ -14,7 +14,8 @@ export function useMonthExpenses(
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [expensesLoadedKey, setExpensesLoadedKey] = useState<string | null>(null);
+  const [itemsLoadedKey, setItemsLoadedKey] = useState<string | null>(null);
 
   const key = gid ? `${gid}:${month}` : null;
 
@@ -27,7 +28,7 @@ export function useMonthExpenses(
     const expQ = query(expensesCol(gid), where('month', '==', month), orderBy('date', 'desc'));
     const unsubExp = onSnapshot(expQ, (snap) => {
       setExpenses(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
-      setLoadedKey(`${gid}:${month}`);
+      setExpensesLoadedKey(`${gid}:${month}`);
     });
 
     // Subscribe to all items for this group+month via collectionGroup
@@ -44,6 +45,7 @@ export function useMonthExpenses(
         map[item.expenseId].push(item);
       }
       setItemsByExpense(map);
+      setItemsLoadedKey(`${gid}:${month}`);
     });
 
     return () => {
@@ -55,7 +57,11 @@ export function useMonthExpenses(
     };
   }, [gid, month]);
 
-  const loading = gid !== null && loadedKey !== key;
+  // Both snapshots must have fired for the current key — callers (e.g. the
+  // edit-expense form) rely on itemsByExpense being fully hydrated before
+  // reading from it, since it arrives from an independent listener that can
+  // resolve after (or before) the expenses listener.
+  const loading = gid !== null && (expensesLoadedKey !== key || itemsLoadedKey !== key);
 
   return { expenses, itemsByExpense, loading };
 }
