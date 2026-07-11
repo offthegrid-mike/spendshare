@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
+import { collapseWhitespace } from '../../lib/textNormalize';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
@@ -172,7 +173,12 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     }
   }
 
-  async function submitExpense(data: FormValues) {
+  async function submitExpense(rawData: FormValues) {
+    const data: FormValues = {
+      ...rawData,
+      shopName: collapseWhitespace(rawData.shopName),
+      items: rawData.items.map((it) => ({ ...it, name: collapseWhitespace(it.name) })),
+    };
     const batch = writeBatch(db);
     const expRef = expense
       ? doc(expensesCol(group.id), expense.id)

@@ -206,6 +206,18 @@ describe('ItemNameCombobox', () => {
     expect(screen.getByText('Groceries')).toBeInTheDocument();
   });
 
+  it('collapses same-name suggestions that differ only by internal or trailing whitespace', async () => {
+    const dupes: SuggestionEntry[] = [
+      { name: 'Chinese cabbage',  categoryId: 'cat1', category: 'Groceries', count: 4 },
+      { name: 'Chinese  cabbage', categoryId: 'cat1', category: 'Groceries', count: 1 },
+      { name: 'Chinese cabbage ', categoryId: 'cat1', category: 'Groceries', count: 2 },
+    ];
+    const u = userEvent.setup();
+    render(<Wrapper sugs={dupes} />);
+    await u.type(screen.getByRole('combobox'), 'cab');
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+  });
+
   // ── RTL ───────────────────────────────────────────────────────────────────
 
   it('renders input and list items with dir="auto" for RTL support', async () => {

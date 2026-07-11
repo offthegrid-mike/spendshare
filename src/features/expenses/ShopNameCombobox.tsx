@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { ShopEntry } from '../../types/models';
-import { findMatchIndex, highlightMatch } from './comboboxUtils';
+import { dedupeByName, highlightMatch } from './comboboxUtils';
 
 interface ShopNameComboboxProps {
   value: string;
@@ -36,9 +36,7 @@ export default function ShopNameCombobox({
     setInputValue(value);
   }
 
-  const filtered = inputValue.length > 0
-    ? suggestions.filter((s) => findMatchIndex(s.name, inputValue) !== -1).slice(0, 5)
-    : [];
+  const filtered = inputValue.length > 0 ? dedupeByName(suggestions, inputValue) : [];
   const isOpen = open && filtered.length > 0;
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
+import { normalizeNameKey } from '../../lib/textNormalize';
 
 export const collator = new Intl.Collator(undefined, { sensitivity: 'base', usage: 'search' });
 
@@ -27,7 +28,7 @@ export function dedupeByName<T extends { name: string; count: number }>(
   const byName = new Map<string, T>();
   for (const entry of entries) {
     if (findMatchIndex(entry.name, query) === -1) continue;
-    const key = entry.name.normalize('NFC').toLocaleLowerCase();
+    const key = normalizeNameKey(entry.name);
     const existing = byName.get(key);
     if (!existing || entry.count > existing.count) byName.set(key, entry);
   }
