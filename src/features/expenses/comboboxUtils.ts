@@ -13,6 +13,29 @@ export function findMatchIndex(haystack: string, needle: string): number {
   return -1;
 }
 
+/**
+ * Filters entries matching `query` by name, then dedupes entries whose names
+ * differ only by case/diacritics (e.g. the same item name under two
+ * categories), keeping the highest-count entry per name, and returns the
+ * top `limit` by count.
+ */
+export function dedupeByName<T extends { name: string; count: number }>(
+  entries: T[],
+  query: string,
+  limit = 5,
+): T[] {
+  const byName = new Map<string, T>();
+  for (const entry of entries) {
+    if (findMatchIndex(entry.name, query) === -1) continue;
+    const key = entry.name.normalize('NFC').toLocaleLowerCase();
+    const existing = byName.get(key);
+    if (!existing || entry.count > existing.count) byName.set(key, entry);
+  }
+  return Array.from(byName.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export function highlightMatch(name: string, query: string): ReactNode {
   const normName = name.normalize('NFC');
   const normQuery = query.normalize('NFC');

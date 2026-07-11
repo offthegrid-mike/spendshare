@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { SuggestionEntry } from '../../types/models';
-import { findMatchIndex, highlightMatch } from './comboboxUtils';
+import { dedupeByName, highlightMatch } from './comboboxUtils';
 
 interface ItemNameComboboxProps {
   value: string;
@@ -23,9 +23,7 @@ export default function ItemNameCombobox({
   const listboxId = useId();
   const optionPrefix = useId();
 
-  const filtered = value.length > 0
-    ? suggestions.filter((s) => findMatchIndex(s.name, value) !== -1).slice(0, 5)
-    : [];
+  const filtered = value.length > 0 ? dedupeByName(suggestions, value) : [];
   const isOpen = open && filtered.length > 0;
 
   useEffect(() => {
