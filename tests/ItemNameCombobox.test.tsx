@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import ItemNameCombobox from '../src/features/expenses/ItemNameCombobox';
@@ -178,6 +178,19 @@ describe('ItemNameCombobox', () => {
     // No suggestion was selected
     const callsWithSuggestion = onChangeSpy.mock.calls.filter(([, s]) => s !== undefined);
     expect(callsWithSuggestion).toHaveLength(0);
+    // The dropdown closes so it doesn't linger over the newly-focused row.
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('does not call onEnter for auto-repeat (held) Enter keydowns', () => {
+    const onEnterSpy = vi.fn();
+    render(<Wrapper onEnterSpy={onEnterSpy} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'zzz' } }); // matches nothing → closed
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true });
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true });
+    expect(onEnterSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not call onEnter when Enter selects a highlighted suggestion', async () => {

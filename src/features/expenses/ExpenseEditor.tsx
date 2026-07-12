@@ -489,7 +489,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    addItemAndFocus(index);
+                    // Ignore auto-repeat so a held Enter can't append multiple rows.
+                    if (!e.repeat) addItemAndFocus(index);
                   }
                 }}
                 className="field"

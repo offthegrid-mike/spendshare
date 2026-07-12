@@ -581,6 +581,23 @@ describe('ExpenseEditor', () => {
     expect((nameInput as HTMLInputElement).value).toBe('Milk');
   });
 
+  // 26b. Enter-to-add — auto-repeat (held Enter) appends only one row -------
+  it('appends only one row when Enter auto-repeats in the amount field', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
+    await u.type(amountInput, '3.00');
+
+    // First keydown is a real press; the rest are OS key-repeat.
+    fireEvent.keyDown(amountInput, { key: 'Enter' });
+    fireEvent.keyDown(amountInput, { key: 'Enter', repeat: true });
+    fireEvent.keyDown(amountInput, { key: 'Enter', repeat: true });
+
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
+  });
+
   // 19. Autocomplete — suggestions doc written in batch --------------------
   it('includes a suggestions doc write in writeBatch when expense is saved', async () => {
     const { setSpy, commitSpy } = makeBatchMock();
