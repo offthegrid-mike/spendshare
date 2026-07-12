@@ -8,6 +8,7 @@ interface ItemNameComboboxProps {
   suggestions: SuggestionEntry[];
   id?: string;
   placeholder?: string;
+  onEnter?: () => void;
 }
 
 export default function ItemNameCombobox({
@@ -16,6 +17,7 @@ export default function ItemNameCombobox({
   suggestions,
   id,
   placeholder = 'Item name',
+  onEnter,
 }: ItemNameComboboxProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -51,6 +53,9 @@ export default function ItemNameCombobox({
         setOpen(true);
         setActiveIndex(0);
         e.preventDefault();
+      } else if (e.key === 'Enter') {
+        onEnter?.();
+        e.preventDefault();
       }
       return;
     }
@@ -66,6 +71,8 @@ export default function ItemNameCombobox({
       case 'Enter':
         if (activeIndex >= 0 && activeIndex < filtered.length) {
           handleSelect(filtered[activeIndex]);
+        } else {
+          onEnter?.();
         }
         e.preventDefault();
         break;

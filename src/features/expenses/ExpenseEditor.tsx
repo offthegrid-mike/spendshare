@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -111,6 +111,25 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+
+  // Enter-to-add: append a blank row and move focus to its Item name field.
+  // The new row's index is stashed here, then consumed by the effect below
+  // once react-hook-form has rendered the appended row.
+  const focusItemIndexRef = useRef<number | null>(null);
+
+  function addItemAndFocus(index: number) {
+    const name = getValues(`items.${index}.name`);
+    if (!name || !name.trim()) return;
+    focusItemIndexRef.current = fields.length;
+    append({ name: '', categoryId: '', amount: '', shared: true, remark: '' });
+  }
+
+  useEffect(() => {
+    if (focusItemIndexRef.current === null) return;
+    const el = document.getElementById(`items.${focusItemIndexRef.current}.name`);
+    el?.focus();
+    focusItemIndexRef.current = null;
+  }, [fields.length]);
 
   // Gift card panel state — open by default when the expense (or a restored
   // draft) already carries a gift card amount.
@@ -403,6 +422,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                       setValue(`items.${index}.categoryId`, suggestion.categoryId);
                     }
                   }}
+                  onEnter={() => addItemAndFocus(index)}
                 />
               )}
             />
@@ -431,6 +451,12 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                 type="text"
                 inputMode="decimal"
                 {...register(`items.${index}.amount`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addItemAndFocus(index);
+                  }
+                }}
                 className="field"
               />
             </div>

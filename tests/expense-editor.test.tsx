@@ -522,6 +522,65 @@ describe('ExpenseEditor', () => {
     expect(screen.getByRole('button', { name: /save expense/i })).not.toBeDisabled();
   });
 
+  // 23. Enter-to-add — Item name field --------------------------------------
+  it('appends a row and focuses the new item name when Enter is pressed in a filled item name field', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    const nameInput = screen.getByPlaceholderText(/item name/i);
+    // "Apples" matches no suggestion (only "Milk") → dropdown stays closed
+    await u.type(nameInput, 'Apples');
+    await u.keyboard('{Enter}');
+
+    const nameInputs = screen.getAllByPlaceholderText(/item name/i);
+    expect(nameInputs).toHaveLength(2);
+    // Focus moved to the new row's item name field
+    expect(document.activeElement).toBe(document.getElementById('items.1.name'));
+  });
+
+  // 24. Enter-to-add — Amount field ------------------------------------------
+  it('appends a row and focuses the new item name when Enter is pressed in the amount field', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
+    await u.type(amountInput, '3.00');
+    await u.keyboard('{Enter}');
+
+    const nameInputs = screen.getAllByPlaceholderText(/item name/i);
+    expect(nameInputs).toHaveLength(2);
+    expect(document.activeElement).toBe(document.getElementById('items.1.name'));
+  });
+
+  // 25. Enter-to-add — empty item name is a no-op ----------------------------
+  it('does not append a row when Enter is pressed with an empty item name', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    const nameInput = screen.getByPlaceholderText(/item name/i);
+    nameInput.focus();
+    await u.keyboard('{Enter}');
+
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
+  });
+
+  // 26. Enter-to-add — highlighted suggestion selects, does not append -------
+  it('selects the highlighted suggestion (no new row) when Enter is pressed with the dropdown open', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    const nameInput = screen.getByPlaceholderText(/item name/i);
+    // "Mi" matches the "Milk" suggestion → dropdown opens
+    await u.type(nameInput, 'Mi');
+    expect(await screen.findByRole('option', { name: /Milk/i })).toBeInTheDocument();
+    await u.keyboard('{ArrowDown}{Enter}');
+
+    // Suggestion was selected, no new row appended
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
+    expect((nameInput as HTMLInputElement).value).toBe('Milk');
+  });
+
   // 19. Autocomplete — suggestions doc written in batch --------------------
   it('includes a suggestions doc write in writeBatch when expense is saved', async () => {
     const { setSpy, commitSpy } = makeBatchMock();
