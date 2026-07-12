@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
 import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
@@ -18,6 +17,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ItemNameCombobox from './ItemNameCombobox';
 import ShopNameCombobox from './ShopNameCombobox';
+import { schema, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 
 function useSafeNavigate(): NavigateFunction {
@@ -27,30 +27,6 @@ function useSafeNavigate(): NavigateFunction {
     return (() => {}) as unknown as NavigateFunction;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
-const lineItemSchema = z.object({
-  name: z.string().min(1, 'Item name required'),
-  categoryId: z.string(),
-  amount: z.string().min(1),
-  shared: z.boolean(),
-  remark: z.string().optional(),
-});
-
-const schema = z.object({
-  date: z.string().min(1, 'Date required'),
-  shopName: z.string().min(1, 'Shop name is required'),
-  payerUid: z.string().min(1),
-  giftCardAmount: z.string().optional().refine(
-    (v) => !v || !isNaN(parseFloat(v)),
-    { message: 'Enter a valid amount' }
-  ),
-  items: z.array(lineItemSchema).min(1),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 // ---------------------------------------------------------------------------
 // Props
