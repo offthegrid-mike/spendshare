@@ -10,10 +10,15 @@ export function useMonthExpenses(
 ): {
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
+  itemsLoaded: boolean;
   loading: boolean;
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
+  // Tracks whether the items subscription has emitted at least once. The items
+  // arrive on a separate snapshot from the expenses, so consumers that need the
+  // full picture (e.g. the edit route) must wait for this, not just `loading`.
+  const [itemsLoaded, setItemsLoaded] = useState(false);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   const key = gid ? `${gid}:${month}` : null;
@@ -44,6 +49,7 @@ export function useMonthExpenses(
         map[item.expenseId].push(item);
       }
       setItemsByExpense(map);
+      setItemsLoaded(true);
     });
 
     return () => {
@@ -52,10 +58,11 @@ export function useMonthExpenses(
       // Reset stale data immediately when group/month changes
       setExpenses([]);
       setItemsByExpense({});
+      setItemsLoaded(false);
     };
   }, [gid, month]);
 
   const loading = gid !== null && loadedKey !== key;
 
-  return { expenses, itemsByExpense, loading };
+  return { expenses, itemsByExpense, itemsLoaded, loading };
 }

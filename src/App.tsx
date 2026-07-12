@@ -44,10 +44,13 @@ function SummaryRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
 function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
   const { selectedMonth } = useUIStore();
-  const { expenses, itemsByExpense } = useMonthExpenses(group.id, selectedMonth);
+  const { expenses, itemsByExpense, itemsLoaded } = useMonthExpenses(group.id, selectedMonth);
   const expense = expenses.find((e) => e.id === id);
   const items = id ? (itemsByExpense[id] ?? []) : [];
-  if (!expense) return <div>Loading…</div>;
+  // Wait for BOTH the expense and its items to load before mounting the editor:
+  // react-hook-form snapshots its default values on mount, so rendering before
+  // the (separate) items snapshot arrives would leave the form permanently empty.
+  if (!expense || !itemsLoaded) return <div>Loading…</div>;
   return <ExpenseEditor group={group} currentUserUid={user.uid} expense={expense} items={items} />;
 }
 
