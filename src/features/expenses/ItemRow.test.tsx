@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useForm } from 'react-hook-form';
 import ItemRow from './ItemRow';
 import type { FormValues } from './expenseForm';
@@ -58,10 +58,52 @@ describe('ItemRow', () => {
   });
 
   it('reveals the remark and remove controls when expanded', () => {
+    render(<Harness expanded />);
+    expect(screen.getByPlaceholderText(/on sale, for party/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /remove item/i })).toBeTruthy();
+  });
+
+  it('arms on the first click without calling onRemove', () => {
     const onRemove = vi.fn();
     render(<Harness expanded onRemove={onRemove} />);
-    expect(screen.getByPlaceholderText(/on sale, for party/i)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /remove item/i }));
+    expect(screen.getByRole('button', { name: /click again to remove/i })).toBeTruthy();
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it('calls onRemove on the second click while armed', () => {
+    const onRemove = vi.fn();
+    render(<Harness expanded onRemove={onRemove} />);
+    fireEvent.click(screen.getByRole('button', { name: /remove item/i }));
+    fireEvent.click(screen.getByRole('button', { name: /click again to remove/i }));
     expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the armed label back on blur', () => {
+    const onRemove = vi.fn();
+    render(<Harness expanded onRemove={onRemove} />);
+    const btn = screen.getByRole('button', { name: /remove item/i });
+    fireEvent.click(btn);
+    expect(screen.getByRole('button', { name: /click again to remove/i })).toBeTruthy();
+    fireEvent.blur(btn);
+    expect(screen.getByRole('button', { name: /remove item/i })).toBeTruthy();
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it('resets the armed label back after the timeout', () => {
+    vi.useFakeTimers();
+    try {
+      const onRemove = vi.fn();
+      render(<Harness expanded onRemove={onRemove} />);
+      fireEvent.click(screen.getByRole('button', { name: /remove item/i }));
+      expect(screen.getByRole('button', { name: /click again to remove/i })).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByRole('button', { name: /remove item/i })).toBeTruthy();
+      expect(onRemove).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

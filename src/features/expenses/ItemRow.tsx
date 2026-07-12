@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import { ChevronDown, ChevronRight, UserRound } from 'lucide-react';
@@ -26,6 +27,34 @@ export default function ItemRow({
 }: ItemRowProps) {
   const catName = cats.find((c) => c.id === summary?.categoryId)?.name ?? '';
   const amountCents = toCents(summary?.amount ?? '0');
+
+  const [armed, setArmed] = useState(false);
+  const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearDisarmTimer = () => {
+    if (disarmTimer.current) {
+      clearTimeout(disarmTimer.current);
+      disarmTimer.current = null;
+    }
+  };
+
+  const disarm = () => {
+    clearDisarmTimer();
+    setArmed(false);
+  };
+
+  useEffect(() => clearDisarmTimer, []);
+
+  const handleRemoveClick = () => {
+    if (armed) {
+      disarm();
+      onRemove();
+      return;
+    }
+    setArmed(true);
+    clearDisarmTimer();
+    disarmTimer.current = setTimeout(() => setArmed(false), 3000);
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60">
@@ -122,10 +151,11 @@ export default function ItemRow({
 
           <button
             type="button"
-            onClick={onRemove}
+            onClick={handleRemoveClick}
+            onBlur={disarm}
             className="text-sm text-rose-600 hover:underline"
           >
-            Remove item
+            {armed ? 'Click again to remove' : 'Remove item'}
           </button>
         </div>
       )}

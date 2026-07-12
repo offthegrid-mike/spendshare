@@ -31,6 +31,8 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
     setAmount('');
     setError('');
     // categoryId and shared intentionally retained (sticky) for the next item.
+    // Return focus to the name input for rapid consecutive entry.
+    document.getElementById('quickadd-name')?.focus();
   }
 
   return (
@@ -42,8 +44,10 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
       <div className="flex gap-2">
         <div className="flex-1">
           <ItemNameCombobox
+            id="quickadd-name"
             value={name}
             suggestions={suggestions}
+            onEnter={handleAdd}
             onChange={(n, suggestion) => {
               setName(n);
               if (suggestion) setCategoryId(suggestion.categoryId);
