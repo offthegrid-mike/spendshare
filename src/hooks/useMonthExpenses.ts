@@ -10,16 +10,13 @@ export function useMonthExpenses(
 ): {
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
-  itemsLoaded: boolean;
   loading: boolean;
+  itemsLoading: boolean;
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
-  // Tracks whether the items subscription has emitted at least once. The items
-  // arrive on a separate snapshot from the expenses, so consumers that need the
-  // full picture (e.g. the edit route) must wait for this, not just `loading`.
-  const [itemsLoaded, setItemsLoaded] = useState(false);
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [expensesLoadedKey, setExpensesLoadedKey] = useState<string | null>(null);
+  const [itemsLoadedKey, setItemsLoadedKey] = useState<string | null>(null);
 
   const key = gid ? `${gid}:${month}` : null;
 
@@ -32,7 +29,11 @@ export function useMonthExpenses(
     const expQ = query(expensesCol(gid), where('month', '==', month), orderBy('date', 'desc'));
     const unsubExp = onSnapshot(expQ, (snap) => {
       setExpenses(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
-      setLoadedKey(`${gid}:${month}`);
+      setExpensesLoadedKey(`${gid}:${month}`);
+    }, () => {
+      // Transient permission-denied can occur while membership propagates;
+      // unblock loading and let the next snapshot resolve it.
+      setExpensesLoadedKey(`${gid}:${month}`);
     });
 
     // Subscribe to all items for this group+month via collectionGroup
@@ -49,7 +50,9 @@ export function useMonthExpenses(
         map[item.expenseId].push(item);
       }
       setItemsByExpense(map);
-      setItemsLoaded(true);
+      setItemsLoadedKey(`${gid}:${month}`);
+    }, () => {
+      setItemsLoadedKey(`${gid}:${month}`);
     });
 
     return () => {
@@ -58,11 +61,17 @@ export function useMonthExpenses(
       // Reset stale data immediately when group/month changes
       setExpenses([]);
       setItemsByExpense({});
-      setItemsLoaded(false);
     };
   }, [gid, month]);
 
-  const loading = gid !== null && loadedKey !== key;
+  // `loading` tracks the expenses listener alone, matching the original
+  // semantics most callers (e.g. the expense list) rely on — they only need
+  // expense docs to render. `itemsLoading` is separate so a caller that also
+  // needs itemsByExpense fully hydrated before rendering (e.g. the
+  // edit-expense form, to avoid mounting react-hook-form with stale
+  // defaultValues) can wait on it explicitly without penalizing everyone else.
+  const loading = gid !== null && expensesLoadedKey !== key;
+  const itemsLoading = gid !== null && itemsLoadedKey !== key;
 
-  return { expenses, itemsByExpense, itemsLoaded, loading };
+  return { expenses, itemsByExpense, loading, itemsLoading };
 }
