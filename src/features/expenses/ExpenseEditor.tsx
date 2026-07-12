@@ -131,6 +131,41 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     focusItemIndexRef.current = null;
   }, [fields.length]);
 
+  // Inline two-click confirm for per-row "Remove item". Only one row can be
+  // armed at a time; the armed state resets on blur or after a short timeout.
+  const [armedRemoveIndex, setArmedRemoveIndex] = useState<number | null>(null);
+  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearRemoveTimer() {
+    if (removeTimerRef.current !== null) {
+      clearTimeout(removeTimerRef.current);
+      removeTimerRef.current = null;
+    }
+  }
+
+  function disarmRemove() {
+    clearRemoveTimer();
+    setArmedRemoveIndex(null);
+  }
+
+  function handleRemoveClick(index: number) {
+    if (armedRemoveIndex === index) {
+      clearRemoveTimer();
+      setArmedRemoveIndex(null);
+      remove(index);
+      return;
+    }
+    clearRemoveTimer();
+    setArmedRemoveIndex(index);
+    removeTimerRef.current = setTimeout(() => {
+      removeTimerRef.current = null;
+      setArmedRemoveIndex(null);
+    }, 3000);
+  }
+
+  // Clear any pending timer on unmount.
+  useEffect(() => clearRemoveTimer, []);
+
   // Gift card panel state — open by default when the expense (or a restored
   // draft) already carries a gift card amount.
   const [giftCardOpen, setGiftCardOpen] = useState(
@@ -492,10 +527,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             {fields.length > 1 && (
               <button
                 type="button"
-                onClick={() => remove(index)}
+                onClick={() => handleRemoveClick(index)}
+                onBlur={disarmRemove}
                 className="text-sm text-rose-600 hover:underline"
               >
-                Remove item
+                {armedRemoveIndex === index ? 'Click again to remove' : 'Remove item'}
               </button>
             )}
           </div>

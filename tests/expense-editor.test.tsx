@@ -603,4 +603,106 @@ describe('ExpenseEditor', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((suggestionsCall as any)[1]).toMatchObject({ items: expect.any(Array) });
   });
+
+  // 27. Inline remove confirm — first click arms, does not remove ------------
+  it('shows "Click again to remove" and does not remove the row on the first click', async () => {
+    const u = userEvent.setup();
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
+    );
+
+    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
+    expect(removeButtons).toHaveLength(2);
+
+    await u.click(removeButtons[0]);
+
+    // Armed label appears; row is NOT removed.
+    expect(screen.getByRole('button', { name: /click again to remove/i })).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
+  });
+
+  // 28. Inline remove confirm — second click removes the row ------------------
+  it('removes the row on the second click of the same "Remove item" button', async () => {
+    const u = userEvent.setup();
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
+    );
+
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
+
+    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
+    await u.click(removeButtons[0]);
+
+    const armed = screen.getByRole('button', { name: /click again to remove/i });
+    await u.click(armed);
+
+    // Down to a single row (remove button no longer shown either).
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /click again to remove/i })).not.toBeInTheDocument();
+  });
+
+  // 29. Inline remove confirm — blur resets the armed state ------------------
+  it('resets the armed button back to "Remove item" on blur', async () => {
+    const u = userEvent.setup();
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
+    );
+
+    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
+    await u.click(removeButtons[0]);
+
+    const armed = screen.getByRole('button', { name: /click again to remove/i });
+    act(() => {
+      fireEvent.blur(armed);
+    });
+
+    expect(screen.queryByRole('button', { name: /click again to remove/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^remove item$/i })).toHaveLength(2);
+  });
+
+  // 30. Inline remove confirm — timeout resets the armed state ---------------
+  it('resets the armed button back to "Remove item" after the ~3s timeout', () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
+      );
+
+      const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
+      act(() => {
+        fireEvent.click(removeButtons[0]);
+      });
+      expect(screen.getByRole('button', { name: /click again to remove/i })).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(
+        screen.queryByRole('button', { name: /click again to remove/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /^remove item$/i })).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // 31. Inline remove confirm — only one row armed at a time -----------------
+  it('arms only one row at a time (arming another disarms the previous)', async () => {
+    const u = userEvent.setup();
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
+    );
+
+    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
+    await u.click(removeButtons[0]);
+    expect(screen.getAllByRole('button', { name: /click again to remove/i })).toHaveLength(1);
+
+    // Arm the other row's button.
+    const other = screen.getByRole('button', { name: /^remove item$/i });
+    await u.click(other);
+
+    // Still exactly one armed button.
+    expect(screen.getAllByRole('button', { name: /click again to remove/i })).toHaveLength(1);
+  });
 });
