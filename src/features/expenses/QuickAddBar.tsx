@@ -72,7 +72,6 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
         <label htmlFor="qa-category" className="sr-only">Category</label>
         <select
           id="qa-category"
-          role="listbox"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
           className="field flex-1"

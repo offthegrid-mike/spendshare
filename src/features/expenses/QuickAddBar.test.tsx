@@ -16,7 +16,7 @@ function setup() {
 describe('QuickAddBar', () => {
   it('adds an item with the entered name, amount, category and shared', () => {
     const { onAdd } = setup();
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Cherry' } });
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '3.00' } });
     fireEvent.change(screen.getByLabelText(/category/i), { target: { value: 'c1' } });
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
@@ -30,11 +30,11 @@ describe('QuickAddBar', () => {
 
   it('clears name and amount but keeps category after adding', () => {
     const { onAdd } = setup();
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Cherry' } });
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '3.00' } });
     fireEvent.change(screen.getByLabelText(/category/i), { target: { value: 'c1' } });
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
-    expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText(/item name/i) as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText(/category/i) as HTMLSelectElement).value).toBe('c1');
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -42,7 +42,7 @@ describe('QuickAddBar', () => {
 
   it('adds when Enter is pressed in the amount field', () => {
     const { onAdd } = setup();
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Milk' } });
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Milk' } });
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '4.20' } });
     fireEvent.keyDown(screen.getByLabelText(/amount/i), { key: 'Enter' });
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -58,7 +58,7 @@ describe('QuickAddBar', () => {
 
   it('does not add when the amount is missing or invalid', () => {
     const { onAdd } = setup();
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Cherry' } });
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
     expect(onAdd).not.toHaveBeenCalled();
     expect(screen.getByText(/enter an amount/i)).toBeTruthy();
