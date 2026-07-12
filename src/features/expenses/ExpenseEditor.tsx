@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
 import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
@@ -17,8 +16,10 @@ import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, Sh
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
-import ItemNameCombobox from './ItemNameCombobox';
 import ShopNameCombobox from './ShopNameCombobox';
+import QuickAddBar from './QuickAddBar';
+import ItemRow from './ItemRow';
+import { schema, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 
 function useSafeNavigate(): NavigateFunction {
@@ -28,30 +29,6 @@ function useSafeNavigate(): NavigateFunction {
     return (() => {}) as unknown as NavigateFunction;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
-const lineItemSchema = z.object({
-  name: z.string().min(1, 'Item name required'),
-  categoryId: z.string(),
-  amount: z.string().min(1),
-  shared: z.boolean(),
-  remark: z.string().optional(),
-});
-
-const schema = z.object({
-  date: z.string().min(1, 'Date required'),
-  shopName: z.string().min(1, 'Shop name is required'),
-  payerUid: z.string().min(1),
-  giftCardAmount: z.string().optional().refine(
-    (v) => !v || !isNaN(parseFloat(v)),
-    { message: 'Enter a valid amount' }
-  ),
-  items: z.array(lineItemSchema).min(1),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -91,7 +68,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             shared: it.shared,
             remark: it.remark ?? '',
           }))
-        : [{ name: '', categoryId: '', amount: '', shared: true, remark: '' }],
+        : [],
   };
 
   // Load a resumable draft once, on mount, for new expenses.
@@ -112,6 +89,17 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(fieldId: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldId)) next.delete(fieldId);
+      else next.add(fieldId);
+      return next;
+    });
+  }
 
   // Gift card panel state — open by default when the expense (or a restored
   // draft) already carries a gift card amount.
@@ -390,106 +378,52 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         )}
       </div>
 
-      {/* Line items */}
+      {/* Items */}
       <div className="space-y-3">
-        {fields.map((field, index) => (
-          <div key={field.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            {/* Item name */}
-            <Controller
-              control={control}
-              name={`items.${index}.name`}
-              render={({ field }) => (
-                <ItemNameCombobox
-                  id={`items.${index}.name`}
-                  value={field.value}
-                  suggestions={suggestions}
-                  onChange={(name, suggestion) => {
-                    field.onChange(name);
-                    if (suggestion) {
-                      setValue(`items.${index}.categoryId`, suggestion.categoryId);
-                    }
-                  }}
-                />
-              )}
-            />
-            {errors.items?.[index]?.name && (
-              <p className="text-rose-600 text-sm">{errors.items[index].name?.message}</p>
-            )}
+        <QuickAddBar
+          cats={cats}
+          suggestions={suggestions}
+          onAdd={({ name, categoryId, amount, shared }) =>
+            append({ name, categoryId, amount, shared, remark: '' })
+          }
+        />
 
-            {/* Category */}
-            <select {...register(`items.${index}.categoryId`)} className="field">
-              <option value="">No category</option>
-              {cats.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-
-            {/* Amount */}
-            <div>
-              <label
-                htmlFor={`items.${index}.amount`}
-                className="mb-1 block text-sm font-medium text-slate-700"
-              >
-                Amount
-              </label>
-              <input
-                id={`items.${index}.amount`}
-                type="text"
-                inputMode="decimal"
-                {...register(`items.${index}.amount`)}
-                className="field"
+        {fields.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+            No items yet — add your first above.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <ItemRow
+                key={field.id}
+                index={index}
+                control={control}
+                register={register}
+                setValue={setValue}
+                cats={cats}
+                suggestions={suggestions}
+                summary={watchedItems?.[index]}
+                currency={group.currency}
+                expanded={expandedIds.has(field.id)}
+                onToggle={() => toggleExpanded(field.id)}
+                onRemove={() => {
+                  remove(index);
+                  setExpandedIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(field.id);
+                    return next;
+                  });
+                }}
               />
-            </div>
-
-            {/* Remark */}
-            <div>
-              <label
-                htmlFor={`items.${index}.remark`}
-                className="mb-1 block text-sm font-medium text-slate-700"
-              >
-                Remark{' '}
-                <span className="font-normal text-slate-400">(optional)</span>
-              </label>
-              <input
-                id={`items.${index}.remark`}
-                type="text"
-                placeholder="e.g. on sale, for party…"
-                {...register(`items.${index}.remark`)}
-                className="field"
-              />
-            </div>
-
-            {/* Shared */}
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                {...register(`items.${index}.shared`)}
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
-              />
-              Shared
-            </label>
-
-            {fields.length > 1 && (
-              <button
-                type="button"
-                onClick={() => remove(index)}
-                className="text-sm text-rose-600 hover:underline"
-              >
-                Remove item
-              </button>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Add item */}
-      <button
-        type="button"
-        onClick={() => append({ name: '', categoryId: '', amount: '', shared: true, remark: '' })}
-        className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
-      >
-        + Add item
-      </button>
+        {errors.items && (
+          <p className="text-sm text-rose-600">{errors.items.message ?? 'Add at least one item'}</p>
+        )}
+      </div>
 
       {/* Totals footer */}
       <div className="space-y-1.5 border-t border-slate-100 pt-3">
