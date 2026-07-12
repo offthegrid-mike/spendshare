@@ -249,6 +249,34 @@ describe('ItemNameCombobox', () => {
     expect(activeOption).toHaveAttribute('aria-selected', 'true');
   });
 
+  // ── Dedup ─────────────────────────────────────────────────────────────────
+
+  it('collapses same-name suggestions across categories into a single option', async () => {
+    const dupes: SuggestionEntry[] = [
+      { name: 'Milk', categoryId: 'cat1', category: 'Dairy', count: 3 },
+      { name: 'milk', categoryId: 'cat2', category: 'Groceries', count: 9 },
+    ];
+    const u = userEvent.setup();
+    render(<Wrapper sugs={dupes} />);
+    await u.type(screen.getByRole('combobox'), 'mil');
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    // the higher-count entry (Groceries) wins
+    expect(screen.getByText('Groceries')).toBeInTheDocument();
+  });
+
+  it('collapses same-name suggestions that differ only by internal or trailing whitespace', async () => {
+    const dupes: SuggestionEntry[] = [
+      { name: 'Chinese cabbage',  categoryId: 'cat1', category: 'Groceries', count: 4 },
+      { name: 'Chinese  cabbage', categoryId: 'cat1', category: 'Groceries', count: 1 },
+      { name: 'Chinese cabbage ', categoryId: 'cat1', category: 'Groceries', count: 2 },
+    ];
+    const u = userEvent.setup();
+    render(<Wrapper sugs={dupes} />);
+    await u.type(screen.getByRole('combobox'), 'cab');
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+  });
+
   // ── RTL ───────────────────────────────────────────────────────────────────
 
   it('renders input and list items with dir="auto" for RTL support', async () => {

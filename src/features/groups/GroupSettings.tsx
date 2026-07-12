@@ -3,6 +3,7 @@ import { doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, deleteField }
 import { UserPlus, Trash2, Crown } from 'lucide-react';
 import { groupsCol } from '../../lib/converters';
 import LoadingButton from '../../components/LoadingButton';
+import { formatVersionLabel } from '../../lib/appVersion';
 import type { GroupDoc } from '../../types/models';
 
 const CURRENCIES = ['AUD', 'USD', 'EUR', 'GBP'];
@@ -210,6 +211,11 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
           </form>
         )}
       </section>
+
+      {/* Desktop only — mobile already shows this on the More tab */}
+      <p className="hidden px-1 text-center text-xs text-slate-400 sm:block">
+        {formatVersionLabel(__APP_COMMIT__, __APP_BUILT_AT__)}
+      </p>
     </div>
   );
 }

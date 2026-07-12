@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { formatMoney } from '../../lib/money';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 
 interface Props { group: GroupDoc; }
@@ -16,6 +17,7 @@ export default function ExpenseList({ group }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ exp: ExpenseDoc; items: ItemDoc[] } | null>(null);
 
   function payerName(uid: string): string {
     return group.members[uid]?.displayName ?? uid;
@@ -37,6 +39,13 @@ export default function ExpenseList({ group }: Props) {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    const { exp, items } = pendingDelete;
+    setPendingDelete(null);
+    await handleDelete(exp, items);
   }
 
   if (loading) {
@@ -152,7 +161,7 @@ export default function ExpenseList({ group }: Props) {
                     <button
                       type="button"
                       disabled={isDeleting}
-                      onClick={() => void handleDelete(exp, items)}
+                      onClick={() => setPendingDelete({ exp, items })}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
                       title="Delete"
                     >
@@ -183,6 +192,19 @@ export default function ExpenseList({ group }: Props) {
         </div>
       ))}
       {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete expense?"
+        message={
+          pendingDelete
+            ? `This will permanently delete the "${pendingDelete.exp.shopName}" expense and its items. This can't be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmDisabled={deletingId !== null}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

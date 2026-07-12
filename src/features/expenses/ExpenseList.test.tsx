@@ -1,7 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
+
+const mockWriteBatch = vi.fn();
+vi.mock('firebase/firestore', () => ({
+  writeBatch: () => {
+    mockWriteBatch();
+    return { delete: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) };
+  },
+  doc: vi.fn(),
+  collection: vi.fn(),
+}));
 
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../stores/uiStore', () => ({
@@ -112,5 +122,39 @@ describe('ExpenseList', () => {
     renderList();
     // Badge is visible in the card header without expanding
     expect(screen.getByText('Food')).toBeTruthy();
+  });
+
+  it('shows a confirmation dialog instead of deleting immediately', async () => {
+    mockUseMonthExpenses.mockReturnValue({
+      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
+    });
+    renderList();
+    fireEvent.click(screen.getByTitle('Delete'));
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+    expect(screen.getByText(/delete expense/i)).toBeTruthy();
+    expect(mockWriteBatch).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when the confirmation is cancelled', async () => {
+    mockUseMonthExpenses.mockReturnValue({
+      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
+    });
+    renderList();
+    fireEvent.click(screen.getByTitle('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(mockWriteBatch).not.toHaveBeenCalled();
+  });
+
+  it('deletes the expense after confirming', async () => {
+    mockUseMonthExpenses.mockReturnValue({
+      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
+    });
+    renderList();
+    fireEvent.click(screen.getByTitle('Delete'));
+    const dialog = screen.getByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }));
+    await waitFor(() => expect(mockWriteBatch).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });

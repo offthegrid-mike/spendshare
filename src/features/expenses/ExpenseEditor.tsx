@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { useForm, useFieldArray, useWatch, Controller, type Resolver } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
 import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
+import { collapseWhitespace } from '../../lib/textNormalize';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
@@ -16,8 +16,10 @@ import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, Sh
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
-import ItemNameCombobox from './ItemNameCombobox';
 import ShopNameCombobox from './ShopNameCombobox';
+import QuickAddBar from './QuickAddBar';
+import ItemRow from './ItemRow';
+import { schema, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 
 function useSafeNavigate(): NavigateFunction {
@@ -27,48 +29,6 @@ function useSafeNavigate(): NavigateFunction {
     return (() => {}) as unknown as NavigateFunction;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
-const lineItemSchema = z.object({
-  name: z.string().min(1, 'Item name required'),
-  categoryId: z.string(),
-  amount: z.string().min(1),
-  shared: z.boolean(),
-  remark: z.string().optional(),
-});
-
-const schema = z.object({
-  date: z.string().min(1, 'Date required'),
-  shopName: z.string().min(1, 'Shop name is required'),
-  payerUid: z.string().min(1),
-  giftCardAmount: z.string().optional().refine(
-    (v) => !v || !isNaN(parseFloat(v)),
-    { message: 'Enter a valid amount' }
-  ),
-  // Silently drop fully-empty line-item rows (both name and amount blank
-  // after trim) before validation, so a trailing untouched row spawned by the
-  // quick-add Enter flow is ignored rather than blocking Save. Partial rows
-  // (e.g. name filled, amount empty) are kept and still fail validation.
-  items: z.preprocess(
-    (val) =>
-      Array.isArray(val)
-        ? val.filter(
-            (it) =>
-              !(
-                typeof it === 'object' &&
-                it !== null &&
-                String((it as { name?: unknown }).name ?? '').trim() === '' &&
-                String((it as { amount?: unknown }).amount ?? '').trim() === ''
-              ),
-          )
-        : val,
-    z.array(lineItemSchema).min(1),
-  ),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -108,7 +68,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             shared: it.shared,
             remark: it.remark ?? '',
           }))
-        : [{ name: '', categoryId: '', amount: '', shared: true, remark: '' }],
+        : [],
   };
 
   // Load a resumable draft once, on mount, for new expenses.
@@ -124,68 +84,22 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     getValues,
     formState: { errors },
   } = useForm<FormValues>({
-    // zodResolver's input type widens `items` to `unknown` because of the
-    // z.preprocess wrapper above; its parsed output is exactly FormValues, so
-    // we type the resolver against FormValues rather than casting the form.
-    resolver: zodResolver(schema) as Resolver<FormValues>,
+    resolver: zodResolver(schema),
     defaultValues: restoredDraft ? { ...blankDefaults, ...restoredDraft } : blankDefaults,
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
-  // Enter-to-add: append a blank row and move focus to its Item name field.
-  // The new row's index is stashed here, then consumed by the effect below
-  // once react-hook-form has rendered the appended row.
-  const focusItemIndexRef = useRef<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  function addItemAndFocus(index: number) {
-    const name = getValues(`items.${index}.name`);
-    if (!name || !name.trim()) return;
-    focusItemIndexRef.current = fields.length;
-    append({ name: '', categoryId: '', amount: '', shared: true, remark: '' });
+  function toggleExpanded(fieldId: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldId)) next.delete(fieldId);
+      else next.add(fieldId);
+      return next;
+    });
   }
-
-  useEffect(() => {
-    if (focusItemIndexRef.current === null) return;
-    const el = document.getElementById(`items.${focusItemIndexRef.current}.name`);
-    el?.focus();
-    focusItemIndexRef.current = null;
-  }, [fields.length]);
-
-  // Inline two-click confirm for per-row "Remove item". Only one row can be
-  // armed at a time; the armed state resets on blur or after a short timeout.
-  const [armedRemoveIndex, setArmedRemoveIndex] = useState<number | null>(null);
-  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function clearRemoveTimer() {
-    if (removeTimerRef.current !== null) {
-      clearTimeout(removeTimerRef.current);
-      removeTimerRef.current = null;
-    }
-  }
-
-  function disarmRemove() {
-    clearRemoveTimer();
-    setArmedRemoveIndex(null);
-  }
-
-  function handleRemoveClick(index: number) {
-    if (armedRemoveIndex === index) {
-      clearRemoveTimer();
-      setArmedRemoveIndex(null);
-      remove(index);
-      return;
-    }
-    clearRemoveTimer();
-    setArmedRemoveIndex(index);
-    removeTimerRef.current = setTimeout(() => {
-      removeTimerRef.current = null;
-      setArmedRemoveIndex(null);
-    }, 3000);
-  }
-
-  // Clear any pending timer on unmount.
-  useEffect(() => clearRemoveTimer, []);
 
   // Gift card panel state — open by default when the expense (or a restored
   // draft) already carries a gift card amount.
@@ -247,7 +161,12 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     }
   }
 
-  async function submitExpense(data: FormValues) {
+  async function submitExpense(rawData: FormValues) {
+    const data: FormValues = {
+      ...rawData,
+      shopName: collapseWhitespace(rawData.shopName),
+      items: rawData.items.map((it) => ({ ...it, name: collapseWhitespace(it.name) })),
+    };
     const batch = writeBatch(db);
     const expRef = expense
       ? doc(expensesCol(group.id), expense.id)
@@ -459,115 +378,52 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         )}
       </div>
 
-      {/* Line items */}
+      {/* Items */}
       <div className="space-y-3">
-        {fields.map((field, index) => (
-          <div key={field.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            {/* Item name */}
-            <Controller
-              control={control}
-              name={`items.${index}.name`}
-              render={({ field }) => (
-                <ItemNameCombobox
-                  id={`items.${index}.name`}
-                  value={field.value}
-                  suggestions={suggestions}
-                  onChange={(name, suggestion) => {
-                    field.onChange(name);
-                    if (suggestion) {
-                      setValue(`items.${index}.categoryId`, suggestion.categoryId);
-                    }
-                  }}
-                  onEnter={() => addItemAndFocus(index)}
-                />
-              )}
-            />
-            {errors.items?.[index]?.name && (
-              <p className="text-rose-600 text-sm">{errors.items[index].name?.message}</p>
-            )}
+        <QuickAddBar
+          cats={cats}
+          suggestions={suggestions}
+          onAdd={({ name, categoryId, amount, shared }) =>
+            append({ name, categoryId, amount, shared, remark: '' })
+          }
+        />
 
-            {/* Category */}
-            <select {...register(`items.${index}.categoryId`)} className="field">
-              <option value="">No category</option>
-              {cats.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-
-            {/* Amount */}
-            <div>
-              <label
-                htmlFor={`items.${index}.amount`}
-                className="mb-1 block text-sm font-medium text-slate-700"
-              >
-                Amount
-              </label>
-              <input
-                id={`items.${index}.amount`}
-                type="text"
-                inputMode="decimal"
-                {...register(`items.${index}.amount`)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    // Ignore auto-repeat so a held Enter can't append multiple rows.
-                    if (!e.repeat) addItemAndFocus(index);
-                  }
+        {fields.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+            No items yet — add your first above.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <ItemRow
+                key={field.id}
+                index={index}
+                control={control}
+                register={register}
+                setValue={setValue}
+                cats={cats}
+                suggestions={suggestions}
+                summary={watchedItems?.[index]}
+                currency={group.currency}
+                expanded={expandedIds.has(field.id)}
+                onToggle={() => toggleExpanded(field.id)}
+                onRemove={() => {
+                  remove(index);
+                  setExpandedIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(field.id);
+                    return next;
+                  });
                 }}
-                className="field"
               />
-            </div>
-
-            {/* Remark */}
-            <div>
-              <label
-                htmlFor={`items.${index}.remark`}
-                className="mb-1 block text-sm font-medium text-slate-700"
-              >
-                Remark{' '}
-                <span className="font-normal text-slate-400">(optional)</span>
-              </label>
-              <input
-                id={`items.${index}.remark`}
-                type="text"
-                placeholder="e.g. on sale, for party…"
-                {...register(`items.${index}.remark`)}
-                className="field"
-              />
-            </div>
-
-            {/* Shared */}
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                {...register(`items.${index}.shared`)}
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
-              />
-              Shared
-            </label>
-
-            {fields.length > 1 && (
-              <button
-                type="button"
-                onClick={() => handleRemoveClick(index)}
-                onBlur={disarmRemove}
-                className="text-sm text-rose-600 hover:underline"
-              >
-                {armedRemoveIndex === index ? 'Click again to remove' : 'Remove item'}
-              </button>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Add item */}
-      <button
-        type="button"
-        onClick={() => append({ name: '', categoryId: '', amount: '', shared: true, remark: '' })}
-        className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
-      >
-        + Add item
-      </button>
+        {errors.items && (
+          <p className="text-sm text-rose-600">{errors.items.message ?? 'Add at least one item'}</p>
+        )}
+      </div>
 
       {/* Totals footer */}
       <div className="space-y-1.5 border-t border-slate-100 pt-3">

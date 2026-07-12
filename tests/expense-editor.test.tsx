@@ -138,6 +138,33 @@ function makeBatchMock() {
   return { batch, commitSpy, setSpy };
 }
 
+// The items UI is now a quick-add bar (which appends a collapsed row) plus
+// per-row expand/collapse — helpers below drive that flow the way a user
+// would, instead of poking at always-visible inline inputs.
+async function addQuickItem(
+  u: ReturnType<typeof userEvent.setup>,
+  name: string,
+  amount: string,
+) {
+  await u.type(screen.getByPlaceholderText(/item name/i), name);
+  await u.type(screen.getByLabelText(/^amount/i), amount);
+  await u.click(screen.getByRole('button', { name: /add item/i }));
+}
+
+// Finds a row's collapsed summary button by its item name and clicks it to
+// expand the row (revealing category/amount/remark/remove controls).
+async function expandRow(u: ReturnType<typeof userEvent.setup>, itemName: string) {
+  await u.click(screen.getByRole('button', { name: new RegExp(itemName, 'i') }));
+}
+
+// Reads the label + value text for one totals-footer row, scoped to that
+// row's own container so it can't collide with the same amount appearing
+// elsewhere on the page (e.g. inside a collapsed item row).
+async function footerRowText(labelRegex: RegExp): Promise<string> {
+  const label = await screen.findByText(labelRegex);
+  return label.closest('div')?.textContent ?? '';
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -177,38 +204,33 @@ describe('ExpenseEditor', () => {
   });
 
   // 2. Running total -------------------------------------------------------
-  it('displays an updated running total as the user enters amounts', async () => {
+  it('displays an updated running total as items are added via quick-add', async () => {
     const u = userEvent.setup();
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
-    // Enter amount into the first (and only) item row
-    const amountInputs = screen.getAllByLabelText(/amount/i);
-    await u.clear(amountInputs[0]);
-    await u.type(amountInputs[0], '10.50');
+    // Add the first item via the quick-add bar
+    await addQuickItem(u, 'Milk', '10.50');
 
     // The live total should reflect A$10.50 (AUD currency)
-    expect(await screen.findByText(/10\.50/)).toBeInTheDocument();
+    expect(await footerRowText(/receipt total/i)).toMatch(/10\.50/);
 
-    // Add a second item via "Add item" button, then fill its amount
-    await u.click(screen.getByRole('button', { name: /add item/i }));
-    const amountInputs2 = screen.getAllByLabelText(/amount/i);
-    await u.clear(amountInputs2[1]);
-    await u.type(amountInputs2[1], '5.00');
+    // Add a second item via the quick-add bar
+    await addQuickItem(u, 'Bread', '5.00');
 
     // Total should now be A$15.50
-    expect(await screen.findByText(/15\.50/)).toBeInTheDocument();
+    expect(await footerRowText(/receipt total/i)).toMatch(/15\.50/);
   });
 
   // 3. Add line item -------------------------------------------------------
-  it('appends a new item row when "Add item" is clicked', async () => {
+  it('adds a new collapsed item row via the quick-add bar', async () => {
     const u = userEvent.setup();
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
-    const before = screen.getAllByPlaceholderText(/item name/i).length;
-    await u.click(screen.getByRole('button', { name: /add item/i }));
-    const after = screen.getAllByPlaceholderText(/item name/i).length;
+    expect(screen.queryByRole('button', { name: /milk/i })).toBeNull();
 
-    expect(after).toBe(before + 1);
+    await addQuickItem(u, 'Milk', '3.00');
+
+    expect(screen.getByRole('button', { name: /milk/i })).toBeInTheDocument();
   });
 
   // 4. Validation ----------------------------------------------------------
@@ -233,14 +255,8 @@ describe('ExpenseEditor', () => {
     await u.clear(screen.getByLabelText(/shop/i));
     await u.type(screen.getByLabelText(/shop/i), 'Coles');
 
-    // Fill item name
-    await u.clear(screen.getByPlaceholderText(/item name/i));
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-
-    // Fill item amount
-    const amountInput = screen.getByLabelText(/amount/i);
-    await u.clear(amountInput);
-    await u.type(amountInput, '3.99');
+    // Add an item via the quick-add bar
+    await addQuickItem(u, 'Apples', '3.99');
 
     // Submit
     await u.click(screen.getByRole('button', { name: /save|submit|add expense/i }));
@@ -263,14 +279,9 @@ describe('ExpenseEditor', () => {
     // Shop name is prefilled
     expect((screen.getByLabelText(/shop/i) as HTMLInputElement).value).toBe('Woolworths');
 
-    // Item names are rendered
-    const itemNameInputs = screen.getAllByPlaceholderText(/item name/i);
-    const itemNames = itemNameInputs.map((el) => (el as HTMLInputElement).value);
-    expect(itemNames).toContain('Milk');
-    expect(itemNames).toContain('Bread');
-
-    // Both items appear in the DOM
-    expect(itemNameInputs).toHaveLength(2);
+    // Both items are rendered as collapsed rows
+    expect(screen.getByRole('button', { name: /milk/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /bread/i })).toBeInTheDocument();
   });
 
   // 7. Gift card — collapsed by default ----------------------------------------
@@ -293,18 +304,16 @@ describe('ExpenseEditor', () => {
     const u = userEvent.setup();
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
-    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
-    await u.clear(amountInput);
-    await u.type(amountInput, '10.00');
+    await addQuickItem(u, 'Milk', '10.00');
 
     await u.click(screen.getByRole('button', { name: /gift card/i }));
     const gcInput = screen.getByLabelText(/gift card amount/i);
     await u.clear(gcInput);
     await u.type(gcInput, '5.30');
 
-    expect(screen.getByText(/10\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/5\.30/)).toBeInTheDocument();
-    expect(screen.getByText(/4\.70/)).toBeInTheDocument();
+    expect(await footerRowText(/receipt total/i)).toMatch(/10\.00/);
+    expect(await footerRowText(/🎁/)).toMatch(/5\.30/);
+    expect(await footerRowText(/paid.*to split/i)).toMatch(/4\.70/);
   });
 
   // 10. Gift card — clears on collapse -----------------------------------------
@@ -327,8 +336,7 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'FairPrice');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Milk');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '10.00');
+    await addQuickItem(u, 'Milk', '10.00');
     await u.click(screen.getByRole('button', { name: /gift card/i }));
     await u.type(screen.getByLabelText(/gift card amount/i), '5.30');
 
@@ -348,8 +356,7 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'Coles');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Bread');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '5.00');
+    await addQuickItem(u, 'Bread', '5.00');
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));
 
@@ -360,9 +367,14 @@ describe('ExpenseEditor', () => {
     expect((expCall as any)?.[1]).not.toHaveProperty('giftCardAmount');
   });
 
-  // 13. Remark — field present per item row ------------------------------------
-  it('renders a remark input for each item row', () => {
+  // 13. Remark — field present when a row is expanded --------------------------
+  it('renders a remark input when an item row is expanded', async () => {
+    const u = userEvent.setup();
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await addQuickItem(u, 'Milk', '3.00');
+    await expandRow(u, 'milk');
+
     expect(screen.getByPlaceholderText(/e\.g\. on sale/i)).toBeInTheDocument();
   });
 
@@ -373,8 +385,8 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'FairPrice');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Milk');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.50');
+    await addQuickItem(u, 'Milk', '3.50');
+    await expandRow(u, 'milk');
     await u.type(screen.getByPlaceholderText(/e\.g\. on sale/i), 'on sale');
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));
@@ -393,8 +405,7 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'Coles');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Bread');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '5.00');
+    await addQuickItem(u, 'Bread', '5.00');
     // remark left empty
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));
@@ -420,6 +431,10 @@ describe('ExpenseEditor', () => {
         items={itemsWithRemark}
       />,
     );
+
+    // Both rows start collapsed — expand them to reveal their remark inputs.
+    fireEvent.click(screen.getByRole('button', { name: /milk/i }));
+    fireEvent.click(screen.getByRole('button', { name: /bread/i }));
 
     const remarkInputs = screen.getAllByPlaceholderText(/e\.g\. on sale/i);
     expect((remarkInputs[0] as HTMLInputElement).value).toBe('on sale');
@@ -480,8 +495,9 @@ describe('ExpenseEditor', () => {
     const option = await screen.findByRole('option', { name: /Milk/i });
     await u.click(option);
 
-    // Fill amount to satisfy validation
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.50');
+    // Fill amount and add the item via the quick-add bar
+    await u.type(screen.getByLabelText(/^amount/i), '3.50');
+    await u.click(screen.getByRole('button', { name: /add item/i }));
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));
 
@@ -506,8 +522,7 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'Coles');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.00');
+    await addQuickItem(u, 'Apples', '3.00');
 
     const submitButton = screen.getByRole('button', { name: /save expense/i });
     await u.click(submitButton);
@@ -522,82 +537,6 @@ describe('ExpenseEditor', () => {
     expect(screen.getByRole('button', { name: /save expense/i })).not.toBeDisabled();
   });
 
-  // 23. Enter-to-add — Item name field --------------------------------------
-  it('appends a row and focuses the new item name when Enter is pressed in a filled item name field', async () => {
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    const nameInput = screen.getByPlaceholderText(/item name/i);
-    // "Apples" matches no suggestion (only "Milk") → dropdown stays closed
-    await u.type(nameInput, 'Apples');
-    await u.keyboard('{Enter}');
-
-    const nameInputs = screen.getAllByPlaceholderText(/item name/i);
-    expect(nameInputs).toHaveLength(2);
-    // Focus moved to the new row's item name field
-    expect(document.activeElement).toBe(document.getElementById('items.1.name'));
-  });
-
-  // 24. Enter-to-add — Amount field ------------------------------------------
-  it('appends a row and focuses the new item name when Enter is pressed in the amount field', async () => {
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
-    await u.type(amountInput, '3.00');
-    await u.keyboard('{Enter}');
-
-    const nameInputs = screen.getAllByPlaceholderText(/item name/i);
-    expect(nameInputs).toHaveLength(2);
-    expect(document.activeElement).toBe(document.getElementById('items.1.name'));
-  });
-
-  // 25. Enter-to-add — empty item name is a no-op ----------------------------
-  it('does not append a row when Enter is pressed with an empty item name', async () => {
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    const nameInput = screen.getByPlaceholderText(/item name/i);
-    nameInput.focus();
-    await u.keyboard('{Enter}');
-
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
-  });
-
-  // 26. Enter-to-add — highlighted suggestion selects, does not append -------
-  it('selects the highlighted suggestion (no new row) when Enter is pressed with the dropdown open', async () => {
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    const nameInput = screen.getByPlaceholderText(/item name/i);
-    // "Mi" matches the "Milk" suggestion → dropdown opens
-    await u.type(nameInput, 'Mi');
-    expect(await screen.findByRole('option', { name: /Milk/i })).toBeInTheDocument();
-    await u.keyboard('{ArrowDown}{Enter}');
-
-    // Suggestion was selected, no new row appended
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
-    expect((nameInput as HTMLInputElement).value).toBe('Milk');
-  });
-
-  // 26b. Enter-to-add — auto-repeat (held Enter) appends only one row -------
-  it('appends only one row when Enter auto-repeats in the amount field', async () => {
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
-    await u.type(amountInput, '3.00');
-
-    // First keydown is a real press; the rest are OS key-repeat.
-    fireEvent.keyDown(amountInput, { key: 'Enter' });
-    fireEvent.keyDown(amountInput, { key: 'Enter', repeat: true });
-    fireEvent.keyDown(amountInput, { key: 'Enter', repeat: true });
-
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
-  });
-
   // 19. Autocomplete — suggestions doc written in batch --------------------
   it('includes a suggestions doc write in writeBatch when expense is saved', async () => {
     const { setSpy, commitSpy } = makeBatchMock();
@@ -605,8 +544,7 @@ describe('ExpenseEditor', () => {
     render(<ExpenseEditor group={group} currentUserUid="u1" />);
 
     await u.type(screen.getByLabelText(/shop/i), 'Coles');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.00');
+    await addQuickItem(u, 'Apples', '3.00');
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));
 
@@ -619,171 +557,5 @@ describe('ExpenseEditor', () => {
     expect(suggestionsCall).toBeDefined();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((suggestionsCall as any)[1]).toMatchObject({ items: expect.any(Array) });
-  });
-
-  // 27. Inline remove confirm — first click arms, does not remove ------------
-  it('shows "Click again to remove" and does not remove the row on the first click', async () => {
-    const u = userEvent.setup();
-    render(
-      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
-    );
-
-    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
-    expect(removeButtons).toHaveLength(2);
-
-    await u.click(removeButtons[0]);
-
-    // Armed label appears; row is NOT removed.
-    expect(screen.getByRole('button', { name: /click again to remove/i })).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
-  });
-
-  // 28. Inline remove confirm — second click removes the row ------------------
-  it('removes the row on the second click of the same "Remove item" button', async () => {
-    const u = userEvent.setup();
-    render(
-      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
-    );
-
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
-
-    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
-    await u.click(removeButtons[0]);
-
-    const armed = screen.getByRole('button', { name: /click again to remove/i });
-    await u.click(armed);
-
-    // Down to a single row (remove button no longer shown either).
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: /click again to remove/i })).not.toBeInTheDocument();
-  });
-
-  // 29. Inline remove confirm — blur resets the armed state ------------------
-  it('resets the armed button back to "Remove item" on blur', async () => {
-    const u = userEvent.setup();
-    render(
-      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
-    );
-
-    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
-    await u.click(removeButtons[0]);
-
-    const armed = screen.getByRole('button', { name: /click again to remove/i });
-    act(() => {
-      fireEvent.blur(armed);
-    });
-
-    expect(screen.queryByRole('button', { name: /click again to remove/i })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /^remove item$/i })).toHaveLength(2);
-  });
-
-  // 30. Inline remove confirm — timeout resets the armed state ---------------
-  it('resets the armed button back to "Remove item" after the ~3s timeout', () => {
-    vi.useFakeTimers();
-    try {
-      render(
-        <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
-      );
-
-      const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
-      act(() => {
-        fireEvent.click(removeButtons[0]);
-      });
-      expect(screen.getByRole('button', { name: /click again to remove/i })).toBeInTheDocument();
-
-      act(() => {
-        vi.advanceTimersByTime(3000);
-      });
-
-      expect(
-        screen.queryByRole('button', { name: /click again to remove/i }),
-      ).not.toBeInTheDocument();
-      expect(screen.getAllByRole('button', { name: /^remove item$/i })).toHaveLength(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  // 32. Quick-add — trailing empty row dropped on submit ---------------------
-  it('drops a trailing fully-empty row (spawned via Enter) on submit and writes only the real item', async () => {
-    const { setSpy, commitSpy } = makeBatchMock();
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    await u.type(screen.getByLabelText(/shop/i), 'Coles');
-    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
-    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
-    await u.type(amountInput, '3.99');
-
-    // Press Enter in the amount field to spawn a trailing blank row.
-    await u.keyboard('{Enter}');
-    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
-
-    // Save — the trailing blank row must be ignored, not block validation.
-    await u.click(screen.getByRole('button', { name: /save|submit/i }));
-
-    expect(commitSpy).toHaveBeenCalledTimes(1);
-
-    // Exactly one item doc written (name === 'Apples').
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const itemCalls = setSpy.mock.calls.filter(([, d]: [unknown, any]) => d?.name === 'Apples');
-    expect(itemCalls).toHaveLength(1);
-
-    // No item doc written for the blank row.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const blankItemCalls = setSpy.mock.calls.filter(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ([, d]: [unknown, any]) => d && 'expenseId' in d && (d.name ?? '') === '',
-    );
-    expect(blankItemCalls).toHaveLength(0);
-
-    // Expense doc reflects only the real item: itemCount 1, total 399.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((expCall as any)?.[1]).toMatchObject({ itemCount: 1, total: 399 });
-  });
-
-  // 33. Quick-add — partial row still blocks submit --------------------------
-  it('does not commit when a second row has a name but no amount (partial row blocks save)', async () => {
-    const { commitSpy } = makeBatchMock();
-    const u = userEvent.setup();
-    render(<ExpenseEditor group={group} currentUserUid="u1" />);
-
-    await u.type(screen.getByLabelText(/shop/i), 'Coles');
-
-    // Item 1 fully filled.
-    const names1 = screen.getAllByPlaceholderText(/item name/i);
-    await u.type(names1[0], 'Apples');
-    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.99');
-
-    // Add a second row and give it a name but no amount (partial).
-    await u.click(screen.getByRole('button', { name: /add item/i }));
-    const names2 = screen.getAllByPlaceholderText(/item name/i);
-    await u.type(names2[1], 'Bread');
-
-    // Save must be blocked by validation on the partial row.
-    await u.click(screen.getByRole('button', { name: /save|submit/i }));
-
-    expect(commitSpy).not.toHaveBeenCalled();
-  });
-
-  // 31. Inline remove confirm — only one row armed at a time -----------------
-  it('arms only one row at a time (arming another disarms the previous)', async () => {
-    const u = userEvent.setup();
-    render(
-      <ExpenseEditor group={group} currentUserUid="u1" expense={savedExpense} items={savedItems} />,
-    );
-
-    const removeButtons = screen.getAllByRole('button', { name: /^remove item$/i });
-    await u.click(removeButtons[0]);
-    expect(screen.getAllByRole('button', { name: /click again to remove/i })).toHaveLength(1);
-
-    // Arm the other row's button.
-    const other = screen.getByRole('button', { name: /^remove item$/i });
-    await u.click(other);
-
-    // Still exactly one armed button.
-    expect(screen.getAllByRole('button', { name: /click again to remove/i })).toHaveLength(1);
   });
 });
