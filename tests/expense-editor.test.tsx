@@ -704,6 +704,70 @@ describe('ExpenseEditor', () => {
     }
   });
 
+  // 32. Quick-add — trailing empty row dropped on submit ---------------------
+  it('drops a trailing fully-empty row (spawned via Enter) on submit and writes only the real item', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    const amountInput = screen.getAllByLabelText(/^amount/i)[0];
+    await u.type(amountInput, '3.99');
+
+    // Press Enter in the amount field to spawn a trailing blank row.
+    await u.keyboard('{Enter}');
+    expect(screen.getAllByPlaceholderText(/item name/i)).toHaveLength(2);
+
+    // Save — the trailing blank row must be ignored, not block validation.
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+
+    // Exactly one item doc written (name === 'Apples').
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemCalls = setSpy.mock.calls.filter(([, d]: [unknown, any]) => d?.name === 'Apples');
+    expect(itemCalls).toHaveLength(1);
+
+    // No item doc written for the blank row.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blankItemCalls = setSpy.mock.calls.filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([, d]: [unknown, any]) => d && 'expenseId' in d && (d.name ?? '') === '',
+    );
+    expect(blankItemCalls).toHaveLength(0);
+
+    // Expense doc reflects only the real item: itemCount 1, total 399.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((expCall as any)?.[1]).toMatchObject({ itemCount: 1, total: 399 });
+  });
+
+  // 33. Quick-add — partial row still blocks submit --------------------------
+  it('does not commit when a second row has a name but no amount (partial row blocks save)', async () => {
+    const { commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+
+    // Item 1 fully filled.
+    const names1 = screen.getAllByPlaceholderText(/item name/i);
+    await u.type(names1[0], 'Apples');
+    await u.type(screen.getAllByLabelText(/^amount/i)[0], '3.99');
+
+    // Add a second row and give it a name but no amount (partial).
+    await u.click(screen.getByRole('button', { name: /add item/i }));
+    const names2 = screen.getAllByPlaceholderText(/item name/i);
+    await u.type(names2[1], 'Bread');
+
+    // Save must be blocked by validation on the partial row.
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
   // 31. Inline remove confirm — only one row armed at a time -----------------
   it('arms only one row at a time (arming another disarms the previous)', async () => {
     const u = userEvent.setup();

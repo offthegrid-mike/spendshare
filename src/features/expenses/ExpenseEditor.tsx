@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
@@ -47,7 +47,25 @@ const schema = z.object({
     (v) => !v || !isNaN(parseFloat(v)),
     { message: 'Enter a valid amount' }
   ),
-  items: z.array(lineItemSchema).min(1),
+  // Silently drop fully-empty line-item rows (both name and amount blank
+  // after trim) before validation, so a trailing untouched row spawned by the
+  // quick-add Enter flow is ignored rather than blocking Save. Partial rows
+  // (e.g. name filled, amount empty) are kept and still fail validation.
+  items: z.preprocess(
+    (val) =>
+      Array.isArray(val)
+        ? val.filter(
+            (it) =>
+              !(
+                typeof it === 'object' &&
+                it !== null &&
+                String((it as { name?: unknown }).name ?? '').trim() === '' &&
+                String((it as { amount?: unknown }).amount ?? '').trim() === ''
+              ),
+          )
+        : val,
+    z.array(lineItemSchema).min(1),
+  ),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -106,7 +124,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     getValues,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    // zodResolver's input type widens `items` to `unknown` because of the
+    // z.preprocess wrapper above; its parsed output is exactly FormValues, so
+    // we type the resolver against FormValues rather than casting the form.
+    resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: restoredDraft ? { ...blankDefaults, ...restoredDraft } : blankDefaults,
   });
 
