@@ -401,7 +401,14 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                 currency={group.currency}
                 expanded={expandedIds.has(field.id)}
                 onToggle={() => toggleExpanded(field.id)}
-                onRemove={() => remove(index)}
+                onRemove={() => {
+                  remove(index);
+                  setExpandedIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(field.id);
+                    return next;
+                  });
+                }}
               />
             ))}
           </div>

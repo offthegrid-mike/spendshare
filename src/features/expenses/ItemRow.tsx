@@ -1,6 +1,6 @@
 import { Controller } from 'react-hook-form';
 import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form';
-import { ChevronDown, ChevronRight, UsersRound } from 'lucide-react';
+import { ChevronDown, ChevronRight, UserRound } from 'lucide-react';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import { toCents, formatMoney } from '../../lib/money';
 import type { FormValues } from './expenseForm';
@@ -47,7 +47,7 @@ export default function ItemRow({
           </span>
         )}
         {summary && !summary.shared && (
-          <UsersRound size={14} className="shrink-0 text-slate-400" aria-label="Not shared" />
+          <UserRound size={14} className="shrink-0 text-slate-400" role="img" aria-label="Not shared" />
         )}
         <span className="shrink-0 text-sm font-medium tabular-nums text-slate-900">
           {formatMoney(isNaN(amountCents) ? 0 : amountCents, currency)}

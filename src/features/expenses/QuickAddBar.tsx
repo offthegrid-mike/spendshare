@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
-import { toCents } from '../../lib/money';
 import ItemNameCombobox from './ItemNameCombobox';
 
 interface QuickAddBarProps {
@@ -22,7 +21,8 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
       setError('Enter an item name');
       return;
     }
-    if (!amount.trim() || isNaN(toCents(amount))) {
+    const amountNum = Number(amount);
+    if (!amount.trim() || isNaN(amountNum) || amountNum <= 0) {
       setError('Enter an amount');
       return;
     }
