@@ -8,6 +8,7 @@ interface ItemNameComboboxProps {
   suggestions: SuggestionEntry[];
   id?: string;
   placeholder?: string;
+  onEnter?: () => void;
 }
 
 export default function ItemNameCombobox({
@@ -16,6 +17,7 @@ export default function ItemNameCombobox({
   suggestions,
   id,
   placeholder = 'Item name',
+  onEnter,
 }: ItemNameComboboxProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -49,6 +51,10 @@ export default function ItemNameCombobox({
         setOpen(true);
         setActiveIndex(0);
         e.preventDefault();
+      } else if (e.key === 'Enter' && onEnter) {
+        // Ignore auto-repeat so a held Enter can't append multiple rows.
+        if (!e.repeat) onEnter();
+        e.preventDefault();
       }
       return;
     }
@@ -64,6 +70,11 @@ export default function ItemNameCombobox({
       case 'Enter':
         if (activeIndex >= 0 && activeIndex < filtered.length) {
           handleSelect(filtered[activeIndex]);
+        } else if (onEnter) {
+          // Close this row's dropdown before focus moves to the new row.
+          setOpen(false);
+          setActiveIndex(-1);
+          if (!e.repeat) onEnter();
         }
         e.preventDefault();
         break;

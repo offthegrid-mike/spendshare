@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import ItemNameCombobox from '../src/features/expenses/ItemNameCombobox';
@@ -19,10 +19,12 @@ function Wrapper({
   initialValue = '',
   sugs = suggestions,
   onChangeSpy = vi.fn(),
+  onEnterSpy,
 }: {
   initialValue?: string;
   sugs?: SuggestionEntry[];
   onChangeSpy?: ReturnType<typeof vi.fn>;
+  onEnterSpy?: ReturnType<typeof vi.fn>;
 }) {
   const [val, setVal] = useState(initialValue);
   return (
@@ -30,6 +32,7 @@ function Wrapper({
       value={val}
       suggestions={sugs}
       onChange={(name, s) => { setVal(name); onChangeSpy(name, s); }}
+      onEnter={onEnterSpy}
     />
   );
 }
@@ -146,6 +149,62 @@ describe('ItemNameCombobox', () => {
     // spy was called only for keystrokes (no suggestion), never with a SuggestionEntry arg
     const callsWithSuggestion = spy.mock.calls.filter(([, s]) => s !== undefined);
     expect(callsWithSuggestion).toHaveLength(0);
+  });
+
+  // ── onEnter prop ──────────────────────────────────────────────────────────
+
+  it('calls onEnter when Enter is pressed and the dropdown is closed', async () => {
+    const onEnterSpy = vi.fn();
+    const u = userEvent.setup();
+    render(<Wrapper onEnterSpy={onEnterSpy} />);
+    const input = screen.getByRole('combobox');
+    // "zzz" matches nothing → dropdown stays closed
+    await u.type(input, 'zzz');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await u.keyboard('{Enter}');
+    expect(onEnterSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onEnter when Enter is pressed while the dropdown is open with nothing highlighted', async () => {
+    const onEnterSpy = vi.fn();
+    const onChangeSpy = vi.fn();
+    const u = userEvent.setup();
+    render(<Wrapper onEnterSpy={onEnterSpy} onChangeSpy={onChangeSpy} />);
+    await u.type(screen.getByRole('combobox'), 'chi');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    // No ArrowDown → activeIndex is -1 (nothing highlighted)
+    await u.keyboard('{Enter}');
+    expect(onEnterSpy).toHaveBeenCalledTimes(1);
+    // No suggestion was selected
+    const callsWithSuggestion = onChangeSpy.mock.calls.filter(([, s]) => s !== undefined);
+    expect(callsWithSuggestion).toHaveLength(0);
+    // The dropdown closes so it doesn't linger over the newly-focused row.
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('does not call onEnter for auto-repeat (held) Enter keydowns', () => {
+    const onEnterSpy = vi.fn();
+    render(<Wrapper onEnterSpy={onEnterSpy} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'zzz' } }); // matches nothing → closed
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true });
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true });
+    expect(onEnterSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onEnter when Enter selects a highlighted suggestion', async () => {
+    const onEnterSpy = vi.fn();
+    const onChangeSpy = vi.fn();
+    const u = userEvent.setup();
+    render(<Wrapper onEnterSpy={onEnterSpy} onChangeSpy={onChangeSpy} />);
+    await u.type(screen.getByRole('combobox'), 'chi');
+    await u.keyboard('{ArrowDown}{Enter}');
+    expect(onEnterSpy).not.toHaveBeenCalled();
+    expect(onChangeSpy).toHaveBeenCalledWith(
+      'Chicken Breast',
+      expect.objectContaining({ categoryId: 'cat1' }),
+    );
   });
 
   // ── Click-outside ─────────────────────────────────────────────────────────
