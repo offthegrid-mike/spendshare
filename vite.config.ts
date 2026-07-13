@@ -51,6 +51,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // pdf.js is only needed when a user scans a PDF receipt, and scanning
+        // requires network anyway — lazy-load it on demand instead of precaching
+        // ~400 KB into every install.
+        globIgnores: ['**/pdf-*.js'],
         // Firestore is excluded: its SDK manages offline persistence internally.
         // Intercepting Firestore's streaming channels (/Write/channel, /Listen/channel)
         // with a Workbox cache strategy breaks real-time listeners.

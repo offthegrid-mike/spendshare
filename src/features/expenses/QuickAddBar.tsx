@@ -6,12 +6,19 @@ import ItemNameCombobox from './ItemNameCombobox';
 interface QuickAddBarProps {
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
-  onAdd: (item: { name: string; categoryId: string; amount: string; shared: boolean }) => void;
+  onAdd: (item: {
+    name: string;
+    categoryId: string;
+    amount: string;
+    quantity: string;
+    shared: boolean;
+  }) => void;
 }
 
 export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarProps) {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [categoryId, setCategoryId] = useState(''); // sticky across adds
   const [shared, setShared] = useState(true); // sticky across adds
   const [error, setError] = useState('');
@@ -23,12 +30,18 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
     }
     const amountNum = Number(amount);
     if (!amount.trim() || isNaN(amountNum) || amountNum <= 0) {
-      setError('Enter an amount');
+      setError('Enter a unit price');
       return;
     }
-    onAdd({ name: name.trim(), categoryId, amount, shared });
+    const qtyNum = Math.floor(Number(quantity));
+    if (!Number.isFinite(qtyNum) || qtyNum < 1) {
+      setError('Enter a quantity of 1 or more');
+      return;
+    }
+    onAdd({ name: name.trim(), categoryId, amount, quantity: String(qtyNum), shared });
     setName('');
     setAmount('');
+    setQuantity('1');
     setError('');
     // categoryId and shared intentionally retained (sticky) for the next item.
     // Return focus to the name input for rapid consecutive entry.
@@ -54,7 +67,7 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
             }}
           />
         </div>
-        <label htmlFor="qa-amount" className="sr-only">Amount</label>
+        <label htmlFor="qa-amount" className="sr-only">Unit price</label>
         <input
           id="qa-amount"
           type="text"
@@ -68,8 +81,28 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
               handleAdd();
             }
           }}
-          className="field w-24"
+          className="field w-20"
         />
+        <label htmlFor="qa-qty" className="sr-only">Quantity</label>
+        <div className="flex items-center">
+          <span className="mr-1 text-sm text-slate-400">×</span>
+          <input
+            id="qa-qty"
+            type="text"
+            inputMode="numeric"
+            aria-label="Quantity"
+            placeholder="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+            className="field w-12"
+          />
+        </div>
       </div>
 
       <div className="mt-2 flex items-center gap-2">

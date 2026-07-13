@@ -147,7 +147,7 @@ async function addQuickItem(
   amount: string,
 ) {
   await u.type(screen.getByPlaceholderText(/item name/i), name);
-  await u.type(screen.getByLabelText(/^amount/i), amount);
+  await u.type(screen.getByLabelText(/unit price/i), amount);
   await u.click(screen.getByRole('button', { name: /add item/i }));
 }
 
@@ -496,7 +496,7 @@ describe('ExpenseEditor', () => {
     await u.click(option);
 
     // Fill amount and add the item via the quick-add bar
-    await u.type(screen.getByLabelText(/^amount/i), '3.50');
+    await u.type(screen.getByLabelText(/unit price/i), '3.50');
     await u.click(screen.getByRole('button', { name: /add item/i }));
 
     await u.click(screen.getByRole('button', { name: /save|submit/i }));

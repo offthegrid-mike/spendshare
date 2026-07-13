@@ -9,6 +9,7 @@ export interface ExpenseDraftItem {
   name: string;
   categoryId: string;
   amount: string;
+  quantity?: string;
   shared: boolean;
   remark?: string;
 }

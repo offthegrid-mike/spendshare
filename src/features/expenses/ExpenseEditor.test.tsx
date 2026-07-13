@@ -52,7 +52,7 @@ describe('ExpenseEditor (hybrid)', () => {
   it('adds an item via the quick-add bar as a collapsed row', () => {
     renderEditor();
     fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '3.00' } });
+    fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '3.00' } });
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
 
     expect(screen.getByRole('button', { name: /cherry/i })).toBeTruthy();
@@ -63,7 +63,7 @@ describe('ExpenseEditor (hybrid)', () => {
   it('expands a row to reveal the full editor when clicked', () => {
     renderEditor();
     fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '3.00' } });
+    fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '3.00' } });
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /cherry/i }));

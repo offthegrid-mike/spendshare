@@ -8,6 +8,9 @@ interface ImportMetaEnv {
   readonly VITE_FB_SENDER_ID: string;
   readonly VITE_FB_APP_ID: string;
   readonly VITE_USE_EMULATOR?: string;
+  // Optional: URL of the receipt-OCR proxy (Cloudflare Worker in worker/).
+  // Absent → scanning is disabled at runtime.
+  readonly VITE_OCR_PROXY_URL?: string;
 }
 
 interface ImportMeta {

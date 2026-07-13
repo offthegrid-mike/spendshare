@@ -29,6 +29,8 @@ export interface ItemDoc {
   name: string; categoryId: string; category: string; amount: number; shared: boolean;
   payerUid: Uid; // denormalized from the expense (for collectionGroup summary)
   remark?: string;
+  quantity?: number;   // count (default 1); amount is the line total = unitAmount * quantity
+  unitAmount?: number; // per-item price in cents (default: same as amount when quantity is 1)
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
@@ -56,4 +58,6 @@ export const itemSchema = z.object({
   name: z.string().min(1), categoryId: z.string(), category: z.string(),
   amount: z.number().int().nonnegative(), shared: z.boolean(), payerUid: z.string(),
   remark: z.string().optional(),
+  quantity: z.number().int().positive().optional(),
+  unitAmount: z.number().int().nonnegative().optional(),
 });

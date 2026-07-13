@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
-import { ChevronDown, ChevronUp, Gift } from 'lucide-react';
+import { ChevronDown, ChevronUp, Gift, ScanLine } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
@@ -19,8 +19,9 @@ import DatePicker from './DatePicker';
 import ShopNameCombobox from './ShopNameCombobox';
 import QuickAddBar from './QuickAddBar';
 import ItemRow from './ItemRow';
-import { schema, type FormValues } from './expenseForm';
+import { schema, parseQty, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
+import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
 
 function useSafeNavigate(): NavigateFunction {
   try {
@@ -64,7 +65,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         ? items.map((it) => ({
             name: it.name,
             categoryId: it.categoryId,
-            amount: (it.amount / 100).toFixed(2),
+            // amount is the unit price; fall back to the line total for items
+            // saved before quantity existed (their quantity is 1).
+            amount: ((it.unitAmount ?? it.amount) / 100).toFixed(2),
+            quantity: String(it.quantity ?? 1),
             shared: it.shared,
             remark: it.remark ?? '',
           }))
@@ -88,9 +92,43 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     defaultValues: restoredDraft ? { ...blankDefaults, ...restoredDraft } : blankDefaults,
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' });
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Receipt scan (OCR) — the picked image is processed in-browser and discarded;
+  // it is never uploaded or stored anywhere.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  async function handleReceiptFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setScanError(null);
+    setScanning(true);
+    try {
+      const parsed = await scanReceipt(file, cats.map((c) => c.name));
+      const patch = receiptToFormPatch(
+        parsed,
+        { date: getValues('date'), shopName: getValues('shopName') },
+        cats,
+      );
+      if (patch.date) setValue('date', patch.date, { shouldValidate: true, shouldDirty: true });
+      if (patch.shopName)
+        setValue('shopName', patch.shopName, { shouldValidate: true, shouldDirty: true });
+      if (patch.items && patch.items.length > 0) replace(patch.items);
+    } catch (err) {
+      setScanError(
+        err instanceof ReceiptOcrError
+          ? err.userMessage
+          : 'Could not read the receipt. Enter the details manually.',
+      );
+    } finally {
+      setScanning(false);
+    }
+  }
 
   function toggleExpanded(fieldId: string) {
     setExpandedIds((prev) => {
@@ -139,7 +177,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
 
   const totalCents = (watchedItems ?? []).reduce((sum, it) => {
     const c = toCents(it?.amount ?? '0');
-    return sum + (isNaN(c) ? 0 : c);
+    return sum + (isNaN(c) ? 0 : c) * parseQty(it?.quantity);
   }, 0);
 
   const gcCents = (() => {
@@ -174,7 +212,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
 
     const expDate = new Date(data.date);
     const month = monthKey(expDate);
-    const total = data.items.reduce((s, it) => s + toCents(it.amount), 0);
+    // amount is the unit price; a line contributes unitPrice * quantity.
+    const total = data.items.reduce((s, it) => s + toCents(it.amount) * parseQty(it.quantity), 0);
     const giftCardAmountCents =
       data.giftCardAmount && data.giftCardAmount.trim() !== ''
         ? toCents(data.giftCardAmount)
@@ -210,6 +249,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     for (const it of data.items) {
       const catName = cats.find((c) => c.id === it.categoryId)?.name ?? '';
       const itemRef = doc(itemsCol(group.id, expRef.id));
+      const unit = toCents(it.amount);
+      const q = parseQty(it.quantity);
       batch.set(itemRef, {
         groupId: group.id,
         expenseId: expRef.id,
@@ -217,7 +258,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         name: it.name,
         categoryId: it.categoryId,
         category: catName,
-        amount: toCents(it.amount),
+        // amount is the line total (unit * qty) so summaries/settlement are unchanged.
+        amount: unit * q,
+        quantity: q,
+        unitAmount: unit,
         shared: it.shared,
         payerUid: data.payerUid,
         ...(it.remark ? { remark: it.remark } : {}),
@@ -285,6 +329,29 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
           </button>
         </div>
       )}
+
+      {/* Scan receipt — OCR prefills the form; the image is not uploaded or stored. */}
+      <div>
+        {/* No `capture` attribute: mobile then offers both the camera and the
+            photo library / files, instead of jumping straight to the camera. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={handleReceiptFile}
+        />
+        <LoadingButton
+          loading={scanning}
+          loadingText="Scanning receipt…"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-700 transition hover:border-brand-400 hover:bg-brand-100"
+        >
+          <ScanLine size={16} />
+          Scan receipt
+        </LoadingButton>
+        {scanError && <p className="mt-1.5 text-sm text-rose-600">{scanError}</p>}
+      </div>
 
       {/* Date */}
       <div>
@@ -383,8 +450,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         <QuickAddBar
           cats={cats}
           suggestions={suggestions}
-          onAdd={({ name, categoryId, amount, shared }) =>
-            append({ name, categoryId, amount, shared, remark: '' })
+          onAdd={({ name, categoryId, amount, quantity, shared }) =>
+            append({ name, categoryId, amount, quantity, shared, remark: '' })
           }
         />
 

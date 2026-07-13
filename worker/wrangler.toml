@@ -1,0 +1,17 @@
+# Cloudflare Worker config for the SpendShare receipt-OCR proxy.
+# Deploy with: cd worker && npx wrangler deploy
+name = "spendshare-ocr"
+main = "index.js"
+compatibility_date = "2026-07-01"
+
+# Expose the Worker at its workers.dev URL (what the app calls). Explicit to
+# silence the deploy-time default warnings.
+workers_dev = true
+# We don't use Cloudflare per-version preview URLs.
+preview_urls = false
+
+# Secrets (set with `npx wrangler secret put <NAME>` — do NOT commit values):
+#   NVIDIA_API_KEY   (required) your nvapi-... key from build.nvidia.com
+#   ALLOWED_ORIGINS  (recommended) comma-separated origins allowed to call the
+#                    proxy, e.g. "https://spendshare-e5236.web.app,http://localhost:5173"
+#                    Leave unset to allow any origin (simpler, less locked-down).

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, UserRound } from 'lucide-react';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import { toCents, formatMoney } from '../../lib/money';
 import type { FormValues } from './expenseForm';
+import { parseQty } from './expenseForm';
 import ItemNameCombobox from './ItemNameCombobox';
 
 interface ItemRowProps {
@@ -14,7 +15,9 @@ interface ItemRowProps {
   setValue: UseFormSetValue<FormValues>;
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
-  summary: { name: string; categoryId: string; amount: string; shared: boolean } | undefined;
+  summary:
+    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean }
+    | undefined;
   currency: string;
   expanded: boolean;
   onToggle: () => void;
@@ -26,7 +29,9 @@ export default function ItemRow({
   summary, currency, expanded, onToggle, onRemove,
 }: ItemRowProps) {
   const catName = cats.find((c) => c.id === summary?.categoryId)?.name ?? '';
-  const amountCents = toCents(summary?.amount ?? '0');
+  const unitCents = toCents(summary?.amount ?? '0');
+  const qty = parseQty(summary?.quantity);
+  const lineCents = (isNaN(unitCents) ? 0 : unitCents) * qty;
 
   const [armed, setArmed] = useState(false);
   const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,8 +83,13 @@ export default function ItemRow({
         {summary && !summary.shared && (
           <UserRound size={14} className="shrink-0 text-slate-400" role="img" aria-label="Not shared" />
         )}
+        {qty > 1 && (
+          <span className="shrink-0 text-xs tabular-nums text-slate-400">
+            {formatMoney(isNaN(unitCents) ? 0 : unitCents, currency)} × {qty}
+          </span>
+        )}
         <span className="shrink-0 text-sm font-medium tabular-nums text-slate-900">
-          {formatMoney(isNaN(amountCents) ? 0 : amountCents, currency)}
+          {formatMoney(lineCents, currency)}
         </span>
       </button>
 
@@ -108,21 +118,43 @@ export default function ItemRow({
             ))}
           </select>
 
-          <div>
-            <label
-              htmlFor={`items.${index}.amount`}
-              className="mb-1 block text-sm font-medium text-slate-700"
-            >
-              Amount
-            </label>
-            <input
-              id={`items.${index}.amount`}
-              type="text"
-              inputMode="decimal"
-              {...register(`items.${index}.amount`)}
-              className="field"
-            />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label
+                htmlFor={`items.${index}.amount`}
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Unit price
+              </label>
+              <input
+                id={`items.${index}.amount`}
+                type="text"
+                inputMode="decimal"
+                {...register(`items.${index}.amount`)}
+                className="field"
+              />
+            </div>
+            <div className="w-24">
+              <label
+                htmlFor={`items.${index}.quantity`}
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Qty
+              </label>
+              <input
+                id={`items.${index}.quantity`}
+                type="text"
+                inputMode="numeric"
+                {...register(`items.${index}.quantity`)}
+                className="field"
+              />
+            </div>
           </div>
+          {qty > 1 && (
+            <p className="text-xs text-slate-500">
+              Line total: {formatMoney(lineCents, currency)}
+            </p>
+          )}
 
           <div>
             <label
