@@ -1,8 +1,12 @@
 # Cloudflare Worker config for the SpendShare receipt-OCR proxy.
-# Deploy with: cd worker && npx wrangler deploy
+# Deploy with: cd worker && npx wrangler deploy (also runs in CI — see
+# .github/workflows/deploy-worker.yml)
 name = "spendshare-ocr"
 main = "index.js"
 compatibility_date = "2026-07-01"
+# Not a secret — pinned so `wrangler deploy` doesn't need to guess the account
+# in non-interactive contexts (CI). Safe to commit.
+account_id = "5ff95272d36cb42441607dd08d2c9825"
 
 # Expose the Worker at its workers.dev URL (what the app calls). Explicit to
 # silence the deploy-time default warnings.

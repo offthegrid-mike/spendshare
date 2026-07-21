@@ -30,6 +30,25 @@ npx wrangler deploy
 `wrangler deploy` prints the Worker URL, e.g.
 `https://spendshare-ocr.<your-subdomain>.workers.dev`.
 
+Secrets (`NVIDIA_API_KEY`, `ALLOWED_ORIGINS`) are per-account state, not part of
+the deployed code — they persist across deploys and are set once with the
+commands above, not on every deploy.
+
+## CI deploy on merge
+
+`.github/workflows/deploy-worker.yml` redeploys this Worker automatically
+whenever a push to `main` changes anything under `worker/`. One-time setup:
+
+1. Create a Cloudflare API token at
+   [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)
+   using the **Edit Cloudflare Workers** template (scoped to this account).
+2. Add it as a GitHub Actions repository secret named `CLOUDFLARE_API_TOKEN`
+   (Settings → Secrets and variables → Actions).
+
+That's it — the workflow runs `wrangler deploy` with that token. It does not
+touch the `NVIDIA_API_KEY` / `ALLOWED_ORIGINS` secrets; those are set once
+(step 2/3 above) and only need to be redone if you rotate the key.
+
 ## Wire it into the app
 
 Set that URL as the app's OCR proxy endpoint:
