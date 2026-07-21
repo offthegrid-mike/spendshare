@@ -27,8 +27,10 @@ _Researched July 2026._
 The VLM route is what SpendShare implements: the OpenAI-compatible body carries a `text` part (the
 extraction prompt) and an `image_url` part with a `data:image/jpeg;base64,…` data URL, and the model
 returns JSON we map straight onto the expense form. The model id lives in one constant (`OCR_MODEL`
-in `src/lib/receiptOcr.ts`, currently `meta/llama-3.2-90b-vision-instruct`) so it's a one-line swap
-if catalog availability changes.
+in `src/lib/receiptOcr.ts`, currently `meta/llama-3.2-11b-vision-instruct`) so it's a one-line swap
+if catalog availability changes. (Previously used the 90B variant, but its NVIDIA-hosted endpoint
+started hanging indefinitely on every request — even text-only, no image — while remaining listed in
+the `/v1/models` catalog; the 11B sibling responds normally.)
 
 The browser does **not** call NVIDIA directly — see the CORS/key section below.
 
@@ -38,7 +40,7 @@ The browser does **not** call NVIDIA directly — see the CORS/key section below
 POST <VITE_OCR_PROXY_URL>              // browser → Worker (no key here)
 // Worker adds:  Authorization: Bearer nvapi-...  and forwards to NVIDIA
 {
-  "model": "meta/llama-3.2-90b-vision-instruct",
+  "model": "meta/llama-3.2-11b-vision-instruct",
   "temperature": 0.1,
   "max_tokens": 1024,
   "messages": [{
