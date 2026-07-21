@@ -19,7 +19,7 @@ import { normalizeNameKey } from './textNormalize';
 
 // Vision-language model on the NVIDIA API catalog. Kept as a single const so
 // swapping models (if catalog availability changes) is a one-line edit.
-const OCR_MODEL = 'meta/llama-3.2-90b-vision-instruct';
+const OCR_MODEL = 'meta/llama-3.2-11b-vision-instruct';
 
 function buildPrompt(categoryNames: string[]): string {
   const base =
