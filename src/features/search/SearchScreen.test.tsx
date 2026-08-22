@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import SearchScreen from './SearchScreen';
@@ -29,11 +29,18 @@ const expenses = [
     date: { toMillis: () => 1000, toDate: () => new Date('2025-11-02T00:00:00Z') },
     createdAt: null, updatedAt: null,
   },
+  {
+    id: 'e3', shopName: 'Bunnings', groupId: 'g1', month: '2026-05', payerUid: 'u1',
+    total: 8000, giftCardAmount: 2000, itemCount: 1, createdByUid: 'u1',
+    date: { toMillis: () => 500, toDate: () => new Date('2026-05-01T00:00:00Z') },
+    createdAt: null, updatedAt: null,
+  },
 ] as any;
 
 const itemsByExpense = {
   e1: [{ id: 'i1', expenseId: 'e1', name: 'Full cream milk', amount: 400 }],
   e2: [{ id: 'i2', expenseId: 'e2', name: '白菜', amount: 300 }],
+  e3: [{ id: 'i3', expenseId: 'e3', name: 'Potting mix', amount: 8000 }],
 } as any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -93,6 +100,18 @@ describe('SearchScreen', () => {
     mockUseAllExpenses.mockReturnValue({ expenses: [], itemsByExpense: {}, loading: true, error: null });
     renderScreen();
     expect(document.querySelectorAll('.animate-pulse').length).toBe(3);
+  });
+
+  it('shows the gift-card treatment on a result, matching the expense list', async () => {
+    renderScreen();
+    await userEvent.type(screen.getByRole('searchbox'), 'bunnings');
+    const link = screen.getByRole('link');
+    // Original total struck through, net-to-split shown, and the badge naming
+    // the gift-card amount — the same figures ExpenseList renders.
+    expect(link.textContent).toContain('A$80.00');
+    expect(link.textContent).toContain('A$60.00');
+    expect(link.textContent).toContain('A$20.00');
+    expect(within(link).getByText(/A\$80\.00/).className).toContain('line-through');
   });
 
   it('shows an error message when the fetch failed', () => {

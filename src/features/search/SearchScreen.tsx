@@ -92,9 +92,25 @@ export default function SearchScreen({ group }: Props) {
                       {payerName(expense.payerUid)}
                     </p>
                   </div>
-                  <span className="text-base font-bold tabular-nums text-slate-900">
-                    {formatMoney(expense.total, group.currency)}
-                  </span>
+                  <div className="text-right">
+                    {expense.giftCardAmount ? (
+                      <>
+                        <p className="text-xs tabular-nums text-slate-400 line-through">
+                          {formatMoney(expense.total, group.currency)}
+                        </p>
+                        <p className="text-base font-bold tabular-nums text-emerald-600">
+                          {formatMoney(expense.total - expense.giftCardAmount, group.currency)}
+                        </p>
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                          🎁 Gift card {formatMoney(expense.giftCardAmount, group.currency)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-base font-bold tabular-nums text-slate-900">
+                        {formatMoney(expense.total, group.currency)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {matchedItems.length > 0 && (
                   <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
