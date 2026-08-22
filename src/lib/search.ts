@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
+import { collapseWhitespace } from './textNormalize';
+import type { ExpenseDoc, ItemDoc } from '../types/models';
 
 export const collator = new Intl.Collator(undefined, { sensitivity: 'base', usage: 'search' });
 
@@ -31,4 +33,42 @@ export function highlightMatch(name: string, query: string): ReactNode {
     createElement('strong', null, match),
     after,
   );
+}
+
+export interface SearchResult {
+  expense: ExpenseDoc;
+  /** True when the query matched the shop name itself. */
+  shopMatch: boolean;
+  /** Items on this expense whose name matched, in document order. */
+  matchedItems: ItemDoc[];
+}
+
+function dateMillis(expense: ExpenseDoc): number {
+  return expense.date ? expense.date.toMillis() : 0;
+}
+
+/**
+ * Finds expenses whose shop name, or one of whose item names, contains `rawQuery`
+ * anywhere. An empty query matches nothing — callers show a prompt instead of the
+ * whole history. Results are most-recent-first.
+ */
+export function searchExpenses(
+  expenses: ExpenseDoc[],
+  itemsByExpense: Record<string, ItemDoc[]>,
+  rawQuery: string,
+): SearchResult[] {
+  const query = collapseWhitespace(rawQuery);
+  if (query.length === 0) return [];
+
+  const results: SearchResult[] = [];
+  for (const expense of expenses) {
+    const shopMatch = findMatchIndex(expense.shopName ?? '', query) !== -1;
+    const matchedItems = (itemsByExpense[expense.id] ?? []).filter(
+      (item) => findMatchIndex(item.name ?? '', query) !== -1,
+    );
+    if (shopMatch || matchedItems.length > 0) {
+      results.push({ expense, shopMatch, matchedItems });
+    }
+  }
+  return results.sort((a, b) => dateMillis(b.expense) - dateMillis(a.expense));
 }
