@@ -19,18 +19,13 @@ export function useAllExpenses(gid: string | null): {
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [loadedGid, setLoadedGid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!gid) {
-      setLoading(false);
-      return;
-    }
+    if (!gid) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -49,10 +44,11 @@ export function useAllExpenses(gid: string | null): {
           map[item.expenseId].push(item);
         }
         setItemsByExpense(map);
+        setError(null);
       } catch {
         if (!cancelled) setError('Could not load expenses. Please try again.');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedGid(gid);
       }
     })();
 
@@ -60,6 +56,9 @@ export function useAllExpenses(gid: string | null): {
       cancelled = true;
     };
   }, [gid]);
+
+  // Derived rather than stored so the effect never calls setState synchronously.
+  const loading = gid !== null && loadedGid !== gid;
 
   return { expenses, itemsByExpense, loading, error };
 }

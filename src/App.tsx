@@ -12,7 +12,7 @@ import PendingInvites from './features/invites/PendingInvites';
 import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
-import { useMonthExpenses } from './hooks/useMonthExpenses';
+import { useExpense } from './hooks/useExpense';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
@@ -43,11 +43,9 @@ function SummaryRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
 
 function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
-  const { selectedMonth } = useUIStore();
-  const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
-  const expense = expenses.find((e) => e.id === id);
-  const items = id ? (itemsByExpense[id] ?? []) : [];
-  if (loading || itemsLoading || !expense) return <div>Loading…</div>;
+  const { expense, items, loading } = useExpense(group.id, id);
+  if (loading) return <div>Loading…</div>;
+  if (!expense) return <div className="text-sm text-slate-500">Expense not found.</div>;
   return (
     <ExpenseEditor key={expense.id} group={group} currentUserUid={user.uid} expense={expense} items={items} />
   );
