@@ -18,6 +18,7 @@ import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
 import Summary from './features/summary/Summary';
 import MoreScreen from './features/more/MoreScreen';
+import SearchScreen from './features/search/SearchScreen';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
 
@@ -91,6 +92,10 @@ function App() {
     <Routes>
       <Route element={<Layout groups={groups} user={user} />}>
         <Route path="/" element={group ? <ExpenseList group={group} /> : <div>Loading…</div>} />
+        <Route
+          path="/search"
+          element={group ? <SearchScreen group={group} /> : <div>Loading…</div>}
+        />
         <Route
           path="/group/settings"
           element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <div>Loading…</div>}
