@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import SearchScreen from './SearchScreen';
@@ -112,6 +112,46 @@ describe('SearchScreen', () => {
     expect(link.textContent).toContain('A$60.00');
     expect(link.textContent).toContain('A$20.00');
     expect(within(link).getByText(/A\$80\.00/).className).toContain('line-through');
+  });
+
+  // Cangjie/Pinyin IMEs emit intermediate keystrokes ("一口廿" for 街) as change
+  // events before the character is chosen. Searching on those is noise, and
+  // re-rendering the input from router state mid-composition destroys the IME
+  // buffer so nothing can be typed at all.
+  it('does not search while an IME composition is in progress', () => {
+    renderScreen();
+    const input = screen.getByRole('searchbox') as HTMLInputElement;
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: '一口廿' } });
+
+    // The keystrokes stay visible in the field...
+    expect(input.value).toBe('一口廿');
+    // ...but no search ran: the prompt is still showing, not a no-results message.
+    expect(screen.getByText(/search by shop or item name/i)).toBeTruthy();
+    expect(screen.queryByText(/no results for/i)).toBeNull();
+  });
+
+  it('searches once the IME composition completes', () => {
+    renderScreen();
+    const input = screen.getByRole('searchbox') as HTMLInputElement;
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: '一口廿' } });
+    fireEvent.change(input, { target: { value: '街' } });
+    fireEvent.compositionEnd(input, { target: { value: '街' } });
+
+    expect(input.value).toBe('街');
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e2/edit');
+  });
+
+  it('keeps searching normally for input typed without an IME', () => {
+    renderScreen();
+    const input = screen.getByRole('searchbox') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'wool' } });
+
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
   });
 
   it('shows an error message when the fetch failed', () => {
