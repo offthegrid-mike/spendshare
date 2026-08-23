@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
@@ -11,8 +11,40 @@ interface Props { group: GroupDoc; }
 
 export default function SearchScreen({ group }: Props) {
   const [params, setParams] = useSearchParams();
-  const query = params.get('q') ?? '';
+  // `draft` is what the field shows; `query` is what we actually search. They
+  // differ only mid-IME-composition. The field is driven by local state rather
+  // than by the URL because re-rendering it from router state on every
+  // keystroke tears down an in-progress composition — with Cangjie that makes
+  // the field impossible to type into. Seeding both from the URL keeps
+  // /search?q=… deep links working; updates use `replace`, so there is no
+  // history to navigate back through afterwards.
+  const [draft, setDraft] = useState(() => params.get('q') ?? '');
+  const [query, setQuery] = useState(() => params.get('q') ?? '');
+  const composing = useRef(false);
   const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
+
+  const commit = useCallback(
+    (value: string) => {
+      setQuery(value);
+      setParams(value ? { q: value } : {}, { replace: true });
+    },
+    [setParams],
+  );
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { value } = e.target;
+    setDraft(value);
+    // Intermediate IME keystrokes ("一口廿" on the way to 街) are not a query.
+    if (composing.current || (e.nativeEvent as InputEvent).isComposing) return;
+    commit(value);
+  }
+
+  function handleCompositionEnd(e: React.CompositionEvent<HTMLInputElement>) {
+    composing.current = false;
+    const { value } = e.currentTarget;
+    setDraft(value);
+    commit(value);
+  }
 
   const results = useMemo(
     () => searchExpenses(expenses, itemsByExpense, query),
@@ -36,8 +68,10 @@ export default function SearchScreen({ group }: Props) {
         <input
           type="search"
           autoFocus
-          value={query}
-          onChange={(e) => setParams(e.target.value ? { q: e.target.value } : {}, { replace: true })}
+          value={draft}
+          onChange={handleChange}
+          onCompositionStart={() => { composing.current = true; }}
+          onCompositionEnd={handleCompositionEnd}
           placeholder="Search shop or item name"
           aria-label="Search shop or item name"
           className="w-full rounded-2xl border border-white/60 bg-white/80 py-3 pl-9 pr-3 text-sm shadow-card backdrop-blur-sm placeholder:text-slate-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-200"
