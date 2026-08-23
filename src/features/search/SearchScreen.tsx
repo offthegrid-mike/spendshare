@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatMoney } from '../../lib/money';
@@ -10,26 +10,20 @@ import type { GroupDoc } from '../../types/models';
 interface Props { group: GroupDoc; }
 
 export default function SearchScreen({ group }: Props) {
-  const [params, setParams] = useSearchParams();
   // `draft` is what the field shows; `query` is what we actually search. They
-  // differ only mid-IME-composition. The field is driven by local state rather
-  // than by the URL because re-rendering it from router state on every
-  // keystroke tears down an in-progress composition — with Cangjie that makes
-  // the field impossible to type into. Seeding both from the URL keeps
-  // /search?q=… deep links working; updates use `replace`, so there is no
-  // history to navigate back through afterwards.
-  const [draft, setDraft] = useState(() => params.get('q') ?? '');
-  const [query, setQuery] = useState(() => params.get('q') ?? '');
+  // differ only mid-IME-composition: re-rendering the field from shared state on
+  // every keystroke tears down an in-progress composition, which with Cangjie
+  // makes it impossible to type into.
+  //
+  // The query is held here rather than in the URL on purpose — mirroring it to
+  // ?q= churned the address bar on every keystroke and seeded browser
+  // autocomplete with search URLs. The cost is that a reload starts from empty.
+  const [draft, setDraft] = useState('');
+  const [query, setQuery] = useState('');
   const composing = useRef(false);
   const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
 
-  const commit = useCallback(
-    (value: string) => {
-      setQuery(value);
-      setParams(value ? { q: value } : {}, { replace: true });
-    },
-    [setParams],
-  );
+  const commit = useCallback((value: string) => setQuery(value), []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { value } = e.target;

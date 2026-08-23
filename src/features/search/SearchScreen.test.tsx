@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import SearchScreen from './SearchScreen';
 
 const mockUseAllExpenses = vi.fn();
@@ -44,10 +44,16 @@ const itemsByExpense = {
 } as any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <span data-testid="location">{pathname + search}</span>;
+}
+
 function renderScreen() {
   return render(
     <MemoryRouter initialEntries={['/search']}>
       <SearchScreen group={mockGroup} />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -65,8 +71,10 @@ describe('SearchScreen', () => {
   it('filters expenses by shop name as you type', async () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), 'wool');
-    expect(screen.getByText(/Woolworths|wool/i)).toBeTruthy();
-    expect(screen.queryByText('街市')).toBeNull();
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute('href')).toBe('/expense/e1/edit');
+    expect(links[0].textContent).toContain('Woolworths');
   });
 
   it('matches a shop name from the middle of the string', async () => {
@@ -152,6 +160,28 @@ describe('SearchScreen', () => {
     fireEvent.change(input, { target: { value: 'wool' } });
 
     expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+  });
+
+  // The query is deliberately kept out of the URL: it churned the address bar on
+  // every keystroke and seeded browser autocomplete with ?q= URLs.
+  it('keeps the query out of the URL while typing', () => {
+    renderScreen();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'wool' } });
+
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+    expect(screen.getByTestId('location').textContent).toBe('/search');
+  });
+
+  it('keeps the query out of the URL when an IME composition commits', () => {
+    renderScreen();
+    const input = screen.getByRole('searchbox') as HTMLInputElement;
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: '街' } });
+    fireEvent.compositionEnd(input, { target: { value: '街' } });
+
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e2/edit');
+    expect(screen.getByTestId('location').textContent).toBe('/search');
   });
 
   it('shows an error message when the fetch failed', () => {
