@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   ReceiptText,
   TrendingUp,
@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   Plus,
+  Search,
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import GroupSwitcher from './GroupSwitcher';
@@ -27,6 +28,7 @@ import type { GroupDoc } from '../types/models';
 interface Props { groups: GroupDoc[]; user: User; }
 
 const navItems = [
+  { to: '/search',         icon: Search,      label: 'Search'     },
   { to: '/income',         icon: TrendingUp,  label: 'Income'     },
   { to: '/summary',        icon: BarChart2,   label: 'Summary'    },
   { to: '/categories',     icon: Tag,         label: 'Categories' },
@@ -41,6 +43,7 @@ const navLink =
 
 export default function Layout({ groups, user }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { pathname } = useLocation();
   const { selectedGroupId } = useUIStore();
   const { group } = useGroup(selectedGroupId);
 
@@ -60,7 +63,7 @@ export default function Layout({ groups, user }: Props) {
               SpendShare
             </span>
             <GroupSwitcher groups={groups} />
-            <MonthPicker />
+            {pathname !== '/search' && <MonthPicker />}
           </div>
           <div className="flex items-center gap-2">
             <NavLink

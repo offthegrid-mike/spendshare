@@ -1,5 +1,5 @@
-import { useLocation } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { useLocation, Link } from 'react-router-dom';
+import { LogOut, Search } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -12,6 +12,7 @@ const TITLE_MAP: Record<string, string> = {
   '/income':         'Income',
   '/summary':        'Summary',
   '/more':           'More',
+  '/search':         'Search',
   '/expense/new':    'New Expense',
   '/categories':     'Categories',
   '/group/settings': 'Settings',
@@ -35,6 +36,13 @@ export default function MobileHeader({ groups, user }: Props) {
         <h1 className="flex-1 text-xl font-extrabold tracking-tight text-white">
           {getTitle(pathname)}
         </h1>
+        <Link
+          to="/search"
+          aria-label="Search"
+          className="rounded-lg p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+        >
+          <Search size={16} />
+        </Link>
         <GroupSwitcher groups={groups} />
         <button
           type="button"
@@ -46,9 +54,11 @@ export default function MobileHeader({ groups, user }: Props) {
           <LogOut size={16} />
         </button>
       </div>
-      <div className="px-4 pb-2.5">
-        <MonthPicker />
-      </div>
+      {pathname !== '/search' && (
+        <div className="px-4 pb-2.5">
+          <MonthPicker />
+        </div>
+      )}
     </header>
   );
 }
