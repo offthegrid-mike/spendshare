@@ -88,4 +88,16 @@ describe('ExpenseEditor (hybrid)', () => {
     expect(screen.getByRole('button', { name: /bread/i })).toBeTruthy();
     expect(screen.queryByPlaceholderText(/on sale, for party/i)).toBeNull();
   });
+
+  it('keeps the totals/save footer sticky to the bottom on mobile only', () => {
+    renderEditor();
+    const footer = screen.getByTestId('expense-editor-footer');
+    expect(footer.className).toContain('max-sm:sticky');
+    expect(footer.className).toContain('max-sm:bottom-0');
+    // Desktop (unprefixed) layout must not be sticky.
+    expect(footer.className).not.toMatch(/(^|\s)sticky(\s|$)/);
+    expect(footer.className).not.toMatch(/(^|\s)bottom-0(\s|$)/);
+    // The Save button must live inside the sticky footer.
+    expect(footer).toContainElement(screen.getByRole('button', { name: /save expense/i }));
+  });
 });
