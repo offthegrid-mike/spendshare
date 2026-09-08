@@ -492,44 +492,50 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         )}
       </div>
 
-      {/* Totals footer */}
-      <div className="space-y-1.5 border-t border-slate-100 pt-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-slate-500">Receipt total</span>
-          <span className="text-base font-semibold tabular-nums text-slate-700">
-            {formatMoney(totalCents, group.currency)}
-          </span>
-        </div>
-        {gcCents > 0 && netCents < 0 && (
-          <p className="text-sm text-rose-600">Gift card amount exceeds receipt total</p>
-        )}
-        {gcCents > 0 && (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">🎁 Gift card</span>
-              <span className="text-sm tabular-nums text-emerald-600">
-                − {formatMoney(gcCents, group.currency)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
-              <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
-              <span className="text-lg font-bold tabular-nums text-slate-900">
-                {formatMoney(netCents, group.currency)}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Submit */}
-      <LoadingButton
-        type="submit"
-        loading={saving}
-        loadingText={expense ? 'Saving changes…' : 'Saving…'}
-        className="btn-primary w-full py-2.5"
+      {/* Totals + Save footer — sticky to the bottom of the mobile sheet only */}
+      <div
+        data-testid="expense-editor-footer"
+        className="space-y-4 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-5 max-sm:border-t max-sm:border-slate-100 max-sm:bg-white max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.08)]"
       >
-        {expense ? 'Save changes' : 'Save expense'}
-      </LoadingButton>
+        {/* Totals */}
+        <div className="space-y-1.5 border-t border-slate-100 pt-3 max-sm:border-t-0 max-sm:pt-0">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-500">Receipt total</span>
+            <span className="text-base font-semibold tabular-nums text-slate-700">
+              {formatMoney(totalCents, group.currency)}
+            </span>
+          </div>
+          {gcCents > 0 && netCents < 0 && (
+            <p className="text-sm text-rose-600">Gift card amount exceeds receipt total</p>
+          )}
+          {gcCents > 0 && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">🎁 Gift card</span>
+                <span className="text-sm tabular-nums text-emerald-600">
+                  − {formatMoney(gcCents, group.currency)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
+                <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
+                <span className="text-lg font-bold tabular-nums text-slate-900">
+                  {formatMoney(netCents, group.currency)}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Submit */}
+        <LoadingButton
+          type="submit"
+          loading={saving}
+          loadingText={expense ? 'Saving changes…' : 'Saving…'}
+          className="btn-primary w-full py-2.5"
+        >
+          {expense ? 'Save changes' : 'Save expense'}
+        </LoadingButton>
+      </div>
     </form>
   );
 }
