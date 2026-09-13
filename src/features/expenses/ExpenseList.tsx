@@ -4,6 +4,7 @@ import { Pencil, Trash2, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-reac
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { formatMoney } from '../../lib/money';
+import { computeDiscountCents } from '../../lib/discount';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -101,6 +102,16 @@ export default function ExpenseList({ group }: Props) {
               const isExpanded = expandedId === exp.id;
               const isDeleting = deletingId === exp.id;
               const primaryCategory = items[0]?.category;
+              // Gift card is applied first, then the percentage discount off
+              // the remainder — same order as ExpenseEditor's totals footer.
+              const afterGiftCardCents = exp.total - (exp.giftCardAmount ?? 0);
+              const discountCents = computeDiscountCents(afterGiftCardCents, exp.discountPercent);
+              const netCents = afterGiftCardCents - discountCents;
+              const hasAdjustment = !!exp.giftCardAmount || discountCents > 0;
+              // Clamped for display so the badge can never show a percentage
+              // (e.g. "150%") that disagrees with the clamped dollar amount
+              // computeDiscountCents actually deducted.
+              const displayDiscountPct = Math.min(Math.max(exp.discountPercent ?? 0, 0), 100);
               return (
                 <div
                   key={exp.id}
@@ -129,16 +140,25 @@ export default function ExpenseList({ group }: Props) {
                         </div>
                       </div>
                       <div className="text-right">
-                        {exp.giftCardAmount ? (
+                        {hasAdjustment ? (
                           <>
                             <p className="text-xs tabular-nums text-slate-400 line-through">
                               {formatMoney(exp.total, group.currency)}
                             </p>
                             <p className="text-base font-bold tabular-nums text-emerald-600">
-                              {formatMoney(exp.total - exp.giftCardAmount, group.currency)}
+                              {formatMoney(netCents, group.currency)}
                             </p>
-                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                              🎁 Gift card {formatMoney(exp.giftCardAmount, group.currency)}
+                            <span className="flex flex-col items-end gap-0.5">
+                              {exp.giftCardAmount ? (
+                                <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                                  🎁 Gift card {formatMoney(exp.giftCardAmount, group.currency)}
+                                </span>
+                              ) : null}
+                              {discountCents > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                                  💳 Card discount ({displayDiscountPct}%) {formatMoney(discountCents, group.currency)}
+                                </span>
+                              ) : null}
                             </span>
                           </>
                         ) : (

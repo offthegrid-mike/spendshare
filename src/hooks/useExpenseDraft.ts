@@ -19,6 +19,8 @@ export interface ExpenseDraftValues {
   shopName: string;
   payerUid: string;
   giftCardAmount?: string;
+  applyDiscount?: boolean;
+  discountPercent?: string;
   items: ExpenseDraftItem[];
 }
 
@@ -38,6 +40,7 @@ export function isDraftMeaningful(v: ExpenseDraftValues | null | undefined): boo
   if (!v) return false;
   if (v.shopName.trim() !== '') return true;
   if ((v.giftCardAmount ?? '').trim() !== '') return true;
+  if (v.applyDiscount) return true;
   return v.items.some((it) => it.name.trim() !== '' || it.amount.trim() !== '');
 }
 

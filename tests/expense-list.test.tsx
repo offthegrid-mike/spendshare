@@ -281,6 +281,53 @@ describe('ExpenseList', () => {
     expect(screen.queryByText(/gift card/i)).not.toBeInTheDocument();
   });
 
+  // --- Fixtures for discount ---
+  const expenseWithDiscount: ExpenseDoc = {
+    ...expense1,
+    id: 'exp3',
+    shopName: 'Costco',
+    total: 10000, // $100.00
+    discountPercent: 2, // net = $98.00
+  };
+
+  it('shows the net amount and strikethrough total when discountPercent is set', () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expenseWithDiscount],
+      itemsByExpense: { exp3: [] },
+      loading: false,
+    });
+    renderExpenseList();
+    expect(screen.getByText(/98\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/100\.00/)).toBeInTheDocument();
+  });
+
+  it('shows a card discount badge with the percent', () => {
+    useMonthExpenses.mockReturnValue({
+      expenses: [expenseWithDiscount],
+      itemsByExpense: { exp3: [] },
+      loading: false,
+    });
+    renderExpenseList();
+    expect(screen.getByText(/card discount/i)).toBeInTheDocument();
+    expect(screen.getByText(/2%/)).toBeInTheDocument();
+    // The badge shows the deducted dollar amount too, not just the percent.
+    expect(screen.getByText(/2\.00/)).toBeInTheDocument();
+  });
+
+  it('combines gift card and discount in the net total', () => {
+    const both: ExpenseDoc = { ...expense1, id: 'exp4', total: 10000, giftCardAmount: 5000, discountPercent: 2 };
+    useMonthExpenses.mockReturnValue({
+      expenses: [both],
+      itemsByExpense: { exp4: [] },
+      loading: false,
+    });
+    renderExpenseList();
+    // (100 - 50) * 2% = 1.00 -> net = 49.00
+    expect(screen.getByText(/49\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/gift card/i)).toBeInTheDocument();
+    expect(screen.getByText(/card discount/i)).toBeInTheDocument();
+  });
+
   // 9. Remark shown in expanded view -------------------------------------------
   it('shows item remark below item name in the expanded view', async () => {
     useMonthExpenses.mockReturnValue({

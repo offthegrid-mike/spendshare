@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
+import { computeDiscountCents } from '../../lib/discount';
+import { formatMoney } from '../../lib/money';
 
 const mockWriteBatch = vi.fn();
 vi.mock('firebase/firestore', () => ({
@@ -122,6 +124,42 @@ describe('ExpenseList', () => {
     renderList();
     // Badge is visible in the card header without expanding
     expect(screen.getByText('Food')).toBeTruthy();
+  });
+
+  it('renders the discount line and correct net total when discountPercent is set', () => {
+    const expWithDiscount = {
+      ...mockExpense,
+      id: 'e4',
+      total: 10000,
+      discountPercent: 2,
+    };
+    mockUseMonthExpenses.mockReturnValue({
+      expenses: [expWithDiscount], itemsByExpense: { e4: [] }, loading: false,
+    });
+    renderList();
+    expect(screen.getByText(/card discount \(2%\)/i)).toBeTruthy();
+    // group.currency is 'AUD' — formatMoney renders it as "A$X.XX".
+    const expectedNet = 10000 - computeDiscountCents(10000, 2);
+    expect(screen.getByText(formatMoney(expectedNet, 'AUD'))).toBeTruthy();
+  });
+
+  it('combines gift card and discount in the net total', () => {
+    const expWithBoth = {
+      ...mockExpense,
+      id: 'e5',
+      total: 10000,
+      giftCardAmount: 5000,
+      discountPercent: 2,
+    };
+    mockUseMonthExpenses.mockReturnValue({
+      expenses: [expWithBoth], itemsByExpense: { e5: [] }, loading: false,
+    });
+    renderList();
+    expect(screen.getByText(new RegExp(`gift card ${formatMoney(5000, 'AUD').replace('$', '\\$')}`, 'i'))).toBeTruthy();
+    expect(screen.getByText(/card discount \(2%\)/i)).toBeTruthy();
+    const afterGiftCard = 10000 - 5000;
+    const expectedNet = afterGiftCard - computeDiscountCents(afterGiftCard, 2);
+    expect(screen.getByText(formatMoney(expectedNet, 'AUD'))).toBeTruthy();
   });
 
   it('shows a confirmation dialog instead of deleting immediately', async () => {

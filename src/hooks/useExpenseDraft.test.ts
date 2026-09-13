@@ -13,6 +13,8 @@ function makeDraft(overrides: Partial<ExpenseDraftValues> = {}): ExpenseDraftVal
     shopName: 'Woolworths',
     payerUid: 'u1',
     giftCardAmount: '',
+    applyDiscount: false,
+    discountPercent: '',
     items: [{ name: 'Milk', categoryId: 'c1', amount: '4.50', shared: true, remark: '' }],
     ...overrides,
   };
@@ -68,6 +70,36 @@ describe('useExpenseDraft', () => {
         items: [{ name: '', categoryId: '', amount: '', shared: true }],
       });
       expect(isDraftMeaningful(d)).toBe(true);
+    });
+
+    it('is true when a discount is applied', () => {
+      const d = makeDraft({
+        shopName: '',
+        applyDiscount: true,
+        discountPercent: '2',
+        items: [{ name: '', categoryId: '', amount: '', shared: true }],
+      });
+      expect(isDraftMeaningful(d)).toBe(true);
+    });
+
+    it('is true when the discount checkbox is checked even with a blank percent', () => {
+      const d = makeDraft({
+        shopName: '',
+        applyDiscount: true,
+        discountPercent: '',
+        items: [{ name: '', categoryId: '', amount: '', shared: true }],
+      });
+      expect(isDraftMeaningful(d)).toBe(true);
+    });
+
+    it('is false for a leftover discount percent when the checkbox is unchecked', () => {
+      const d = makeDraft({
+        shopName: '',
+        applyDiscount: false,
+        discountPercent: '5',
+        items: [{ name: '', categoryId: '', amount: '', shared: true }],
+      });
+      expect(isDraftMeaningful(d)).toBe(false);
     });
   });
 
@@ -127,6 +159,25 @@ describe('useExpenseDraft', () => {
         JSON.stringify({ values: { shopName: 'x' }, savedAt: Date.now() }),
       );
       expect(readDraft(GROUP)).toBeNull();
+    });
+
+    it('reads a legacy draft saved before the discount fields existed', () => {
+      // Pre-upgrade payload: no applyDiscount/discountPercent keys at all.
+      const legacyValues = {
+        date: '2026-07-11',
+        shopName: 'Aldi',
+        payerUid: 'u1',
+        giftCardAmount: '',
+        items: [{ name: 'Milk', categoryId: 'c1', amount: '4.50', shared: true, remark: '' }],
+      };
+      localStorage.setItem(
+        `expense_draft_${GROUP}`,
+        JSON.stringify({ values: legacyValues, savedAt: Date.now() }),
+      );
+      const draft = readDraft(GROUP);
+      expect(draft?.shopName).toBe('Aldi');
+      expect(draft?.applyDiscount).toBeUndefined();
+      expect(draft?.discountPercent).toBeUndefined();
     });
   });
 });

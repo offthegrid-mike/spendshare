@@ -558,4 +558,133 @@ describe('ExpenseEditor', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((suggestionsCall as any)[1]).toMatchObject({ items: expect.any(Array) });
   });
+
+  // 23. Discount — checkbox reveals percent field defaulting to 2% -------------
+  it('reveals a percent field defaulting to 2 when "Apply card discount" is checked', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    expect(screen.queryByLabelText(/discount %/i)).not.toBeInTheDocument();
+
+    await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
+    expect(screen.getByLabelText(/discount %/i)).toHaveValue('2');
+  });
+
+  // 24. Discount — totals footer shows discount + net ---------------------------
+  it('totals footer shows the card discount deduction and net-to-split', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await addQuickItem(u, 'Milk', '100.00');
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
+
+    expect(await footerRowText(/receipt total/i)).toMatch(/100\.00/);
+    expect(await footerRowText(/💳/)).toMatch(/2\.00/);
+    expect(await footerRowText(/paid.*to split/i)).toMatch(/98\.00/);
+  });
+
+  // 25. Discount — applies after gift card ---------------------------------------
+  it('applies the percentage discount to the amount remaining after the gift card', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await addQuickItem(u, 'Milk', '100.00');
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    const gcInput = screen.getByLabelText(/gift card amount/i);
+    await u.type(gcInput, '50.00');
+    await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
+
+    // (100 - 50) * 2% = 1.00
+    expect(await footerRowText(/💳/)).toMatch(/1\.00/);
+    expect(await footerRowText(/paid.*to split/i)).toMatch(/49\.00/);
+  });
+
+  // 26. Discount — submitted as a percent number ---------------------------------
+  it('submits discountPercent as a number when a discount is applied', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'FairPrice');
+    await addQuickItem(u, 'Milk', '10.00');
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((expCall as any)?.[1]).toMatchObject({ discountPercent: 2 });
+  });
+
+  // 27. Discount — omitted when not applied --------------------------------------
+  it('does not include discountPercent when the discount is not applied', async () => {
+    const { setSpy, commitSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await addQuickItem(u, 'Bread', '5.00');
+
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expCall = setSpy.mock.calls.find(([, d]: [unknown, any]) => 'shopName' in d);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((expCall as any)?.[1]).not.toHaveProperty('discountPercent');
+  });
+
+  // 28. Discount — clears on uncheck, resets to 2 on recheck --------------------
+  it('clears the percent field when the discount checkbox is unchecked, and resets to 2 on recheck', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.click(screen.getByRole('button', { name: /gift card/i }));
+    const checkbox = screen.getByRole('checkbox', { name: /apply card discount/i });
+    await u.click(checkbox);
+    await u.clear(screen.getByLabelText(/discount %/i));
+    await u.type(screen.getByLabelText(/discount %/i), '5');
+    await u.click(checkbox);
+    expect(screen.queryByLabelText(/discount %/i)).not.toBeInTheDocument();
+
+    await u.click(checkbox);
+    expect(screen.getByLabelText(/discount %/i)).toHaveValue('2');
+  });
+
+  // 30. Discount — collapsing the panel clears it, not just hides it ------------
+  it('clears the discount when the Gift Card & Discount panel is collapsed', async () => {
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await addQuickItem(u, 'Milk', '100.00');
+    const panelToggle = screen.getByRole('button', { name: /gift card/i });
+    await u.click(panelToggle);
+    await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
+
+    // Collapse the panel — the discount should stop being reflected in the footer.
+    await u.click(panelToggle);
+    expect(screen.queryByText(/paid.*to split/i)).not.toBeInTheDocument();
+
+    // Reopen — the discount should not have survived the collapse.
+    await u.click(panelToggle);
+    expect(screen.getByRole('checkbox', { name: /apply card discount/i })).not.toBeChecked();
+    expect(screen.queryByLabelText(/discount %/i)).not.toBeInTheDocument();
+  });
+
+  // 29. Discount — edit mode prefills applied percent ----------------------------
+  it('opens the discount field and prefills the percent when editing an expense with discountPercent', () => {
+    const expenseWithDiscount: ExpenseDoc = { ...savedExpense, discountPercent: 3 };
+    render(
+      <ExpenseEditor group={group} currentUserUid="u1" expense={expenseWithDiscount} items={savedItems} />,
+    );
+
+    const pctInput = screen.getByLabelText(/discount %/i) as HTMLInputElement;
+    expect(pctInput).toBeInTheDocument();
+    expect(pctInput.value).toBe('3');
+  });
 });

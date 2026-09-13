@@ -12,6 +12,7 @@ import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { readDraft, writeDraft, clearDraft } from '../../hooks/useExpenseDraft';
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
+import { computeDiscountCents } from '../../lib/discount';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
 import { useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
@@ -22,6 +23,10 @@ import ItemRow from './ItemRow';
 import { schema, parseQty, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
+
+// Default percent shown/applied when "Apply card discount" is first checked
+// (typical credit-card cashback rate).
+const DEFAULT_DISCOUNT_PERCENT = '2';
 
 function useSafeNavigate(): NavigateFunction {
   try {
@@ -60,6 +65,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     shopName: expense?.shopName ?? '',
     payerUid: expense?.payerUid ?? group.memberUids[0] ?? '',
     giftCardAmount: expense?.giftCardAmount ? (expense.giftCardAmount / 100).toFixed(2) : '',
+    applyDiscount: !!expense?.discountPercent,
+    discountPercent: expense?.discountPercent != null ? String(expense.discountPercent) : DEFAULT_DISCOUNT_PERCENT,
     items:
       expense && items && items.length > 0
         ? items.map((it) => ({
@@ -140,15 +147,28 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   }
 
   // Gift card panel state — open by default when the expense (or a restored
-  // draft) already carries a gift card amount.
+  // draft) already carries a gift card amount or an applied discount.
   const [giftCardOpen, setGiftCardOpen] = useState(
-    () => !!expense?.giftCardAmount || !!restoredDraft?.giftCardAmount?.trim(),
+    () =>
+      !!expense?.giftCardAmount ||
+      !!restoredDraft?.giftCardAmount?.trim() ||
+      !!expense?.discountPercent ||
+      !!restoredDraft?.applyDiscount,
   );
   const [saving, setSaving] = useState(false);
 
   function handleGiftCardToggle() {
-    if (giftCardOpen) setValue('giftCardAmount', '');
+    if (giftCardOpen) {
+      setValue('giftCardAmount', '');
+      setValue('applyDiscount', false);
+      setValue('discountPercent', '');
+    }
     setGiftCardOpen((o) => !o);
+  }
+
+  function handleApplyDiscountToggle(checked: boolean) {
+    setValue('applyDiscount', checked);
+    setValue('discountPercent', checked ? DEFAULT_DISCOUNT_PERCENT : '');
   }
 
   // Autosave the in-progress form so it can be resumed later. Watches every
@@ -174,6 +194,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   // Live totals
   const watchedItems = useWatch({ control, name: 'items' });
   const watchedGiftCard = useWatch({ control, name: 'giftCardAmount' });
+  const watchedApplyDiscount = useWatch({ control, name: 'applyDiscount' });
+  const watchedDiscountPercent = useWatch({ control, name: 'discountPercent' });
 
   const totalCents = (watchedItems ?? []).reduce((sum, it) => {
     const c = toCents(it?.amount ?? '0');
@@ -185,7 +207,18 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
     return !isNaN(v) && v > 0 ? v : 0;
   })();
 
-  const netCents = totalCents - gcCents;
+  // Gift card is applied first; the percentage discount then applies to
+  // whatever's left (see docs/superpowers/specs/2026-09-13-expense-discount-percent-design.md).
+  const afterGiftCardCents = totalCents - gcCents;
+  const rawDiscountPct = parseFloat(watchedDiscountPercent ?? '');
+  const discountCents = watchedApplyDiscount
+    ? computeDiscountCents(afterGiftCardCents, rawDiscountPct)
+    : 0;
+  const netCents = afterGiftCardCents - discountCents;
+  // Clamped/sanitized for display so the footer label can never show a
+  // percentage (e.g. "150%") that disagrees with the clamped dollar amount
+  // computeDiscountCents actually deducted.
+  const displayDiscountPct = Math.min(Math.max(rawDiscountPct || 0, 0), 100);
 
   // ---------------------------------------------------------------------------
   // Submit
@@ -224,6 +257,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       return;
     }
 
+    const discountPercentNum =
+      data.applyDiscount && data.discountPercent && data.discountPercent.trim() !== ''
+        ? parseFloat(data.discountPercent)
+        : undefined;
+
     const expenseData = {
       groupId: group.id,
       date: Timestamp.fromDate(expDate),
@@ -236,6 +274,9 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       createdAt: expense ? (expense.createdAt ?? serverTimestamp()) : serverTimestamp(),
       updatedAt: serverTimestamp(),
       ...(giftCardAmountCents !== undefined ? { giftCardAmount: giftCardAmountCents } : {}),
+      ...(discountPercentNum !== undefined && !isNaN(discountPercentNum)
+        ? { discountPercent: discountPercentNum }
+        : {}),
     } as WithFieldValue<ExpenseDoc>;
 
     batch.set(expRef, expenseData);
@@ -407,18 +448,18 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         </select>
       </div>
 
-      {/* Gift card */}
+      {/* Gift card & discount */}
       <div className="rounded-xl border border-slate-200">
         <button
           type="button"
-          aria-label="Gift card"
+          aria-label="Gift Card & Discount"
           aria-expanded={giftCardOpen}
           onClick={handleGiftCardToggle}
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
             <Gift size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium text-emerald-700">Gift Card</span>
+            <span className="text-sm font-medium text-emerald-700">Gift Card & Discount</span>
             <span className="text-xs text-slate-400">(optional)</span>
           </div>
           {giftCardOpen
@@ -426,21 +467,53 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             : <ChevronDown size={16} className="text-slate-400" />}
         </button>
         {giftCardOpen && (
-          <div className="border-t border-slate-100 px-4 pb-3 pt-2">
-            <label htmlFor="giftCardAmount" className="mb-1 block text-sm font-medium text-slate-700">
-              Gift card amount
-            </label>
-            <input
-              id="giftCardAmount"
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              {...register('giftCardAmount')}
-              className="field"
-            />
-            {errors.giftCardAmount && (
-              <p className="mt-1 text-sm text-rose-600">{errors.giftCardAmount.message}</p>
-            )}
+          <div className="space-y-3 border-t border-slate-100 px-4 pb-3 pt-2">
+            <div>
+              <label htmlFor="giftCardAmount" className="mb-1 block text-sm font-medium text-slate-700">
+                Gift card amount
+              </label>
+              <input
+                id="giftCardAmount"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                {...register('giftCardAmount')}
+                className="field"
+              />
+              {errors.giftCardAmount && (
+                <p className="mt-1 text-sm text-rose-600">{errors.giftCardAmount.message}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="applyDiscount" className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  id="applyDiscount"
+                  type="checkbox"
+                  checked={!!watchedApplyDiscount}
+                  onChange={(e) => handleApplyDiscountToggle(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                Apply card discount
+              </label>
+              {watchedApplyDiscount && (
+                <div className="mt-2">
+                  <label htmlFor="discountPercent" className="mb-1 block text-sm font-medium text-slate-700">
+                    Discount %
+                  </label>
+                  <input
+                    id="discountPercent"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="2"
+                    {...register('discountPercent')}
+                    className="field"
+                  />
+                  {errors.discountPercent && (
+                    <p className="mt-1 text-sm text-rose-600">{errors.discountPercent.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -505,24 +578,32 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
               {formatMoney(totalCents, group.currency)}
             </span>
           </div>
-          {gcCents > 0 && netCents < 0 && (
+          {gcCents > 0 && afterGiftCardCents < 0 && (
             <p className="text-sm text-rose-600">Gift card amount exceeds receipt total</p>
           )}
           {gcCents > 0 && (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">🎁 Gift card</span>
-                <span className="text-sm tabular-nums text-emerald-600">
-                  − {formatMoney(gcCents, group.currency)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
-                <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
-                <span className="text-lg font-bold tabular-nums text-slate-900">
-                  {formatMoney(netCents, group.currency)}
-                </span>
-              </div>
-            </>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">🎁 Gift card</span>
+              <span className="text-sm tabular-nums text-emerald-600">
+                − {formatMoney(gcCents, group.currency)}
+              </span>
+            </div>
+          )}
+          {discountCents > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">💳 Card discount ({displayDiscountPct}%)</span>
+              <span className="text-sm tabular-nums text-emerald-600">
+                − {formatMoney(discountCents, group.currency)}
+              </span>
+            </div>
+          )}
+          {(gcCents > 0 || discountCents > 0) && (
+            <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
+              <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
+              <span className="text-lg font-bold tabular-nums text-slate-900">
+                {formatMoney(netCents, group.currency)}
+              </span>
+            </div>
           )}
         </div>
 

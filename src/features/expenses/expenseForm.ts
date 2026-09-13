@@ -15,15 +15,29 @@ export function parseQty(q: string | undefined): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-export const schema = z.object({
-  date: z.string().min(1, 'Date required'),
-  shopName: z.string().min(1, 'Shop name is required'),
-  payerUid: z.string().min(1),
-  giftCardAmount: z
-    .string()
-    .optional()
-    .refine((v) => !v || !isNaN(parseFloat(v)), { message: 'Enter a valid amount' }),
-  items: z.array(lineItemSchema).min(1, 'Add at least one item'),
-});
+export const schema = z
+  .object({
+    date: z.string().min(1, 'Date required'),
+    shopName: z.string().min(1, 'Shop name is required'),
+    payerUid: z.string().min(1),
+    giftCardAmount: z
+      .string()
+      .optional()
+      .refine((v) => !v || !isNaN(parseFloat(v)), { message: 'Enter a valid amount' }),
+    applyDiscount: z.boolean(),
+    discountPercent: z.string().optional(),
+    items: z.array(lineItemSchema).min(1, 'Add at least one item'),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.applyDiscount) return;
+    const n = parseFloat(data.discountPercent ?? '');
+    if ((data.discountPercent ?? '').trim() === '' || isNaN(n) || n < 0 || n > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Enter a percent between 0 and 100',
+        path: ['discountPercent'],
+      });
+    }
+  });
 
 export type FormValues = z.infer<typeof schema>;

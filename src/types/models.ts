@@ -23,6 +23,7 @@ export interface ExpenseDoc {
   payerUid: Uid; total: number; itemCount: number; createdByUid: Uid;
   createdAt: Timestamp; updatedAt: Timestamp;
   giftCardAmount?: number; // cents — net-to-split = total - giftCardAmount
+  discountPercent?: number; // percent (e.g. 2 or 2.5) — see computeDiscountCents in lib/discount.ts
 }
 export interface ItemDoc {
   id: string; groupId: string; expenseId: string; month: string;
