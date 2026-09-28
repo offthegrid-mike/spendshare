@@ -14,3 +14,14 @@ export function distributeEvenly(totalCents: number, ids: string[]): Record<stri
   for (const id of [...ids].sort()) { out[id] = base + (remainder-- > 0 ? 1 : 0); }
   return out;
 }
+
+/** Short axis-label form, e.g. 123456 cents → "$1.2K". Not for exact figures. */
+export function formatCompactMoney(cents: number, currency: string, locale = 'en-US'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  }).format(cents / 100);
+}

@@ -1,6 +1,7 @@
 // src/features/summary/Summary.test.tsx
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Summary from './Summary';
 
@@ -12,8 +13,9 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
 }));
 vi.mock('../../lib/converters', () => ({ settlementsCol: vi.fn(() => ({})) }));
+const { monthState } = vi.hoisted(() => ({ monthState: { loading: false } }));
 vi.mock('../../hooks/useMonthItems', () => ({
-  useMonthItems: () => ({ items: [], loading: false }),
+  useMonthItems: () => ({ items: [], loading: monthState.loading }),
 }));
 vi.mock('../../hooks/useSettlements', () => ({
   useSettlements: () => ({ settlements: [], loading: false }),
@@ -29,6 +31,19 @@ vi.mock('../../lib/settlement', () => ({
     shareOf: { u1: 500, u2: 500 },
     sharedTotal: 1000,
   }),
+}));
+
+const { setMonth } = vi.hoisted(() => ({ setMonth: vi.fn() }));
+vi.mock('../../stores/uiStore', () => ({
+  useUIStore: () => ({ setMonth }),
+}));
+vi.mock('./YearSummary', () => ({
+  default: ({ year, onSelectMonth }: { year: string; onSelectMonth: (m: string) => void }) => (
+    <div>
+      <p>Year view {year}</p>
+      <button type="button" onClick={() => onSelectMonth('2026-03')}>pick march</button>
+    </div>
+  ),
 }));
 
 const mockGroup = {
@@ -73,5 +88,49 @@ describe('Summary', () => {
     ];
     const totalIncome = income.filter((i) => i.uid === 'u1').reduce((sum, i) => sum + i.amount, 0);
     expect(totalIncome).toBe(400000);
+  });
+});
+
+describe('Summary Month/Year toggle', () => {
+  beforeEach(() => {
+    setMonth.mockClear();
+    monthState.loading = false;
+  });
+
+  it('defaults to the Month view', () => {
+    renderSummary();
+    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Year' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Settle up')).toBeInTheDocument();
+  });
+
+  it('switches to the Year view for the selected month’s year and hides settle-up', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
+    expect(screen.queryByText('Settle up')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Year' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('picking a month in the Year view selects it and returns to Month view', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'pick march' }));
+    expect(setMonth).toHaveBeenCalledWith('2026-03');
+    expect(screen.getByText('Settle up')).toBeInTheDocument();
+  });
+
+  it('keeps the Year view and toggle visible while month data reloads', async () => {
+    const { rerender } = renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
+    monthState.loading = true;
+    rerender(
+      <MemoryRouter>
+        <Summary group={mockGroup} currentUserUid="u1" selectedMonth="2026-06" />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Year view 2026')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument();
   });
 });

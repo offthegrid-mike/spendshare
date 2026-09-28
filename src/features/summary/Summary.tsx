@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { settlementsCol } from '../../lib/converters';
 import { computeSummary } from '../../lib/settlement';
@@ -6,7 +6,11 @@ import { formatMoney } from '../../lib/money';
 import { useMonthItems } from '../../hooks/useMonthItems';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useIncome } from '../../hooks/useIncome';
+import { useUIStore } from '../../stores/uiStore';
 import type { GroupDoc } from '../../types/models';
+
+// Lazy so the Recharts bundle only loads when the Year view is opened.
+const YearSummary = lazy(() => import('./YearSummary'));
 
 interface Props {
   group: GroupDoc;
@@ -20,7 +24,51 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   const { income, loading: incomeLoading } = useIncome(group.id, selectedMonth);
   const [isPending, setIsPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [view, setView] = useState<'month' | 'year'>('month');
+  const { setMonth } = useUIStore();
+  const year = selectedMonth.slice(0, 4);
 
+  function selectMonth(month: string) {
+    setMonth(month);
+    setView('month');
+  }
+
+  const header = (
+    <div className="flex items-center justify-between gap-3">
+      <h1 className="hidden text-2xl font-extrabold tracking-tight text-slate-900 sm:block">
+        Summary — {view === 'year' ? year : selectedMonth}
+      </h1>
+      <div role="group" aria-label="Summary period" className="inline-flex rounded-xl bg-slate-100 p-1 text-sm font-semibold">
+        {(['month', 'year'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={view === v}
+            onClick={() => setView(v)}
+            className={`rounded-lg px-4 py-1.5 transition ${
+              view === v ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {v === 'month' ? 'Month' : 'Year'}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (view === 'year') {
+    return (
+      <div className="space-y-6">
+        {header}
+        <Suspense fallback={<div>Loading…</div>}>
+          <YearSummary group={group} year={year} onSelectMonth={selectMonth} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Month-only data gates only the Month view, so the Year view and the toggle
+  // stay put while month subscriptions reload.
   if (itemsLoading || settlementsLoading || incomeLoading) {
     return <div>Loading…</div>;
   }
@@ -72,7 +120,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
 
   return (
     <div className="space-y-6">
-      <h1 className="hidden text-2xl font-extrabold tracking-tight text-slate-900 sm:block">Summary — {selectedMonth}</h1>
+      {header}
 
       {/* Per-person section */}
       <section className="card overflow-hidden p-5">
