@@ -8,6 +8,13 @@ const dayPickerClassNames = {
   months: 'flex',
   month: 'space-y-2',
   month_caption: 'flex items-center justify-center py-1 text-sm font-semibold text-slate-900',
+  dropdowns: 'relative z-20 flex items-center gap-1',
+  // The native <select> is stretched transparently over its label, so the
+  // styled label is what shows while the OS picker handles the interaction.
+  dropdown_root:
+    'relative inline-flex rounded-lg transition hover:bg-brand-50 focus-within:ring-2 focus-within:ring-brand-500/40',
+  dropdown: 'absolute inset-0 w-full cursor-pointer appearance-none opacity-0',
+  caption_label: 'flex items-center gap-1 px-2 py-1 text-sm font-semibold text-slate-900',
   nav: 'absolute inset-x-2 top-2 z-10 flex items-center justify-between',
   button_previous:
     'rounded-lg p-1 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700',
@@ -27,6 +34,11 @@ const dayPickerClassNames = {
   disabled: '[&>button]:cursor-not-allowed [&>button]:text-slate-300 [&>button]:hover:bg-transparent',
 };
 
+// How far back / ahead the year dropdown reaches, widened to always include
+// the selected date.
+const YEARS_BACK = 10;
+const YEARS_AHEAD = 5;
+
 interface Props {
   id?: string;
   value: string; // YYYY-MM-DD
@@ -40,6 +52,11 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
 
   const parsed = value ? parse(value, 'yyyy-MM-dd', new Date()) : undefined;
   const selected = parsed && isValid(parsed) ? parsed : undefined;
+
+  const thisYear = new Date().getFullYear();
+  const selectedYear = selected?.getFullYear() ?? thisYear;
+  const startMonth = new Date(Math.min(thisYear - YEARS_BACK, selectedYear), 0);
+  const endMonth = new Date(Math.max(thisYear + YEARS_AHEAD, selectedYear), 11);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -79,6 +96,9 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
             selected={selected}
             onSelect={handleSelect}
             defaultMonth={selected}
+            captionLayout="dropdown"
+            startMonth={startMonth}
+            endMonth={endMonth}
             classNames={dayPickerClassNames}
           />
         </div>
