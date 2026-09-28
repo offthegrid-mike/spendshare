@@ -252,6 +252,39 @@ describe('/groups invite-accept arbitrary-UID injection (H-1)', () => {
     }));
   });
 
+  it("denies accept that rewrites an existing member's entry", async () => {
+    // Keys are preserved, but the owner's name/email are tampered with.
+    const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
+    await assertFails(updateDoc(doc(userC.firestore(), 'groups', 'group3'), {
+      members: {
+        userA: { uid: 'userA', name: 'Hacked', email: 'attacker@test.com', role: 'owner' },
+        userB: { uid: 'userB', name: 'Bob', email: 'bob@test.com', role: 'member' },
+        userC: { uid: 'userC', name: 'Carol', email: 'userc@test.com', role: 'member' },
+      },
+      memberUids: ['userA', 'userB', 'userC'],
+    }));
+  });
+
+  it("denies accept that changes an existing member's role", async () => {
+    const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
+    await assertFails(updateDoc(doc(userC.firestore(), 'groups', 'group3'), {
+      members: {
+        userA: { uid: 'userA', name: 'Alice', email: 'alicea@test.com', role: 'member' },
+        userB: { uid: 'userB', name: 'Bob', email: 'bob@test.com', role: 'owner' },
+        userC: { uid: 'userC', name: 'Carol', email: 'userc@test.com', role: 'member' },
+      },
+      memberUids: ['userA', 'userB', 'userC'],
+    }));
+  });
+
+  it('allows a dotted-path accept, as the app writes it', async () => {
+    const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
+    await assertSucceeds(updateDoc(doc(userC.firestore(), 'groups', 'group3'), {
+      'members.userC': { uid: 'userC', name: 'Carol', email: 'userc@test.com', role: 'member' },
+      memberUids: ['userA', 'userB', 'userC'],
+    }));
+  });
+
   it('allows a clean accept that adds only the caller as a member', async () => {
     const userC = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true });
     await assertSucceeds(updateDoc(doc(userC.firestore(), 'groups', 'group3'), {

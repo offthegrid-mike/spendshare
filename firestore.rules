@@ -59,10 +59,10 @@ service cloud.firestore {
              && request.auth.uid in request.resource.data.memberUids
              && request.resource.data.memberUids.toSet()
                   .difference(resource.data.memberUids.toSet()) == [request.auth.uid].toSet()
-             // members map: no existing key removed, and the only added key is the caller
-             && resource.data.members.keys().toSet().difference(request.resource.data.members.keys().toSet()).size() == 0
-             && request.resource.data.members.keys().toSet()
-                  .difference(resource.data.members.keys().toSet()) == [request.auth.uid].toSet()
+             // members map: the caller's entry is the only one added, removed or changed —
+             // existing members' entries (name, email, role, joinedAt) must be untouched
+             && request.resource.data.members.diff(resource.data.members).affectedKeys()
+                  .hasOnly([request.auth.uid])
              // pin the new member's role to 'member'
              && request.resource.data.members[request.auth.uid].role == 'member' );
       allow delete: if isOwner(groupId);
