@@ -36,6 +36,75 @@ describe('BottomSheet', () => {
   });
 });
 
+// The pill itself is only 4px tall, so the whole header strip is the grab
+// target. Pointer events cover touch as well as a mouse in a narrow window.
+describe('BottomSheet drag to dismiss', () => {
+  function dragZone() {
+    return screen.getByTestId('sheet-drag-zone');
+  }
+
+  function drag(from: number, to: number) {
+    const zone = dragZone();
+    fireEvent.pointerDown(zone, { pointerId: 1, clientY: from });
+    fireEvent.pointerMove(zone, { pointerId: 1, clientY: to });
+  }
+
+  it('wraps the handle and title in a drag zone the browser will not scroll', () => {
+    renderSheet(true);
+    const zone = dragZone();
+    expect(zone.contains(screen.getByTestId('sheet-handle'))).toBe(true);
+    expect(zone.contains(screen.getByText('Add Expense'))).toBe(true);
+    expect(zone.style.touchAction).toBe('none');
+  });
+
+  it('moves the sheet with the pointer while dragging down', () => {
+    renderSheet(true);
+    drag(100, 150);
+    expect(screen.getByRole('dialog').style.transform).toBe('translateY(50px)');
+  });
+
+  it('does not move the sheet above its resting position', () => {
+    renderSheet(true);
+    drag(100, 40);
+    expect(screen.getByRole('dialog').style.transform).toBe('translateY(0px)');
+  });
+
+  it('closes when released past the threshold', () => {
+    const { onClose } = renderSheet(true);
+    drag(100, 220);
+    fireEvent.pointerUp(dragZone(), { pointerId: 1, clientY: 220 });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('snaps back when released short of the threshold', () => {
+    const { onClose } = renderSheet(true);
+    drag(100, 130);
+    fireEvent.pointerUp(dragZone(), { pointerId: 1, clientY: 130 });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog').style.transform).toBe('');
+  });
+
+  it('snaps back when the pointer is cancelled', () => {
+    const { onClose } = renderSheet(true);
+    drag(100, 220);
+    fireEvent.pointerCancel(dragZone(), { pointerId: 1 });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog').style.transform).toBe('');
+  });
+
+  it('opens at rest again after being dragged closed', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <BottomSheet open onClose={onClose} title="Add Expense"><p>x</p></BottomSheet>
+    );
+    drag(100, 220);
+    fireEvent.pointerUp(dragZone(), { pointerId: 1, clientY: 220 });
+    rerender(<BottomSheet open={false} onClose={onClose} title="Add Expense"><p>x</p></BottomSheet>);
+    rerender(<BottomSheet open onClose={onClose} title="Add Expense"><p>x</p></BottomSheet>);
+    expect(screen.getByRole('dialog').style.transform).toBe('');
+  });
+});
+
 // Android Chrome's on-screen keyboard shrinks only the visual viewport, so a
 // sheet sized against the layout viewport ends up partly behind the keyboard.
 describe('BottomSheet with an on-screen keyboard', () => {
