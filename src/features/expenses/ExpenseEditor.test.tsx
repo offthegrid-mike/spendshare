@@ -199,4 +199,12 @@ describe('ExpenseEditor (hybrid)', () => {
     // The Save button must live inside the sticky footer.
     expect(footer).toContainElement(screen.getByRole('button', { name: /save expense/i }));
   });
+
+  it('unsticks the footer while the bottom sheet reports an open keyboard', () => {
+    // With the keyboard up the sheet is short; a sticky footer would cover the field being edited.
+    renderEditor();
+    const footer = screen.getByTestId('expense-editor-footer');
+    expect(footer.className).toContain('group-data-[keyboard=open]/sheet:static');
+    expect(footer.className).toContain('group-data-[keyboard=open]/sheet:shadow-none');
+  });
 });

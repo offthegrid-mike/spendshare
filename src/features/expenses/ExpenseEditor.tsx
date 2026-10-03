@@ -565,10 +565,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         )}
       </div>
 
-      {/* Totals + Save footer — sticky to the bottom of the mobile sheet only */}
+      {/* Totals + Save footer — sticky to the bottom of the mobile sheet only, and not
+          while the keyboard is up (it would cover the field being edited). */}
       <div
         data-testid="expense-editor-footer"
-        className="space-y-4 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-5 max-sm:border-t max-sm:border-slate-100 max-sm:bg-white max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.08)]"
+        className="space-y-4 group-data-[keyboard=open]/sheet:static group-data-[keyboard=open]/sheet:shadow-none max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-5 max-sm:border-t max-sm:border-slate-100 max-sm:bg-white max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.08)]"
       >
         {/* Totals */}
         <div className="space-y-1.5 border-t border-slate-100 pt-3 max-sm:border-t-0 max-sm:pt-0">

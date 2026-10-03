@@ -1,4 +1,9 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useVisualViewport } from '../hooks/useVisualViewport';
+
+// The visible area shrinking by more than this means an on-screen keyboard
+// (not just a collapsing browser toolbar) is covering the page.
+const KEYBOARD_MIN_HEIGHT = 150;
 
 interface Props {
   open: boolean;
@@ -9,6 +14,7 @@ interface Props {
 
 export default function BottomSheet({ open, onClose, title, children }: Props) {
   const startYRef = useRef<number | null>(null);
+  const viewport = useVisualViewport();
 
   useEffect(() => {
     if (!open || window.innerWidth >= 640) return;
@@ -17,6 +23,8 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
   }, [open]);
 
   if (!open) return null;
+
+  const keyboardOpen = viewport !== null && window.innerHeight - viewport.height > KEYBOARD_MIN_HEIGHT;
 
   function handleTouchStart(e: React.TouchEvent) {
     startYRef.current = e.touches[0].clientY;
@@ -30,7 +38,11 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 sm:hidden">
+    <div
+      className="fixed inset-0 z-40 sm:hidden"
+      // Track the visible area so the sheet stays above the on-screen keyboard.
+      style={viewport ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' } : undefined}
+    >
       <div
         className="absolute inset-0 bg-black/40"
         data-testid="sheet-backdrop"
@@ -38,7 +50,8 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
         aria-hidden="true"
       />
       <div
-        className="absolute bottom-0 left-0 right-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white"
+        className={`group/sheet absolute bottom-0 left-0 right-0 ${keyboardOpen ? 'max-h-full' : 'max-h-[85%]'} overflow-y-auto overscroll-contain rounded-t-2xl bg-white`}
+        data-keyboard={keyboardOpen ? 'open' : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
