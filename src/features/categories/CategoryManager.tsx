@@ -4,6 +4,8 @@ import { categoriesCol } from '../../lib/converters';
 import { useCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
 import LoadingButton from '../../components/LoadingButton';
+import CategoryTile from '../../components/ui/CategoryTile';
+import { iconForCategory } from '../../lib/categoryIcons';
 import type { CategoryDoc } from '../../types/models';
 
 export default function CategoryManager() {
@@ -17,6 +19,7 @@ export default function CategoryManager() {
   const [error, setError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -89,24 +92,30 @@ export default function CategoryManager() {
     }
   }
 
-  if (!gid) return <div className="p-4 text-slate-500">No group selected.</div>;
-  if (loading) return <div className="p-4 text-slate-500">Loading…</div>;
+  if (!gid) return <div className="p-4 text-ink-muted">No group selected.</div>;
+  if (loading) return <div className="p-4 text-ink-muted">Loading…</div>;
+
+  const activeCategories = all.filter((category) => !category.archived);
+  const archivedCategories = all.filter((category) => category.archived);
+  const visibleCategories = showArchived ? all : activeCategories;
 
   return (
-    <div className="mx-auto max-w-lg">
-      <h2 className="mb-4 text-lg font-semibold text-slate-800">Categories</h2>
+    <div className="mx-auto max-w-lg space-y-4">
+      <h2 className="text-xl font-semibold tracking-tight text-ink">Categories</h2>
 
-      {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-negative">{error}</p>}
 
-      <ul className="mb-6 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-        {all.length === 0 && (
-          <li className="px-4 py-3 text-sm text-slate-400">No categories yet.</li>
+      <div className="card overflow-hidden">
+        <ul className="divide-y divide-line">
+        {visibleCategories.length === 0 && (
+          <li className="px-4 py-3 text-sm text-ink-muted">No categories yet.</li>
         )}
-        {all.map((cat) => (
+        {visibleCategories.map((cat) => (
           <li
             key={cat.id}
-            className={`flex items-center gap-3 px-4 py-3 ${cat.archived ? 'bg-slate-50' : ''}`}
+            className={`flex items-center gap-3 px-4 py-3 ${cat.archived ? 'bg-recessed/60' : ''}`}
           >
+            <CategoryTile icon={iconForCategory(cat.name)} label={cat.name} />
             {editingId === cat.id ? (
               <>
                 <input
@@ -119,13 +128,13 @@ export default function CategoryManager() {
                   }}
                   autoFocus
                   disabled={savingEdit}
-                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="field flex-1 py-1 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <LoadingButton
                   loading={savingEdit}
                   loadingText="Saving…"
                   onClick={() => void saveEdit(cat)}
-                  className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                  className="btn-primary h-8 px-3 text-xs"
                 >
                   Save
                 </LoadingButton>
@@ -133,7 +142,7 @@ export default function CategoryManager() {
                   type="button"
                   disabled={savingEdit}
                   onClick={cancelEdit}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-outline h-8 px-3 text-xs"
                 >
                   Cancel
                 </button>
@@ -142,12 +151,12 @@ export default function CategoryManager() {
               <>
                 <span
                   className={`flex-1 text-sm ${
-                    cat.archived ? 'text-slate-400 line-through' : 'text-slate-800'
+                    cat.archived ? 'text-ink-faint line-through' : 'text-ink'
                   }`}
                 >
                   {cat.name}
                   {cat.archived && (
-                    <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-500">
+                    <span className="ml-2 rounded-full bg-recessed px-2 py-0.5 text-xs font-medium text-ink-muted">
                       archived
                     </span>
                   )}
@@ -156,7 +165,7 @@ export default function CategoryManager() {
                   type="button"
                   disabled={savingEdit}
                   onClick={() => startEdit(cat)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-outline h-8 px-3 text-xs"
                 >
                   Rename
                 </button>
@@ -164,7 +173,7 @@ export default function CategoryManager() {
                   loading={archivingIds.has(cat.id)}
                   loadingText={cat.archived ? 'Unarchiving…' : 'Archiving…'}
                   onClick={() => void toggleArchive(cat)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="btn-outline h-8 px-3 text-xs"
                 >
                   {cat.archived ? 'Unarchive' : 'Archive'}
                 </LoadingButton>
@@ -173,14 +182,23 @@ export default function CategoryManager() {
           </li>
         ))}
       </ul>
-
-      <form onSubmit={(e) => void handleAdd(e)} className="flex gap-2">
+      {archivedCategories.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowArchived((shown) => !shown)}
+          className="btn-ghost mx-2 mb-2"
+          aria-expanded={showArchived}
+        >
+          Archived ({archivedCategories.length})
+        </button>
+      )}
+      <form onSubmit={(e) => void handleAdd(e)} className="flex gap-2 border-t border-line p-3">
         <input
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="New category name"
-          className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          className="field flex-1"
         />
         <button
           type="submit"
@@ -190,6 +208,7 @@ export default function CategoryManager() {
           {adding ? 'Adding…' : 'Add'}
         </button>
       </form>
+      </div>
     </div>
   );
 }

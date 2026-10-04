@@ -20,21 +20,21 @@ export default function PendingInvites({ user }: Props) {
   if (invites.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="card divide-y divide-line overflow-hidden">
       {invites.map((invite) => {
         const inFlight = pending === invite.ref.path;
         return (
           <div
             key={invite.ref.path}
-            className="rounded-lg border border-brand-200 bg-brand-50 p-4 shadow-sm"
+            className="p-4"
           >
-            <p className="text-sm text-slate-800">
+            <p className="text-sm text-ink">
               <span className="font-semibold">{invite.invitedByName}</span>{' '}
               invited you to join{' '}
               <span className="font-semibold">{invite.groupName}</span>.
             </p>
             {error?.id === invite.ref.path && (
-              <p className="mt-2 text-sm text-rose-600">{error.message}</p>
+              <p className="mt-2 text-sm text-negative">{error.message}</p>
             )}
             <div className="mt-3 flex gap-2">
               <button
@@ -71,7 +71,7 @@ export default function PendingInvites({ user }: Props) {
                     )
                     .finally(() => setPending(null));
                 }}
-                className="rounded-md border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="btn-ghost border border-line disabled:opacity-50"
               >
                 Decline
               </button>

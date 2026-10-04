@@ -46,15 +46,15 @@ export default function SendInvite({ user, group }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="card p-6">
-        <h1 className="mb-4 text-xl font-semibold text-slate-800">
+      <div className="card p-5 sm:p-6">
+        <h1 className="mb-4 text-xl font-semibold tracking-tight text-ink">
           Invite to {group.name}
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="invite-email"
-              className="mb-1 block text-sm font-medium text-slate-700"
+              className="mb-1 block text-sm font-medium text-ink"
             >
               Email
             </label>
@@ -66,11 +66,11 @@ export default function SendInvite({ user, group }: Props) {
               placeholder="friend@example.com"
               className="field"
             />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Invite the exact email they&apos;ll sign in with.
             </p>
           </div>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-negative">{error}</p>}
           <button
             type="submit"
             disabled={saving}
@@ -82,18 +82,18 @@ export default function SendInvite({ user, group }: Props) {
       </div>
 
       {invites.length > 0 && (
-        <div className="card p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-800">Invites</h2>
-          {error && <p className="mb-2 text-sm text-rose-600">{error}</p>}
-          <ul className="divide-y divide-slate-100">
+        <div className="card overflow-hidden">
+          <h2 className="px-5 pb-3 pt-5 text-lg font-semibold text-ink">Invites</h2>
+          {error && <p className="px-5 pb-2 text-sm text-negative">{error}</p>}
+          <ul className="divide-y divide-line">
             {invites.map((invite) => (
               <li
                 key={invite.id}
-                className="flex items-center justify-between py-2"
+                className="flex items-center justify-between gap-3 px-5 py-3"
               >
                 <div>
-                  <p className="text-sm text-slate-800">{invite.email}</p>
-                  <p className="text-xs capitalize text-slate-500">
+                  <p className="text-sm font-medium text-ink">{invite.email}</p>
+                  <p className="text-xs capitalize text-ink-muted">
                     {invite.status}
                   </p>
                 </div>
@@ -110,7 +110,7 @@ export default function SendInvite({ user, group }: Props) {
                         })
                         .finally(() => setRevoking(null));
                     }}
-                    className="rounded-md border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    className="btn-ghost shrink-0 border border-line disabled:opacity-50"
                   >
                     Revoke
                   </button>

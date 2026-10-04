@@ -68,18 +68,18 @@ export default function SignIn() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm rounded-2xl border border-white/60 bg-white/85 p-8 shadow-card backdrop-blur-md">
+      <div className="card w-full max-w-sm p-8">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-brand">
+          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-on-accent">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 4h16v14l-2.5-1.5L15 18l-3-1.5L9 18l-2.5-1.5L4 18z" />
               <path d="M9 8h6M9 12h4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
             SpendShare
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Split expenses, settle up, stay friends.
           </p>
         </div>
@@ -93,13 +93,14 @@ export default function SignIn() {
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-slate-700"
+              className="mb-1 block text-sm font-medium text-ink"
             >
               Email
             </label>
             <input
               id="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="field"
@@ -108,13 +109,14 @@ export default function SignIn() {
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium text-slate-700"
+              className="mb-1 block text-sm font-medium text-ink"
             >
               Password
             </label>
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="field"
@@ -122,12 +124,12 @@ export default function SignIn() {
           </div>
 
           {validationError && (
-            <p className="text-sm text-red-600" role="alert">
+            <p className="text-sm text-negative" role="alert">
               {validationError}
             </p>
           )}
           {authError && (
-            <p className="text-sm text-red-600" role="alert">
+            <p className="text-sm text-negative" role="alert">
               {authError}
             </p>
           )}
@@ -145,16 +147,16 @@ export default function SignIn() {
           </button>
 
           <div className="flex items-center gap-3 py-1">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
-            <span className="h-px flex-1 bg-slate-200" />
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-xs font-medium text-ink-muted">or</span>
+            <span className="h-px flex-1 bg-line" />
           </div>
 
           <button
             type="button"
             disabled={busy}
             onClick={() => void handleGoogle()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+            className="btn-outline w-full py-2.5"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.9z" />

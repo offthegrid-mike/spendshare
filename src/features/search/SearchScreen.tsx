@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, ShoppingBag } from 'lucide-react';
+import { Gift, Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatMoney } from '../../lib/money';
 import { searchExpenses, highlightMatch } from '../../lib/search';
@@ -67,7 +67,7 @@ export default function SearchScreen({ group }: Props) {
         <Search
           size={16}
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
         />
         <input
           type="search"
@@ -78,53 +78,53 @@ export default function SearchScreen({ group }: Props) {
           onCompositionEnd={handleCompositionEnd}
           placeholder="Search shop or item name"
           aria-label="Search shop or item name"
-          className="w-full rounded-2xl border border-white/60 bg-white/80 py-3 pl-9 pr-3 text-sm shadow-card backdrop-blur-sm placeholder:text-slate-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          className="field py-3 pl-9 pr-3"
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-negative">{error}</p>}
 
       {!error && loading && (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/70 shadow-card" />
+            <div key={i} className="h-16 animate-pulse rounded-2xl bg-recessed" />
           ))}
         </div>
       )}
 
       {!error && !loading && !hasQuery && (
-        <p className="px-1 py-8 text-center text-sm text-slate-500">
-          Search by shop or item name — across every month.
+        <p className="px-1 py-8 text-center text-sm text-ink-muted">
+          Search every item your group has bought
         </p>
       )}
 
       {!error && !loading && hasQuery && results.length === 0 && (
-        <p className="px-1 py-8 text-center text-sm text-slate-500">
-          No results for “{query}”.
+        <p className="px-1 py-8 text-center text-sm text-ink-muted">
+          No items match '{query}'.
         </p>
       )}
 
       {!error && !loading && results.length > 0 && (
         <>
-          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <p className="px-1 text-xs font-medium text-ink-muted">
             {results.length} result{results.length !== 1 ? 's' : ''}
           </p>
-          <div className="space-y-2.5">
+          <div className="overflow-hidden rounded-2xl border border-line bg-surface">
             {results.map(({ expense, matchedItems }) => (
               <Link
                 key={expense.id}
                 to={`/expense/${expense.id}/edit`}
-                className="block rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm transition-shadow hover:shadow-card-hover"
+                className="block border-b border-line last:border-0 hover:bg-recessed"
               >
                 <div className="flex min-h-[44px] items-center gap-3 px-4 py-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-recessed text-ink-muted">
                     <ShoppingBag size={18} aria-hidden="true" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-900">
+                    <p className="font-medium text-ink">
                       {highlightMatch(expense.shopName, query)}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-ink-muted">
                       {expense.date ? format(expense.date.toDate(), 'd MMM yyyy') : expense.month}
                       {' · '}
                       {payerName(expense.payerUid)}
@@ -133,29 +133,29 @@ export default function SearchScreen({ group }: Props) {
                   <div className="text-right">
                     {expense.giftCardAmount ? (
                       <>
-                        <p className="text-xs tabular-nums text-slate-400 line-through">
+                        <p className="money text-xs text-ink-faint line-through">
                           {formatMoney(expense.total, group.currency)}
                         </p>
-                        <p className="text-base font-bold tabular-nums text-emerald-600">
+                        <p className="money text-base font-semibold text-ink">
                           {formatMoney(expense.total - expense.giftCardAmount, group.currency)}
                         </p>
-                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                          🎁 Gift card {formatMoney(expense.giftCardAmount, group.currency)}
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-ink-faint">
+                          <Gift size={12} aria-hidden="true" /> Gift card {formatMoney(expense.giftCardAmount, group.currency)}
                         </span>
                       </>
                     ) : (
-                      <span className="text-base font-bold tabular-nums text-slate-900">
+                      <span className="money text-base font-semibold text-ink">
                         {formatMoney(expense.total, group.currency)}
                       </span>
                     )}
                   </div>
                 </div>
                 {matchedItems.length > 0 && (
-                  <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
+                  <ul className="space-y-1 border-t border-line px-4 py-2.5">
                     {matchedItems.map((item) => (
-                      <li key={item.id} className="flex items-start justify-between text-sm text-slate-600">
-                        <span>{highlightMatch(item.name, query)}</span>
-                        <span className="tabular-nums text-slate-400">
+                      <li key={item.id} className="flex items-start justify-between text-sm text-ink-muted">
+                        <mark className="bg-accent-soft text-inherit">{highlightMatch(item.name, query)}</mark>
+                        <span className="money text-ink-muted">
                           {formatMoney(item.amount, group.currency)}
                         </span>
                       </li>

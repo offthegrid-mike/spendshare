@@ -127,4 +127,25 @@ describe('CategoryManager', () => {
       await Promise.resolve();
     });
   });
+
+  it('keeps archived categories collapsed until the archived control is opened', async () => {
+    useCategories.mockReturnValue({
+      all: [
+        ...categories,
+        { id: 'cat3', name: 'Archived category', order: 2, archived: true },
+      ],
+      active: categories,
+      loading: false,
+    });
+
+    const u = userEvent.setup();
+    render(<CategoryManager />);
+
+    expect(screen.getByRole('button', { name: 'Archived (1)' })).toBeInTheDocument();
+    expect(screen.queryByText('Archived category')).not.toBeInTheDocument();
+
+    await u.click(screen.getByRole('button', { name: 'Archived (1)' }));
+
+    expect(screen.getByText('Archived category')).toBeInTheDocument();
+  });
 });

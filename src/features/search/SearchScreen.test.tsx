@@ -71,7 +71,7 @@ describe('SearchScreen', () => {
 
   it('prompts for a query before anything is typed', () => {
     renderScreen();
-    expect(screen.getByText(/search by shop or item name/i)).toBeTruthy();
+    expect(screen.getByText('Search every item your group has bought')).toBeTruthy();
   });
 
   it('filters expenses by shop name as you type', async () => {
@@ -107,7 +107,7 @@ describe('SearchScreen', () => {
   it('shows a no-results message', async () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), 'zzzz');
-    expect(screen.getByText(/no results for/i)).toBeTruthy();
+    expect(screen.getByText("No items match 'zzzz'.")).toBeTruthy();
   });
 
   it('shows skeletons while loading', () => {
@@ -142,8 +142,8 @@ describe('SearchScreen', () => {
     // The keystrokes stay visible in the field...
     expect(input.value).toBe('一口廿');
     // ...but no search ran: the prompt is still showing, not a no-results message.
-    expect(screen.getByText(/search by shop or item name/i)).toBeTruthy();
-    expect(screen.queryByText(/no results for/i)).toBeNull();
+    expect(screen.getByText('Search every item your group has bought')).toBeTruthy();
+    expect(screen.queryByText(/no items match/i)).toBeNull();
   });
 
   it('searches once the IME composition completes', () => {

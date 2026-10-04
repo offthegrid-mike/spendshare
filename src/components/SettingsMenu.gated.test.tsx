@@ -7,12 +7,12 @@ import SettingsMenu from './SettingsMenu';
 vi.mock('../lib/firebase', () => ({ auth: {} }));
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
 
-describe('SettingsMenu while dark mode is not yet enabled', () => {
-  it('has no appearance options', async () => {
+describe('SettingsMenu with dark mode enabled', () => {
+  it('shows appearance options', async () => {
     render(<MemoryRouter><SettingsMenu /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Settings menu' }));
     expect(screen.getByRole('menuitem', { name: 'Categories' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Appearance' })).toBeNull();
-    expect(screen.queryByRole('menuitemradio')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3);
   });
 });

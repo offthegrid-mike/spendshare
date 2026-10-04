@@ -6,11 +6,11 @@ import MoreScreen from './MoreScreen';
 vi.mock('../../lib/firebase', () => ({ auth: {} }));
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
 
-describe('MoreScreen while dark mode is not yet enabled', () => {
-  it('has no appearance switch', () => {
+describe('MoreScreen with dark mode enabled', () => {
+  it('has an appearance switch', () => {
     render(<MemoryRouter><MoreScreen /></MemoryRouter>);
     expect(screen.getByRole('link', { name: /categories/i })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Appearance' })).toBeNull();
-    expect(screen.queryByText('Appearance')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getByText('Appearance')).toBeInTheDocument();
   });
 });

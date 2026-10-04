@@ -31,19 +31,19 @@ export default function MoreScreen() {
   return (
     <div className="space-y-6">
       <section>
-        <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="mb-2 px-1 text-sm font-medium text-ink-muted">
           Manage
-        </p>
-        <div className="space-y-1">
+        </h2>
+        <div className="card divide-y divide-line overflow-hidden">
           {manageItems.map(({ to, icon: Icon, label }) => (
             <Link
               key={to}
               to={to}
-              className="flex min-h-[44px] items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white"
+              className="flex min-h-[44px] items-center gap-3 px-4 transition hover:bg-recessed"
             >
-              <Icon size={18} className="shrink-0 text-brand-600" aria-hidden="true" />
-              <span className="flex-1 text-sm font-medium text-slate-800">{label}</span>
-              <ChevronRight size={16} className="text-slate-400" aria-hidden="true" />
+              <Icon size={18} className="shrink-0 text-accent-ink" aria-hidden="true" />
+              <span className="flex-1 text-sm font-medium text-ink">{label}</span>
+              <ChevronRight size={16} className="text-ink-faint" aria-hidden="true" />
             </Link>
           ))}
         </div>
@@ -55,20 +55,20 @@ export default function MoreScreen() {
         </section>
       )}
       <section>
-        <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="mb-2 px-1 text-sm font-medium text-ink-muted">
           Account
-        </p>
+        </h2>
         <LoadingButton
           loading={signingOut}
           loadingText="Signing out…"
           onClick={() => void handleSignOut()}
-          className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-4 shadow-card backdrop-blur-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="card flex min-h-[44px] w-full items-center gap-3 px-4 transition hover:bg-recessed disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <LogOut size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
-          <span className="flex-1 text-left text-sm font-medium text-slate-800">Sign out</span>
+          <LogOut size={18} className="shrink-0 text-ink-muted" aria-hidden="true" />
+          <span className="flex-1 text-left text-sm font-medium text-ink">Sign out</span>
         </LoadingButton>
       </section>
-      <p className="px-1 text-center text-xs text-slate-400">
+      <p className="px-1 text-center text-xs text-ink-faint">
         {formatVersionLabel(__APP_COMMIT__, __APP_BUILT_AT__)}
       </p>
     </div>
