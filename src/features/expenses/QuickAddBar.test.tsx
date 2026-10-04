@@ -19,6 +19,12 @@ function setup(sugs: any[] = []) { // eslint-disable-line @typescript-eslint/no-
 }
 
 describe('QuickAddBar', () => {
+  it('is a plain strip without a "Quick add" heading', () => {
+    setup();
+    expect(screen.queryByText(/quick add/i)).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Shared' })).toBeChecked();
+  });
+
   it('adds an item with the entered name, amount, category and shared', () => {
     const { onAdd } = setup();
     fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });

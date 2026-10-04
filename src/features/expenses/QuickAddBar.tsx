@@ -48,44 +48,42 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
     document.getElementById('quickadd-name')?.focus();
   }
 
-  return (
-    <div className="rounded-xl border border-brand-300 bg-white p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-600">
-        Quick add
-      </div>
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAdd();
+    }
+  };
 
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <ItemNameCombobox
-            id="quickadd-name"
-            value={name}
-            suggestions={suggestions}
-            onEnter={handleAdd}
-            onChange={(n, suggestion) => {
-              setName(n);
-              if (suggestion) setCategoryId(suggestion.categoryId);
-            }}
+  // One row from lg up; on phones, name/price/qty then category/shared/add.
+  return (
+    <div className="rounded-[10px] bg-recessed p-2.5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <ItemNameCombobox
+              id="quickadd-name"
+              value={name}
+              suggestions={suggestions}
+              onEnter={handleAdd}
+              onChange={(n, suggestion) => {
+                setName(n);
+                if (suggestion) setCategoryId(suggestion.categoryId);
+              }}
+            />
+          </div>
+          <label htmlFor="qa-amount" className="sr-only">Unit price</label>
+          <input
+            id="qa-amount"
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={onEnter}
+            className="field money w-20 lg:w-[72px]"
           />
-        </div>
-        <label htmlFor="qa-amount" className="sr-only">Unit price</label>
-        <input
-          id="qa-amount"
-          type="text"
-          inputMode="decimal"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-          className="field w-20"
-        />
-        <label htmlFor="qa-qty" className="sr-only">Quantity</label>
-        <div className="flex items-center">
-          <span className="mr-1 text-sm text-slate-400">×</span>
+          <span className="text-sm text-ink-muted" aria-hidden="true">×</span>
           <input
             id="qa-qty"
             type="text"
@@ -94,52 +92,51 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
             placeholder="1"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleAdd();
-              }
-            }}
-            className="field w-12"
+            onKeyDown={onEnter}
+            className="field money w-12"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="qa-category" className="sr-only">Category</label>
+          <select
+            id="qa-category"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="field flex-1 lg:w-32 lg:flex-none"
+          >
+            <option value="">No category</option>
+            {cats.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+
+          {/* A checkbox styled as a switch: role and keyboard stay native. */}
+          <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={shared}
+              onChange={(e) => setShared(e.target.checked)}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className="relative h-5 w-9 shrink-0 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:shadow-sm after:transition-transform peer-checked:bg-accent peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40"
+            />
+            Shared
+          </label>
+
+          <button
+            type="button"
+            onClick={handleAdd}
+            aria-label="Add item"
+            className="grid h-9 w-10 shrink-0 place-items-center rounded-[10px] bg-accent text-on-accent transition hover:brightness-110 motion-safe:active:scale-95"
+          >
+            <Plus size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <label htmlFor="qa-category" className="sr-only">Category</label>
-        <select
-          id="qa-category"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="field flex-1"
-        >
-          <option value="">No category</option>
-          {cats.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
-          ))}
-        </select>
-
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={shared}
-            onChange={(e) => setShared(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
-          />
-          Shared
-        </label>
-
-        <button
-          type="button"
-          onClick={handleAdd}
-          aria-label="Add item"
-          className="flex h-9 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white shadow-brand transition hover:opacity-90"
-        >
-          <Plus size={18} />
-        </button>
-      </div>
-
-      {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-negative">{error}</p>}
     </div>
   );
 }

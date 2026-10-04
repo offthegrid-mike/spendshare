@@ -7,31 +7,29 @@ const dayPickerClassNames = {
   root: 'relative p-2',
   months: 'flex',
   month: 'space-y-2',
-  month_caption: 'flex items-center justify-center py-1 text-sm font-semibold text-slate-900',
+  month_caption: 'flex items-center justify-center py-1 text-sm font-semibold text-ink',
   dropdowns: 'relative z-20 flex items-center gap-1',
   // The native <select> is stretched transparently over its label, so the
   // styled label is what shows while the OS picker handles the interaction.
   dropdown_root:
-    'relative inline-flex rounded-lg transition hover:bg-brand-50 focus-within:ring-2 focus-within:ring-brand-500/40',
+    'relative inline-flex rounded-lg transition hover:bg-recessed focus-within:ring-2 focus-within:ring-accent/40',
   dropdown: 'absolute inset-0 w-full cursor-pointer appearance-none opacity-0',
-  caption_label: 'flex items-center gap-1 px-2 py-1 text-sm font-semibold text-slate-900',
+  caption_label: 'flex items-center gap-1 px-2 py-1 text-sm font-semibold text-ink',
   nav: 'absolute inset-x-2 top-2 z-10 flex items-center justify-between',
-  button_previous:
-    'rounded-lg p-1 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700',
-  button_next:
-    'rounded-lg p-1 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700',
+  button_previous: 'rounded-lg p-1 text-ink-muted transition hover:bg-recessed hover:text-ink',
+  button_next: 'rounded-lg p-1 text-ink-muted transition hover:bg-recessed hover:text-ink',
   chevron: 'h-4 w-4 fill-current',
   month_grid: 'w-full border-collapse',
   weekdays: '',
-  weekday: 'text-xs font-medium text-slate-400 uppercase',
+  weekday: 'text-xs font-medium text-ink-muted',
   week: '',
   day: 'p-0 text-center',
   day_button:
-    'flex h-9 w-9 items-center justify-center rounded-full text-sm text-slate-700 transition hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
-  selected: '[&>button]:bg-brand-600 [&>button]:font-semibold [&>button]:text-white [&>button]:hover:bg-brand-600',
-  today: '[&>button]:font-semibold [&>button]:text-brand-700',
-  outside: '[&>button]:text-slate-300',
-  disabled: '[&>button]:cursor-not-allowed [&>button]:text-slate-300 [&>button]:hover:bg-transparent',
+    'flex h-9 w-9 items-center justify-center rounded-full text-sm text-ink transition hover:bg-recessed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+  selected: '[&>button]:bg-accent [&>button]:font-semibold [&>button]:text-on-accent [&>button]:hover:bg-accent',
+  today: '[&>button]:font-semibold [&>button]:text-accent-ink',
+  outside: '[&>button]:text-ink-faint',
+  disabled: '[&>button]:cursor-not-allowed [&>button]:text-ink-faint [&>button]:hover:bg-transparent',
 };
 
 // How far back / ahead the year dropdown reaches, widened to always include
@@ -87,10 +85,10 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
         className="field flex w-full items-center justify-between text-left"
       >
         <span>{label}</span>
-        <Calendar size={16} className="shrink-0 text-slate-400" />
+        <Calendar size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 rounded-2xl border border-brand-100 bg-white/95 shadow-card-hover backdrop-blur-sm">
+        <div className="absolute z-50 mt-1 rounded-[10px] border border-line bg-surface shadow-pop">
           <DayPicker
             mode="single"
             selected={selected}
@@ -103,7 +101,7 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
           />
         </div>
       )}
-      {error && <p className="mt-1 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mt-1 text-sm text-negative">{error}</p>}
     </div>
   );
 }

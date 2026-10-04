@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
-import { ChevronDown, ChevronUp, Gift, ScanLine } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
@@ -10,16 +10,17 @@ import { collapseWhitespace } from '../../lib/textNormalize';
 import { monthKey } from '../../lib/month';
 import { useCategories } from '../../hooks/useCategories';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
-import { readDraft, writeDraft, clearDraft } from '../../hooks/useExpenseDraft';
+import { readDraft, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
 import { computeDiscountCents } from '../../lib/discount';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
-import { useNavigate } from 'react-router-dom';
+import { Link, useInRouterContext, useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ShopNameCombobox from './ShopNameCombobox';
 import QuickAddBar from './QuickAddBar';
 import ItemRow from './ItemRow';
+import PayerPicker from './PayerPicker';
 import { schema, parseQty, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
@@ -45,12 +46,14 @@ interface Props {
   expense?: ExpenseDoc;
   items?: ItemDoc[];
   onSuccess?: () => void;
+  /** `sheet` inside the mobile Add expense sheet (which shows its own title). */
+  variant?: 'page' | 'sheet';
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess }: Props) {
+export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess, variant = 'page' }: Props) {
   const navigate = useSafeNavigate();
   const { active: cats } = useCategories(group.id);
   const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
@@ -349,29 +352,59 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  const isSheet = variant === 'sheet';
+  const inRouter = useInRouterContext();
+  // A new expense autosaves a draft once there is something worth keeping.
+  const draftSaved = isNew && isDraftMeaningful(allValues as ExpenseDraftValues);
+  const itemCount = (watchedItems ?? []).length;
+  const sharedCents = (watchedItems ?? []).reduce((sum, it) => {
+    if (!it?.shared) return sum;
+    const c = toCents(it.amount ?? '0');
+    return sum + (isNaN(c) ? 0 : c) * parseQty(it.quantity);
+  }, 0);
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="card mx-auto max-w-lg space-y-4 p-5">
-      <h1 className="text-xl font-bold tracking-tight text-slate-900">
-        {expense ? 'Edit expense' : 'New expense'}
-      </h1>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {/* Desktop page header; on phones the app header shows the title, and
+          the Add expense sheet has its own. */}
+      {!isSheet && (
+        <div className="hidden items-center gap-1 lg:flex">
+          {inRouter && (
+            <Link
+              to="/"
+              aria-label="Back"
+              className="grid h-9 w-9 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink"
+            >
+              <ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" />
+            </Link>
+          )}
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink">
+            {expense ? 'Edit expense' : 'New expense'}
+          </h1>
+          {draftSaved && <span className="ml-auto text-xs text-ink-muted">Draft saved</span>}
+        </div>
+      )}
 
       {/* Resumed draft notice */}
       {draftBannerOpen && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm text-amber-800">
-            Resumed your unsaved entry.
-          </p>
+        <div className="flex items-center gap-3 rounded-[10px] bg-recessed px-3.5 py-2.5">
+          <History size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
+          <p className="flex-1 text-sm text-ink">Resumed your unsaved entry.</p>
           <button
             type="button"
             onClick={handleStartFresh}
-            className="shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
+            className="shrink-0 text-sm font-medium text-accent-ink hover:underline"
           >
             Start fresh
           </button>
         </div>
       )}
 
-      {/* Scan receipt — OCR prefills the form; the image is not uploaded or stored. */}
+      {/* Two columns on desktop; DOM order is the field order, so tab order
+          is the same on every screen size. */}
+      <div className="lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <div className="space-y-4">
+      {/* Scan receipt: OCR prefills the form; the image is not uploaded or stored. */}
       <div>
         {/* No `capture` attribute: mobile then offers both the camera and the
             photo library / files, instead of jumping straight to the camera. */}
@@ -386,17 +419,17 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
           loading={scanning}
           loadingText="Scanning receipt…"
           onClick={() => fileInputRef.current?.click()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-700 transition hover:border-brand-400 hover:bg-brand-100"
+          className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-line bg-recessed px-4 py-2.5 text-sm font-medium text-accent-ink transition hover:bg-accent-soft"
         >
-          <ScanLine size={16} />
+          <ScanLine size={16} strokeWidth={1.75} aria-hidden="true" />
           Scan receipt
         </LoadingButton>
-        {scanError && <p className="mt-1.5 text-sm text-rose-600">{scanError}</p>}
+        {scanError && <p className="mt-1.5 text-sm text-negative">{scanError}</p>}
       </div>
 
       {/* Date */}
       <div>
-        <label htmlFor="date-picker" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="date-picker" className="mb-1 block text-sm font-medium text-ink">
           Date
         </label>
         <Controller
@@ -413,10 +446,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         />
       </div>
 
-      {/* Shop Name */}
+      {/* Shop name */}
       <div>
-        <label htmlFor="shopName" className="mb-1 block text-sm font-medium text-slate-700">
-          Shop Name
+        <label htmlFor="shopName" className="mb-1 block text-sm font-medium text-ink">
+          Shop name
         </label>
         <Controller
           control={control}
@@ -431,45 +464,40 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             />
           )}
         />
-        {errors.shopName && <p className="text-rose-600 text-sm">{errors.shopName.message}</p>}
+        {errors.shopName && <p className="mt-1 text-sm text-negative">{errors.shopName.message}</p>}
       </div>
 
       {/* Paid by */}
-      <div>
-        <label htmlFor="payerUid" className="mb-1 block text-sm font-medium text-slate-700">
-          Paid by
-        </label>
-        <select id="payerUid" {...register('payerUid')} className="field">
-          {group.memberUids.map((uid) => (
-            <option key={uid} value={uid}>
-              {group.members[uid]?.displayName ?? uid}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Controller
+        control={control}
+        name="payerUid"
+        render={({ field }) => (
+          <PayerPicker group={group} viewerUid={currentUserUid} value={field.value} onChange={field.onChange} />
+        )}
+      />
 
       {/* Gift card & discount */}
-      <div className="rounded-xl border border-slate-200">
+      <div className="rounded-[10px] border border-line bg-surface">
         <button
           type="button"
-          aria-label="Gift Card & Discount"
+          aria-label="Gift card & discount"
           aria-expanded={giftCardOpen}
           onClick={handleGiftCardToggle}
-          className="flex w-full items-center justify-between px-4 py-3 text-left"
+          className="flex w-full items-center justify-between px-3.5 py-3 text-left"
         >
-          <div className="flex items-center gap-2">
-            <Gift size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium text-emerald-700">Gift Card & Discount</span>
-            <span className="text-xs text-slate-400">(optional)</span>
-          </div>
+          <span className="flex items-center gap-2">
+            <Gift size={16} strokeWidth={1.75} className="text-accent-ink" aria-hidden="true" />
+            <span className="text-sm font-medium text-ink">Gift card & discount</span>
+            <span className="text-xs text-ink-muted">Optional</span>
+          </span>
           {giftCardOpen
-            ? <ChevronUp size={16} className="text-slate-400" />
-            : <ChevronDown size={16} className="text-slate-400" />}
+            ? <ChevronUp size={16} strokeWidth={1.75} className="text-ink-faint" aria-hidden="true" />
+            : <ChevronDown size={16} strokeWidth={1.75} className="text-ink-faint" aria-hidden="true" />}
         </button>
         {giftCardOpen && (
-          <div className="space-y-3 border-t border-slate-100 px-4 pb-3 pt-2">
+          <div className="space-y-3 border-t border-line px-3.5 pb-3 pt-2.5">
             <div>
-              <label htmlFor="giftCardAmount" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="giftCardAmount" className="mb-1 block text-sm font-medium text-ink">
                 Gift card amount
               </label>
               <input
@@ -478,26 +506,26 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                 inputMode="decimal"
                 placeholder="0.00"
                 {...register('giftCardAmount')}
-                className="field"
+                className="field money"
               />
               {errors.giftCardAmount && (
-                <p className="mt-1 text-sm text-rose-600">{errors.giftCardAmount.message}</p>
+                <p className="mt-1 text-sm text-negative">{errors.giftCardAmount.message}</p>
               )}
             </div>
             <div>
-              <label htmlFor="applyDiscount" className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <label htmlFor="applyDiscount" className="flex items-center gap-2 text-sm font-medium text-ink">
                 <input
                   id="applyDiscount"
                   type="checkbox"
                   checked={!!watchedApplyDiscount}
                   onChange={(e) => handleApplyDiscountToggle(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
                 />
                 Apply card discount
               </label>
               {watchedApplyDiscount && (
                 <div className="mt-2">
-                  <label htmlFor="discountPercent" className="mb-1 block text-sm font-medium text-slate-700">
+                  <label htmlFor="discountPercent" className="mb-1 block text-sm font-medium text-ink">
                     Discount %
                   </label>
                   <input
@@ -506,10 +534,10 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
                     inputMode="decimal"
                     placeholder="2"
                     {...register('discountPercent')}
-                    className="field"
+                    className="field money"
                   />
                   {errors.discountPercent && (
-                    <p className="mt-1 text-sm text-rose-600">{errors.discountPercent.message}</p>
+                    <p className="mt-1 text-sm text-negative">{errors.discountPercent.message}</p>
                   )}
                 </div>
               )}
@@ -517,7 +545,9 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
           </div>
         )}
       </div>
+      </div>
 
+      <div className="mt-4 space-y-3 lg:mt-0">
       {/* Items */}
       <div className="space-y-3">
         <QuickAddBar
@@ -529,8 +559,8 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         />
 
         {fields.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-            No items yet — add your first above.
+          <p className="rounded-[10px] border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted">
+            No items yet. Add your first one above.
           </p>
         ) : (
           <div className="space-y-2">
@@ -561,62 +591,71 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         )}
 
         {errors.items && (
-          <p className="text-sm text-rose-600">{errors.items.message ?? 'Add at least one item'}</p>
+          <p className="text-sm text-negative">{errors.items.message ?? 'Add at least one item'}</p>
         )}
       </div>
 
-      {/* Totals + Save footer — sticky to the bottom of the mobile sheet only, and not
-          while the keyboard is up (it would cover the field being edited). */}
+      {/* Totals + Save. Below lg (mobile page and the Add expense sheet) it
+          sticks to the bottom, except while the keyboard is up (it would cover
+          the field being edited). On desktop it sticks to the bottom of the
+          items column. */}
       <div
         data-testid="expense-editor-footer"
-        className="space-y-4 group-data-[keyboard=open]/sheet:static group-data-[keyboard=open]/sheet:shadow-none max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-5 max-sm:border-t max-sm:border-slate-100 max-sm:bg-white max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.08)]"
+        className="space-y-3 group-data-[keyboard=open]/sheet:static group-data-[keyboard=open]/sheet:shadow-none max-lg:sticky max-lg:bottom-0 max-lg:z-10 max-lg:-mx-4 max-lg:border-t max-lg:border-line max-lg:bg-surface max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-lg:shadow-pop lg:sticky lg:bottom-0 lg:bg-canvas lg:pb-4"
       >
-        {/* Totals */}
-        <div className="space-y-1.5 border-t border-slate-100 pt-3 max-sm:border-t-0 max-sm:pt-0">
+        <div className="space-y-1.5 border-t border-line pt-3 max-lg:border-t-0 max-lg:pt-0">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Receipt total</span>
-            <span className="text-base font-semibold tabular-nums text-slate-700">
+            <span className="text-sm text-ink-muted">Receipt total</span>
+            <span className="money text-base font-semibold text-ink">
               {formatMoney(totalCents, group.currency)}
             </span>
           </div>
           {gcCents > 0 && afterGiftCardCents < 0 && (
-            <p className="text-sm text-rose-600">Gift card amount exceeds receipt total</p>
+            <p className="text-sm text-negative">Gift card amount exceeds receipt total</p>
           )}
           {gcCents > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">🎁 Gift card</span>
-              <span className="text-sm tabular-nums text-emerald-600">
-                − {formatMoney(gcCents, group.currency)}
+              <span className="flex items-center gap-1.5 text-sm text-ink-muted">
+                <Gift size={14} strokeWidth={1.75} aria-hidden="true" />
+                Gift card
               </span>
+              <span className="money text-sm text-ink">− {formatMoney(gcCents, group.currency)}</span>
             </div>
           )}
           {discountCents > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">💳 Card discount ({displayDiscountPct}%)</span>
-              <span className="text-sm tabular-nums text-emerald-600">
-                − {formatMoney(discountCents, group.currency)}
+              <span className="flex items-center gap-1.5 text-sm text-ink-muted">
+                <CreditCard size={14} strokeWidth={1.75} aria-hidden="true" />
+                Card discount ({displayDiscountPct}%)
               </span>
+              <span className="money text-sm text-ink">− {formatMoney(discountCents, group.currency)}</span>
             </div>
           )}
           {(gcCents > 0 || discountCents > 0) && (
-            <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
-              <span className="text-sm font-semibold text-slate-700">Paid (to split)</span>
-              <span className="text-lg font-bold tabular-nums text-slate-900">
+            <div className="flex items-center justify-between border-t border-line pt-1.5">
+              <span className="text-sm font-semibold text-ink">Paid (to split)</span>
+              <span className="money text-lg font-semibold text-ink">
                 {formatMoney(netCents, group.currency)}
               </span>
             </div>
           )}
+          {itemCount > 0 && (
+            <p className="text-xs text-ink-muted">
+              {itemCount} item{itemCount === 1 ? '' : 's'}, {formatMoney(sharedCents, group.currency)} shared
+            </p>
+          )}
         </div>
 
-        {/* Submit */}
         <LoadingButton
           type="submit"
           loading={saving}
           loadingText={expense ? 'Saving changes…' : 'Saving…'}
-          className="btn-primary w-full py-2.5"
+          className="btn-primary h-11 w-full"
         >
           {expense ? 'Save changes' : 'Save expense'}
         </LoadingButton>
+      </div>
+      </div>
       </div>
     </form>
   );

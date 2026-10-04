@@ -38,7 +38,8 @@ vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [[], [], true],
   writeCache: vi.fn(),
 }));
-vi.mock('../../hooks/useExpenseDraft', () => ({
+vi.mock('../../hooks/useExpenseDraft', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../hooks/useExpenseDraft')>()),
   readDraft: () => null,
   writeDraft: vi.fn(),
   clearDraft: vi.fn(),
@@ -50,7 +51,20 @@ const group = {
   memberUids: ['u1'], createdAt: null,
 } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-function renderEditor(props = {}) {
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const editExpense = {
+  id: 'e1', groupId: 'g1', shopName: 'Flemington', payerUid: 'u1',
+  total: 570, itemCount: 2, month: '2026-07',
+  date: { seconds: 1783900800, nanoseconds: 0 },
+  createdByUid: 'u1', createdAt: null, updatedAt: null,
+} as any;
+const editItems = [
+  { id: 'i1', name: 'Cherry', categoryId: 'c1', category: 'Fruit', amount: 300, shared: true, payerUid: 'u1', expenseId: 'e1', groupId: 'g1', month: '2026-07' },
+  { id: 'i2', name: 'Bread', categoryId: 'c2', category: 'Bakery', amount: 270, shared: true, payerUid: 'u1', expenseId: 'e1', groupId: 'g1', month: '2026-07' },
+] as any;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function renderEditor(props: Record<string, unknown> = {}) {
   return render(
     <MemoryRouter>
       <ExpenseEditor group={group} currentUserUid="u1" {...props} />
@@ -188,11 +202,12 @@ describe('ExpenseEditor (hybrid)', () => {
     expect(expenseSet?.discountPercent).toBe(2);
   });
 
-  it('keeps the totals/save footer sticky to the bottom on mobile only', () => {
+  it('keeps the totals/save footer sticky to the bottom below the desktop breakpoint', () => {
     renderEditor();
     const footer = screen.getByTestId('expense-editor-footer');
-    expect(footer.className).toContain('max-sm:sticky');
-    expect(footer.className).toContain('max-sm:bottom-0');
+    // Sticks below lg: the mobile page and the Add expense sheet (up to 1023px).
+    expect(footer.className).toContain('max-lg:sticky');
+    expect(footer.className).toContain('max-lg:bottom-0');
     // Desktop (unprefixed) layout must not be sticky.
     expect(footer.className).not.toMatch(/(^|\s)sticky(\s|$)/);
     expect(footer.className).not.toMatch(/(^|\s)bottom-0(\s|$)/);
@@ -206,5 +221,51 @@ describe('ExpenseEditor (hybrid)', () => {
     const footer = screen.getByTestId('expense-editor-footer');
     expect(footer.className).toContain('group-data-[keyboard=open]/sheet:static');
     expect(footer.className).toContain('group-data-[keyboard=open]/sheet:shadow-none');
+  });
+
+  it('has a page header with a back link and title', () => {
+    renderEditor();
+    expect(screen.getByRole('heading', { level: 1, name: 'New expense' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/');
+  });
+
+  it('leaves the title to the sheet when shown in the Add expense sheet', () => {
+    renderEditor({ variant: 'sheet' });
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Back' })).toBeNull();
+  });
+
+  it('says "Draft saved" once a new expense has something worth keeping', () => {
+    renderEditor();
+    expect(screen.queryByText('Draft saved')).toBeNull();
+    fireEvent.change(screen.getByLabelText(/shop name/i), { target: { value: 'Coles' } });
+    expect(screen.getByText('Draft saved')).toBeInTheDocument();
+  });
+
+  it('never says "Draft saved" while editing an existing expense', () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    fireEvent.change(screen.getByLabelText(/shop name/i), { target: { value: 'Coles' } });
+    expect(screen.queryByText('Draft saved')).toBeNull();
+  });
+
+  it('summarises the items under the totals', () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    expect(screen.getByText(/^2 items, /)).toHaveTextContent('2 items, A$5.70 shared');
+  });
+
+  it('keeps the fields in their original order for keyboard users', () => {
+    renderEditor();
+    const order = [
+      screen.getByRole('button', { name: /scan receipt/i }),
+      screen.getByRole('button', { name: /^date/i }),
+      screen.getByLabelText(/shop name/i),
+      screen.getByRole('radiogroup', { name: 'Paid by' }),
+      screen.getByRole('button', { name: /gift card & discount/i }),
+      screen.getByPlaceholderText(/item name/i),
+      screen.getByRole('button', { name: /save expense/i }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
   });
 });

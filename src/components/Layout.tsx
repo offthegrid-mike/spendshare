@@ -75,6 +75,7 @@ export default function Layout({ groups, user }: Props) {
             group={group}
             currentUserUid={user.uid}
             onSuccess={closeAddSheet}
+            variant="sheet"
           />
         )}
       </BottomSheet>

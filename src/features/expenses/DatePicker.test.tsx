@@ -85,4 +85,12 @@ describe('DatePicker', () => {
     render(<DatePicker id="dp" value="" onChange={vi.fn()} error="Date required" />);
     expect(screen.getByText(/date required/i)).toBeInTheDocument();
   });
+
+  it('opens the calendar in a token-styled popover', async () => {
+    render(<DatePicker value="2026-06-15" onChange={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: /Jun 15, 2026/i }));
+    const popover = screen.getByTestId('mock-calendar').parentElement!;
+    expect(popover.className).toContain('shadow-pop');
+    expect(popover.className).toContain('bg-surface');
+  });
 });

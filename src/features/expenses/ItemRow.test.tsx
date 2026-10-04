@@ -8,10 +8,11 @@ const cats = [{ id: 'c1', name: 'Fruit', order: 0, archived: false }] as any; //
 
 function Harness({
   shared = true,
+  remark = '',
   expanded = false,
   onToggle = vi.fn(),
   onRemove = vi.fn(),
-}: { shared?: boolean; expanded?: boolean; onToggle?: () => void; onRemove?: () => void }) {
+}: { shared?: boolean; remark?: string; expanded?: boolean; onToggle?: () => void; onRemove?: () => void }) {
   const { control, register, setValue } = useForm<FormValues>({
     defaultValues: {
       date: '', shopName: '', payerUid: 'u1', giftCardAmount: '',
@@ -26,7 +27,7 @@ function Harness({
       setValue={setValue}
       cats={cats}
       suggestions={[]}
-      summary={{ name: 'Cherry', categoryId: 'c1', amount: '3.00', shared }}
+      summary={{ name: 'Cherry', categoryId: 'c1', amount: '3.00', shared, remark }}
       currency="AUD"
       expanded={expanded}
       onToggle={onToggle}
@@ -43,11 +44,17 @@ describe('ItemRow', () => {
     expect(screen.getByText(/3\.00/)).toBeTruthy();
   });
 
-  it('shows a "not shared" indicator only when the item is not shared', () => {
-    const { rerender } = render(<Harness shared={true} />);
-    expect(screen.queryByLabelText(/not shared/i)).toBeNull();
-    rerender(<Harness shared={false} />);
-    expect(screen.getByLabelText(/not shared/i)).toBeTruthy();
+  it('marks an unshared item as Personal', () => {
+    const { unmount } = render(<Harness />);
+    expect(screen.queryByText('Personal')).toBeNull();
+    unmount();
+    render(<Harness shared={false} />);
+    expect(screen.getByRole('button', { name: /cherry/i })).toHaveTextContent('Personal');
+  });
+
+  it('shows the remark in the collapsed row', () => {
+    render(<Harness remark="on sale" />);
+    expect(screen.getByRole('button', { name: /cherry/i })).toHaveTextContent('on sale');
   });
 
   it('calls onToggle when the summary row is clicked', () => {

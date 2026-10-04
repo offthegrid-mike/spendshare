@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent, act } from '@testing-library/react';
+import { render, screen, within, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Timestamp } from 'firebase/firestore';
 import type { GroupDoc, ExpenseDoc, ItemDoc, CategoryDoc, ShopEntry } from '../src/types/models';
@@ -190,11 +190,10 @@ describe('ExpenseEditor', () => {
     // Shop name field
     expect(screen.getByLabelText(/shop/i)).toBeInTheDocument();
 
-    // Payer select includes both group members
-    const payerSelect = screen.getByLabelText(/paid by|payer/i);
-    expect(payerSelect).toBeInTheDocument();
-    expect(within(payerSelect as HTMLElement).getByText('Alice')).toBeInTheDocument();
-    expect(within(payerSelect as HTMLElement).getByText('Bob')).toBeInTheDocument();
+    // Paid by offers both group members, the viewer as "You"
+    const payer = screen.getByRole('radiogroup', { name: /paid by/i });
+    expect(within(payer).getByRole('radio', { name: /you/i })).toBeChecked();
+    expect(within(payer).getByRole('radio', { name: /bob/i })).toBeInTheDocument();
 
     // At least one item row with name, category, amount, shared fields
     expect(screen.getByPlaceholderText(/item name/i)).toBeInTheDocument();
@@ -231,6 +230,19 @@ describe('ExpenseEditor', () => {
     await addQuickItem(u, 'Milk', '3.00');
 
     expect(screen.getByRole('button', { name: /milk/i })).toBeInTheDocument();
+  });
+
+  it('saves the payer picked in Paid by', async () => {
+    const { setSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.click(screen.getByRole('radio', { name: /bob/i }));
+    await addQuickItem(u, 'Apples', '3.99');
+    await u.click(screen.getByRole('button', { name: /save|submit|add expense/i }));
+    await waitFor(() => expect(setSpy).toHaveBeenCalled());
+    const expenseDoc = setSpy.mock.calls[0][1] as { payerUid: string };
+    expect(expenseDoc.payerUid).toBe('u2');
   });
 
   // 4. Validation ----------------------------------------------------------
@@ -312,7 +324,7 @@ describe('ExpenseEditor', () => {
     await u.type(gcInput, '5.30');
 
     expect(await footerRowText(/receipt total/i)).toMatch(/10\.00/);
-    expect(await footerRowText(/🎁/)).toMatch(/5\.30/);
+    expect(await footerRowText(/^gift card$/i)).toMatch(/5\.30/);
     expect(await footerRowText(/paid.*to split/i)).toMatch(/4\.70/);
   });
 
@@ -581,7 +593,7 @@ describe('ExpenseEditor', () => {
     await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
 
     expect(await footerRowText(/receipt total/i)).toMatch(/100\.00/);
-    expect(await footerRowText(/💳/)).toMatch(/2\.00/);
+    expect(await footerRowText(/^card discount/i)).toMatch(/2\.00/);
     expect(await footerRowText(/paid.*to split/i)).toMatch(/98\.00/);
   });
 
@@ -597,7 +609,7 @@ describe('ExpenseEditor', () => {
     await u.click(screen.getByRole('checkbox', { name: /apply card discount/i }));
 
     // (100 - 50) * 2% = 1.00
-    expect(await footerRowText(/💳/)).toMatch(/1\.00/);
+    expect(await footerRowText(/^card discount/i)).toMatch(/1\.00/);
     expect(await footerRowText(/paid.*to split/i)).toMatch(/49\.00/);
   });
 

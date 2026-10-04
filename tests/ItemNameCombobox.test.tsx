@@ -288,4 +288,14 @@ describe('ItemNameCombobox', () => {
     const option = screen.getByRole('option');
     expect(option).toHaveAttribute('dir', 'auto');
   });
+
+  it('shows suggestions in a token-styled popover with the active option tinted', async () => {
+    const u = userEvent.setup();
+    render(<Wrapper />);
+    await u.type(screen.getByRole('combobox'), 'Ch');
+    expect(screen.getByRole('listbox').className).toContain('shadow-pop');
+    await u.keyboard('{ArrowDown}');
+    const active = screen.getAllByRole('option').find((o) => o.getAttribute('aria-selected') === 'true')!;
+    expect(active.className).toContain('bg-accent-soft');
+  });
 });

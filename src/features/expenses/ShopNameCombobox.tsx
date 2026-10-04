@@ -125,7 +125,7 @@ export default function ShopNameCombobox({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+          className="absolute z-50 mt-1 w-full overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-pop"
         >
           {filtered.map((s, i) => (
             <li
@@ -135,8 +135,8 @@ export default function ShopNameCombobox({
               dir="auto"
               aria-selected={i === activeIndex}
               onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
-              className={`flex cursor-pointer items-center px-3 py-2 text-sm ${
-                i === activeIndex ? 'bg-emerald-50' : 'hover:bg-slate-50'
+              className={`flex cursor-pointer items-center px-3 py-2 text-sm text-ink ${
+                i === activeIndex ? 'bg-accent-soft' : 'hover:bg-recessed'
               }`}
             >
               <span aria-hidden="true">{highlightMatch(s.name, inputValue)}</span>

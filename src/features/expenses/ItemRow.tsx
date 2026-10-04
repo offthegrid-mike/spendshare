@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form';
-import { ChevronDown, ChevronRight, UserRound } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import CategoryTile from '../../components/ui/CategoryTile';
+import Chip from '../../components/ui/Chip';
+import { iconForCategory } from '../../lib/categoryIcons';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import { toCents, formatMoney } from '../../lib/money';
 import type { FormValues } from './expenseForm';
@@ -16,7 +19,7 @@ interface ItemRowProps {
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
   summary:
-    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean }
+    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean; remark?: string }
     | undefined;
   currency: string;
   expanded: boolean;
@@ -62,39 +65,44 @@ export default function ItemRow({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60">
+    <div className="overflow-hidden rounded-[10px] border border-line bg-surface">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left"
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-recessed/55"
       >
-        {expanded
-          ? <ChevronDown size={16} className="shrink-0 text-slate-500" />
-          : <ChevronRight size={16} className="shrink-0 text-slate-400" />}
-        <span className="min-w-0 flex-1 truncate text-sm text-slate-900" dir="auto">
-          {summary?.name || 'Untitled item'}
-        </span>
-        {catName && (
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-            {catName}
+        <CategoryTile icon={iconForCategory(catName)} label={catName || summary?.name || '?'} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-ink" dir="auto">
+              {summary?.name || 'Untitled item'}
+            </span>
+            {summary && !summary.shared && <Chip>Personal</Chip>}
           </span>
-        )}
-        {summary && !summary.shared && (
-          <UserRound size={14} className="shrink-0 text-slate-400" role="img" aria-label="Not shared" />
-        )}
+          {(catName || summary?.remark) && (
+            <span className="block truncate text-xs text-ink-muted">
+              {catName && <span>{catName}</span>}
+              {catName && summary?.remark && ' · '}
+              {summary?.remark && <span dir="auto">{summary.remark}</span>}
+            </span>
+          )}
+        </span>
         {qty > 1 && (
-          <span className="shrink-0 text-xs tabular-nums text-slate-400">
+          <span className="money shrink-0 text-xs text-ink-muted">
             {formatMoney(isNaN(unitCents) ? 0 : unitCents, currency)} × {qty}
           </span>
         )}
-        <span className="shrink-0 text-sm font-medium tabular-nums text-slate-900">
+        <span className="money shrink-0 text-sm font-medium text-ink">
           {formatMoney(lineCents, currency)}
         </span>
+        {expanded
+          ? <ChevronDown size={16} strokeWidth={1.75} className="shrink-0 text-ink-faint" aria-hidden="true" />
+          : <ChevronRight size={16} strokeWidth={1.75} className="shrink-0 text-ink-faint" aria-hidden="true" />}
       </button>
 
       {expanded && (
-        <div className="space-y-2 border-t border-slate-200 px-3 pb-3 pt-2">
+        <div className="space-y-2 border-t border-line px-3 pb-3 pt-2">
           <Controller
             control={control}
             name={`items.${index}.name`}
@@ -122,7 +130,7 @@ export default function ItemRow({
             <div className="flex-1">
               <label
                 htmlFor={`items.${index}.amount`}
-                className="mb-1 block text-sm font-medium text-slate-700"
+                className="mb-1 block text-sm font-medium text-ink"
               >
                 Unit price
               </label>
@@ -137,7 +145,7 @@ export default function ItemRow({
             <div className="w-24">
               <label
                 htmlFor={`items.${index}.quantity`}
-                className="mb-1 block text-sm font-medium text-slate-700"
+                className="mb-1 block text-sm font-medium text-ink"
               >
                 Qty
               </label>
@@ -151,7 +159,7 @@ export default function ItemRow({
             </div>
           </div>
           {qty > 1 && (
-            <p className="text-xs text-slate-500">
+            <p className="money text-xs text-ink-muted">
               Line total: {formatMoney(lineCents, currency)}
             </p>
           )}
@@ -159,9 +167,9 @@ export default function ItemRow({
           <div>
             <label
               htmlFor={`items.${index}.remark`}
-              className="mb-1 block text-sm font-medium text-slate-700"
+              className="mb-1 block text-sm font-medium text-ink"
             >
-              Remark <span className="font-normal text-slate-400">(optional)</span>
+              Remark <span className="font-normal text-ink-muted">(optional)</span>
             </label>
             <input
               id={`items.${index}.remark`}
@@ -172,11 +180,11 @@ export default function ItemRow({
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               {...register(`items.${index}.shared`)}
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
+              className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
             />
             Shared
           </label>
@@ -185,7 +193,7 @@ export default function ItemRow({
             type="button"
             onClick={handleRemoveClick}
             onBlur={disarm}
-            className="text-sm text-rose-600 hover:underline"
+            className="text-sm text-negative hover:underline"
           >
             {armed ? 'Click again to remove' : 'Remove item'}
           </button>
