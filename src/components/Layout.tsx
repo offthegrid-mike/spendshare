@@ -44,6 +44,7 @@ const navLink =
 export default function Layout({ groups, user }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const { pathname } = useLocation();
+  const isExpenseEditorPage = pathname.startsWith('/expense/');
   const { selectedGroupId } = useUIStore();
   const { group } = useGroup(selectedGroupId);
 
@@ -106,15 +107,17 @@ export default function Layout({ groups, user }: Props) {
         <Outlet />
       </main>
 
-      {/* Mobile FAB — hidden on sm+ */}
-      <button
-        type="button"
-        aria-label="Add expense"
-        onClick={() => setSheetOpen(true)}
-        className="fixed bottom-20 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-white shadow-brand shadow-lg transition hover:brightness-105 active:scale-95 sm:hidden"
-      >
-        <Plus size={26} strokeWidth={2} aria-hidden="true" />
-      </button>
+      {/* Mobile FAB — hidden on sm+ and on the expense editor pages */}
+      {!isExpenseEditorPage && (
+        <button
+          type="button"
+          aria-label="Add expense"
+          onClick={() => setSheetOpen(true)}
+          className="fixed bottom-20 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-white shadow-brand shadow-lg transition hover:brightness-105 active:scale-95 sm:hidden"
+        >
+          <Plus size={26} strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
 
       {/* Mobile bottom nav — hidden on sm+ */}
       <BottomNav />

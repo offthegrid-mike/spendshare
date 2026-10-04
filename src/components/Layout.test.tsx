@@ -88,4 +88,17 @@ describe('Layout', () => {
     renderLayout();
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
+
+  it('shows the mobile add-expense FAB on the list page', () => {
+    renderLayout('/');
+    expect(screen.getByRole('button', { name: 'Add expense' })).toBeTruthy();
+  });
+
+  it.each(['/expense/new', '/expense/abc123/edit'])(
+    'hides the mobile add-expense FAB on %s',
+    (path) => {
+      renderLayout(path);
+      expect(screen.queryByRole('button', { name: 'Add expense' })).toBeNull();
+    }
+  );
 });
