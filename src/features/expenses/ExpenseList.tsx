@@ -1,28 +1,118 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, Trash2, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
-import { formatMoney } from '../../lib/money';
-import { computeDiscountCents } from '../../lib/discount';
+import { computeAdjustment } from '../../lib/adjustment';
+import { settlementEventText } from '../../lib/balance';
+import { monthName } from '../../lib/month';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
+import { useSettlements } from '../../hooks/useSettlements';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import Skeleton from '../../components/ui/Skeleton';
+import BalanceHero from './BalanceHero';
+import ExpenseRow from './ExpenseRow';
+import ExpenseDetail from './ExpenseDetail';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 
-interface Props { group: GroupDoc; }
+interface Props { group: GroupDoc; currentUserUid: string; }
 
-export default function ExpenseList({ group }: Props) {
-  const { selectedMonth } = useUIStore();
-  const { expenses, itemsByExpense, loading } = useMonthExpenses(group.id, selectedMonth);
+interface DayGroup { key: string; label: string; total: number; exps: ExpenseDoc[]; }
+
+const plain = (cents: number) => (cents / 100).toFixed(2);
+
+function groupByDay(expenses: ExpenseDoc[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const exp of expenses) {
+    const date = exp.date?.toDate?.();
+    const key = date ? format(date, 'yyyy-MM-dd') : 'no-date';
+    const net = computeAdjustment(exp).net;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.exps.push(exp);
+      last.total += net;
+    } else {
+      groups.push({ key, label: date ? format(date, 'EEE d MMM') : '', total: net, exps: [exp] });
+    }
+  }
+  return groups;
+}
+
+/** Typing in a field must not move the list selection. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+function ListSkeleton() {
+  return (
+    <div role="status" aria-label="Loading expenses" className="space-y-6">
+      <div className="space-y-3">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-10 w-44" />
+        <Skeleton className="h-2 w-full rounded-full" />
+      </div>
+      {[0, 1].map((day) => (
+        <div key={day} className="space-y-2">
+          <Skeleton className="h-3 w-20" />
+          <div className="card divide-y divide-line">
+            {[0, 1].map((row) => (
+              <div key={row} className="flex items-center gap-3 px-3.5 py-3">
+                <Skeleton className="h-[38px] w-[38px] rounded-[10px]" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-1/3" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
+                <Skeleton className="h-4 w-14" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function ExpenseList({ group, currentUserUid }: Props) {
+  const { selectedMonth, openAddSheet } = useUIStore();
+  const isDesktop = useIsDesktop();
+  const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
+  const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ exp: ExpenseDoc; items: ItemDoc[] } | null>(null);
 
-  function payerName(uid: string): string {
-    return group.members[uid]?.displayName ?? uid;
-  }
+  // Desktop selection: the chosen expense while it exists in this month,
+  // otherwise the first one (on load, after a month change or a delete).
+  const activeId = expenses.some((e) => e.id === selectedId) ? selectedId : expenses[0]?.id ?? null;
+  const active = expenses.find((e) => e.id === activeId) ?? null;
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      // Another control (the gear menu, say) already used the key, or a
+      // dialog is open on top of the list.
+      if (e.defaultPrevented || pendingDelete || document.querySelector('[aria-modal="true"]')) return;
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (expenses.length === 0) return;
+      e.preventDefault();
+      const i = expenses.findIndex((x) => x.id === activeId);
+      const next = expenses[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), expenses.length - 1)];
+      setSelectedId(next.id);
+      const row = document.querySelector<HTMLElement>(`[data-expense-id="${next.id}"]`);
+      // Keep keyboard focus on the selected option when the list has focus;
+      // otherwise just bring it into view without stealing focus.
+      if (document.activeElement?.closest('[role="listbox"]')) row?.focus();
+      else row?.scrollIntoView?.({ block: 'nearest' });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isDesktop, expenses, activeId, pendingDelete]);
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);
@@ -49,169 +139,121 @@ export default function ExpenseList({ group }: Props) {
     await handleDelete(exp, items);
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/70 shadow-card" />
-        ))}
-      </div>
-    );
-  }
+  if (loading || itemsLoading || settlementsLoading) return <ListSkeleton />;
 
-  if (expenses.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-brand-200 bg-white/70 py-16 text-center backdrop-blur-sm">
-        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-500 ring-1 ring-brand-100">
-          <ShoppingBag size={28} />
-        </div>
-        <p className="text-sm font-medium text-slate-500">No expenses for {selectedMonth}</p>
-        <Link to="/expense/new" className="btn-primary mt-1">
-          Add first expense
-        </Link>
-      </div>
-    );
-  }
+  const allItems = Object.values(itemsByExpense).flat();
+  const paidSettlements = settlements.filter((s) => s.paid);
+  const days = groupByDay(expenses);
+  const itemsOf = (exp: ExpenseDoc) => itemsByExpense[exp.id] ?? [];
 
-  // Group expenses by date label for section headers
-  const grouped: { label: string; exps: ExpenseDoc[] }[] = [];
-  for (const exp of expenses) {
-    const label = exp.date
-      ? format(exp.date.toDate(), 'MMM d')
-      : '';
-    const last = grouped[grouped.length - 1];
-    if (last && last.label === label) {
-      last.exps.push(exp);
-    } else {
-      grouped.push({ label, exps: [exp] });
-    }
-  }
+  const list = (
+    <div className="space-y-1">
+      <BalanceHero
+        group={group}
+        viewerUid={currentUserUid}
+        month={selectedMonth}
+        items={allItems}
+        settlements={settlements}
+      />
 
-  return (
-    <div className="space-y-4">
-      {grouped.map(({ label, exps }) => (
-        <div key={label || 'no-date'}>
-          {label && (
-            <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              {label}
-            </p>
-          )}
-          <div className="space-y-2.5">
-            {exps.map((exp) => {
-              const items = itemsByExpense[exp.id] ?? [];
-              const isExpanded = expandedId === exp.id;
-              const isDeleting = deletingId === exp.id;
-              const primaryCategory = items[0]?.category;
-              // Gift card is applied first, then the percentage discount off
-              // the remainder — same order as ExpenseEditor's totals footer.
-              const afterGiftCardCents = exp.total - (exp.giftCardAmount ?? 0);
-              const discountCents = computeDiscountCents(afterGiftCardCents, exp.discountPercent);
-              const netCents = afterGiftCardCents - discountCents;
-              const hasAdjustment = !!exp.giftCardAmount || discountCents > 0;
-              // Clamped for display so the badge can never show a percentage
-              // (e.g. "150%") that disagrees with the clamped dollar amount
-              // computeDiscountCents actually deducted.
-              const displayDiscountPct = Math.min(Math.max(exp.discountPercent ?? 0, 0), 100);
-              return (
-                <div
-                  key={exp.id}
-                  className="rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm transition-shadow hover:shadow-card-hover"
-                >
-                  <div className="flex min-h-[44px] items-center gap-3 px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(isExpanded ? null : exp.id)}
-                      className="flex flex-1 items-center gap-3 text-left"
-                    >
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                        <ShoppingBag size={18} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-900">{exp.shopName}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs text-slate-400">
-                            {payerName(exp.payerUid)} · {exp.itemCount} item{exp.itemCount !== 1 ? 's' : ''}
-                          </p>
-                          {primaryCategory && (
-                            <span className="inline-flex items-center rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
-                              {primaryCategory}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {hasAdjustment ? (
-                          <>
-                            <p className="text-xs tabular-nums text-slate-400 line-through">
-                              {formatMoney(exp.total, group.currency)}
-                            </p>
-                            <p className="text-base font-bold tabular-nums text-emerald-600">
-                              {formatMoney(netCents, group.currency)}
-                            </p>
-                            <span className="flex flex-col items-end gap-0.5">
-                              {exp.giftCardAmount ? (
-                                <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                                  🎁 Gift card {formatMoney(exp.giftCardAmount, group.currency)}
-                                </span>
-                              ) : null}
-                              {discountCents > 0 ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                                  💳 Card discount ({displayDiscountPct}%) {formatMoney(discountCents, group.currency)}
-                                </span>
-                              ) : null}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-base font-bold tabular-nums text-slate-900">
-                            {formatMoney(exp.total, group.currency)}
-                          </span>
-                        )}
-                      </div>
-                      {isExpanded
-                        ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
-                        : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
-                    </button>
-                    <Link
-                      to={`/expense/${exp.id}/edit`}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil size={15} />
-                    </Link>
-                    <button
-                      type="button"
-                      disabled={isDeleting}
-                      onClick={() => setPendingDelete({ exp, items })}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
-                      title="Delete"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                  {isExpanded && items.length > 0 && (
-                    <ul className="space-y-1 border-t border-slate-100 px-4 py-2.5">
-                      {items.map((it) => (
-                        <li key={it.id} className="flex items-start justify-between text-sm text-slate-600">
-                          <span className="flex flex-col">
-                            <span>{it.name}</span>
-                            {it.remark && (
-                              <span data-testid="item-remark" className="text-xs text-slate-400">
-                                {it.remark}
-                              </span>
-                            )}
-                          </span>
-                          <span className="tabular-nums text-slate-400">{formatMoney(it.amount, group.currency)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+      {paidSettlements.map((s) => (
+        <div key={s.id} className="flex justify-center pt-4">
+          <span className="flex items-center gap-1.5 rounded-full border border-dashed border-line px-3 py-1.5 text-xs text-ink-muted">
+            <CircleCheck size={14} strokeWidth={1.75} className="text-accent-ink" aria-hidden="true" />
+            {settlementEventText(s, currentUserUid, group, group.currency)}
+          </span>
         </div>
       ))}
-      {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
+
+      {expenses.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-recessed text-ink-muted">
+            <ShoppingBasket size={26} strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <p className="text-sm text-ink-muted">No expenses in {monthName(selectedMonth)} yet</p>
+          {isDesktop ? (
+            <Link to="/expense/new" className="btn-primary">
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              Add expense
+            </Link>
+          ) : (
+            <button type="button" className="btn-primary" onClick={openAddSheet}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              Add expense
+            </button>
+          )}
+        </div>
+      ) : (
+        days.map((day) => (
+          <div key={day.key}>
+            <div className="flex justify-between px-1.5 pb-[7px] pt-[18px] text-xs font-medium text-ink-muted">
+              <span>{day.label}</span>
+              <span className="money">{plain(day.total)}</span>
+            </div>
+            <div
+              className="card divide-y divide-line overflow-hidden"
+              {...(isDesktop ? { role: 'listbox', 'aria-label': day.label || 'Expenses' } : {})}
+            >
+              {day.exps.map((exp) =>
+                isDesktop ? (
+                  <ExpenseRow
+                    key={exp.id}
+                    mode="option"
+                    expense={exp}
+                    items={itemsOf(exp)}
+                    group={group}
+                    viewerUid={currentUserUid}
+                    selected={exp.id === activeId}
+                    onSelect={() => setSelectedId(exp.id)}
+                  />
+                ) : (
+                  <ExpenseRow
+                    key={exp.id}
+                    mode="disclosure"
+                    expense={exp}
+                    items={itemsOf(exp)}
+                    group={group}
+                    viewerUid={currentUserUid}
+                    expanded={expandedId === exp.id}
+                    onToggle={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
+                    onDelete={() => setPendingDelete({ exp, items: itemsOf(exp) })}
+                    deleting={deletingId === exp.id}
+                  />
+                ),
+              )}
+            </div>
+          </div>
+        ))
+      )}
+
+      {deleteError && <p className="pt-2 text-sm text-negative">{deleteError}</p>}
+    </div>
+  );
+
+  return (
+    <>
+      {isDesktop ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 px-8 pb-12 pt-[22px]">
+            <div className="mx-auto max-w-[760px]">{list}</div>
+          </div>
+          <aside
+            aria-label="Expense detail"
+            className="sticky top-[60px] flex h-[calc(100dvh-60px)] flex-col overflow-y-auto border-l border-line bg-surface p-[22px]"
+          >
+            <ExpenseDetail
+              expense={active}
+              items={active ? itemsOf(active) : []}
+              group={group}
+              viewerUid={currentUserUid}
+              onDelete={() => active && setPendingDelete({ exp: active, items: itemsOf(active) })}
+              deleting={active !== null && deletingId === active.id}
+            />
+          </aside>
+        </div>
+      ) : (
+        list
+      )}
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete expense?"
@@ -225,6 +267,6 @@ export default function ExpenseList({ group }: Props) {
         onConfirm={() => void handleConfirmDelete()}
         onCancel={() => setPendingDelete(null)}
       />
-    </div>
+    </>
   );
 }

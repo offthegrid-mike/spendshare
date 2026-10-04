@@ -133,4 +133,17 @@ describe('Summary Month/Year toggle', () => {
     expect(screen.getByText('Year view 2026')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument();
   });
+
+  it('returns to the Month view when another month is selected while in the Year view', async () => {
+    const { rerender } = renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <Summary group={mockGroup} currentUserUid="u1" selectedMonth="2026-04" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText('Year view 2026')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true');
+  });
 });

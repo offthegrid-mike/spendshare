@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { settlementsCol } from '../../lib/converters';
+import { markSettlementPaid, undoSettlement as removeSettlement } from '../../lib/settle';
 import { computeSummary } from '../../lib/settlement';
 import { formatMoney } from '../../lib/money';
 import { useMonthItems } from '../../hooks/useMonthItems';
@@ -24,7 +23,12 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   const { income, loading: incomeLoading } = useIncome(group.id, selectedMonth);
   const [isPending, setIsPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [view, setView] = useState<'month' | 'year'>('month');
+  // The Year view belongs to the month it was opened from: picking another
+  // month (rail, month control) drops back to the Month view. Derived, so no
+  // effect is needed to reset it.
+  const [yearViewMonth, setYearViewMonth] = useState<string | null>(null);
+  const view: 'month' | 'year' = yearViewMonth === selectedMonth ? 'year' : 'month';
+  const setView = (v: 'month' | 'year') => setYearViewMonth(v === 'year' ? selectedMonth : null);
   const { setMonth } = useUIStore();
   const year = selectedMonth.slice(0, 4);
 
@@ -84,17 +88,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
     setActionError(null);
     setIsPending(true);
     try {
-      const id = `${selectedMonth}_${fromUid}_${toUid}`;
-      await setDoc(doc(settlementsCol(group.id), id), {
-        id,
-        month: selectedMonth,
-        fromUid,
-        toUid,
-        amount,
-        paid: true,
-        paidAt: serverTimestamp(),
-        markedByUid: currentUserUid,
-      });
+      await markSettlementPaid(group.id, selectedMonth, { fromUid, toUid, amount }, currentUserUid, settlements);
     } catch {
       setActionError('Failed. Try again.');
     } finally {
@@ -106,7 +100,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
     setActionError(null);
     setIsPending(true);
     try {
-      await deleteDoc(doc(settlementsCol(group.id), settlementId));
+      await removeSettlement(group.id, settlementId);
     } catch {
       setActionError('Failed. Try again.');
     } finally {

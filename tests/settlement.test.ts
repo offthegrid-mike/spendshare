@@ -52,3 +52,14 @@ describe('computeSummary', () => {
     expect(s.transactions).toHaveLength(2);
   });
 });
+
+describe('computeSummary paidShared', () => {
+  it('totals only shared items per payer', () => {
+    expect(computeSummary(members, items, []).paidShared).toEqual({ alice: 9000, bob: 3000, carol: 0 });
+  });
+
+  it('includes a payer who is no longer a member', () => {
+    const s = computeSummary(['alice'], [{ amount: 500, shared: true, payerUid: 'gone' }], []);
+    expect(s.paidShared).toEqual({ alice: 0, gone: 500 });
+  });
+});

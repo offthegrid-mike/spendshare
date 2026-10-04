@@ -5,6 +5,8 @@ export interface PaidSettlement { fromUid: string; toUid: string; amount: number
 export interface Txn { fromUid: string; toUid: string; amount: number; }
 export interface Summary {
   paidTotal: Record<string, number>; sharedTotal: number;
+  /** Shared spending per payer, the input to the balance tug bar. */
+  paidShared: Record<string, number>;
   shareOf: Record<string, number>; balance: Record<string, number>; transactions: Txn[];
 }
 
@@ -35,5 +37,5 @@ export function computeSummary(members: string[], items: SummaryItem[], settleme
     debtors[i].amt -= pay; creditors[j].amt -= pay;
     if (debtors[i].amt === 0) i++; if (creditors[j].amt === 0) j++;
   }
-  return { paidTotal, sharedTotal, shareOf, balance, transactions };
+  return { paidTotal, sharedTotal, paidShared, shareOf, balance, transactions };
 }

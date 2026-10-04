@@ -1,198 +1,230 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, within, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
-import { computeDiscountCents } from '../../lib/discount';
-import { formatMoney } from '../../lib/money';
+import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
+import type { ExpenseDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
-const mockWriteBatch = vi.fn();
-vi.mock('firebase/firestore', () => ({
-  writeBatch: () => {
-    mockWriteBatch();
-    return { delete: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) };
+const { commit, openAddSheet, desktop, data } = vi.hoisted(() => ({
+  commit: vi.fn().mockResolvedValue(undefined),
+  openAddSheet: vi.fn(),
+  desktop: { value: false },
+  data: {
+    expenses: [] as ExpenseDoc[],
+    itemsByExpense: {} as Record<string, ItemDoc[]>,
+    settlements: [] as SettlementDoc[],
+    loading: false,
   },
+}));
+
+vi.mock('firebase/firestore', () => ({
+  writeBatch: () => ({ delete: vi.fn(), commit }),
   doc: vi.fn(),
   collection: vi.fn(),
 }));
-
 vi.mock('../../lib/firebase', () => ({ db: {} }));
+vi.mock('../../lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 vi.mock('../../stores/uiStore', () => ({
-  useUIStore: () => ({ selectedMonth: '2026-06' }),
+  useUIStore: () => ({ selectedMonth: '2026-10', openAddSheet }),
 }));
-
-const mockUseMonthExpenses = vi.fn();
+vi.mock('../../hooks/useMediaQuery', () => ({ useIsDesktop: () => desktop.value }));
 vi.mock('../../hooks/useMonthExpenses', () => ({
-  useMonthExpenses: () => mockUseMonthExpenses(),
+  useMonthExpenses: () => ({
+    expenses: data.expenses, itemsByExpense: data.itemsByExpense, loading: data.loading, itemsLoading: false,
+  }),
+}));
+vi.mock('../../hooks/useSettlements', () => ({
+  useSettlements: () => ({ settlements: data.settlements, loading: false }),
 }));
 
-const mockGroup = {
-  id: 'g1', name: 'Family', currency: 'AUD', ownerUid: 'u1',
-  members: { u1: { displayName: 'Alice', email: '', role: 'owner', joinedAt: null } },
-  memberUids: ['u1'], createdAt: null,
-} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+const pair = makeGroup('g1', 'Home');
 
-const mockExpense = {
-  id: 'e1', shopName: 'Woolworths', payerUid: 'u1',
-  total: 5000, itemCount: 2, groupId: 'g1', month: '2026-06',
-  date: null, createdByUid: 'u1', createdAt: null, updatedAt: null,
-} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+// Newest first, as useMonthExpenses orders them.
+const woolies = makeExpense('e1', { shopName: 'Woolworths', day: '2026-10-03', total: 3000 });
+const bunnings = makeExpense('e2', { shopName: 'Bunnings', day: '2026-10-03', total: 2143, payerUid: 'priya' });
+const thai = makeExpense('e3', { shopName: 'Thai Riffic', day: '2026-10-02', total: 4740, payerUid: 'priya', giftCardAmount: 740 });
+const items = {
+  e1: [makeItem('i1', 'e1', { name: 'Bananas', amount: 3000 })],
+  e2: [makeItem('i2', 'e2', { name: 'Potting mix', amount: 2143, payerUid: 'priya', category: 'Household' })],
+  e3: [makeItem('i3', 'e3', { name: 'Pad see ew', amount: 4740, payerUid: 'priya', category: 'Dining' })],
+};
 
 function renderList() {
-  return render(<MemoryRouter><ExpenseList group={mockGroup} /></MemoryRouter>);
+  return render(
+    <MemoryRouter>
+      <input aria-label="Search items" />
+      <ExpenseList group={pair} currentUserUid="mike" />
+    </MemoryRouter>,
+  );
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  desktop.value = false;
+  data.expenses = [woolies, bunnings, thai];
+  data.itemsByExpense = items;
+  data.settlements = [];
+  data.loading = false;
+});
+
 describe('ExpenseList', () => {
-  it('shows skeleton loader when loading', () => {
-    mockUseMonthExpenses.mockReturnValue({ expenses: [], itemsByExpense: {}, loading: true });
+  it('shows skeletons while loading', () => {
+    data.loading = true;
     renderList();
-    const pulses = document.querySelectorAll('.animate-pulse');
-    expect(pulses.length).toBe(3);
+    expect(screen.getByRole('status', { name: 'Loading expenses' })).toBeInTheDocument();
+    expect(screen.queryByText('Woolworths')).toBeNull();
   });
 
-  it('shows empty state when no expenses', () => {
-    mockUseMonthExpenses.mockReturnValue({ expenses: [], itemsByExpense: {}, loading: false });
+  it('opens the Add Expense sheet from the empty state on mobile', async () => {
+    data.expenses = [];
+    data.itemsByExpense = {};
     renderList();
-    expect(screen.getByText(/no expenses for 2026-06/i)).toBeTruthy();
-    expect(screen.getByRole('link', { name: /add first expense/i })).toBeTruthy();
+    expect(screen.getByText('Nothing to settle')).toBeInTheDocument();
+    expect(screen.getByText('No expenses in October yet')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Add expense' }));
+    expect(openAddSheet).toHaveBeenCalled();
   });
 
-  it('renders expense card with shop name', () => {
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
-    });
+  it('links to the editor page from the empty state on desktop', () => {
+    desktop.value = true;
+    data.expenses = [];
+    data.itemsByExpense = {};
     renderList();
-    expect(screen.getByText('Woolworths')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/expense/new');
   });
 
-  it('renders edit link and delete button', () => {
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
-    });
+  it('groups expenses by day with the day net total', () => {
     renderList();
-    expect(screen.getByTitle('Edit')).toBeTruthy();
-    expect(screen.getByTitle('Delete')).toBeTruthy();
+    const sat = screen.getByText('Sat 3 Oct').parentElement!;
+    expect(sat).toHaveTextContent('51.43');
+    const fri = screen.getByText('Fri 2 Oct').parentElement!;
+    expect(fri).toHaveTextContent('40.00');
   });
 
-  it('expands to show items on click', () => {
-    const mockItem = { id: 'i1', name: 'Milk', amount: 350, categoryId: 'c1', category: 'Food', shared: true, payerUid: 'u1', expenseId: 'e1', groupId: 'g1', month: '2026-06' } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense],
-      itemsByExpense: { e1: [mockItem] },
-      loading: false,
-    });
+  it('shows the balance hero for the month', () => {
     renderList();
-    // Click to expand
-    const expandBtn = screen.getAllByRole('button')[0]; // first button = expand
-    fireEvent.click(expandBtn);
-    expect(screen.getByText('Milk')).toBeTruthy();
+    // Mike paid 30.00 shared, Priya 68.83: Mike owes half the difference.
+    expect(screen.getByText('You owe Priya')).toBeInTheDocument();
+    expect(screen.getByText('19.42')).toBeInTheDocument();
   });
 
-  it('renders a date section header when expense has a date', () => {
-    const expWithDate = {
-      ...mockExpense,
-      id: 'e2',
-      // 2026-06-12 noon UTC — safe for all UTC+ and UTC-8 timezones
-      date: { seconds: 1781352000, nanoseconds: 0, toDate: () => new Date(1781352000 * 1000) },
-    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [expWithDate],
-      itemsByExpense: { e2: [] },
-      loading: false,
-    });
+  it("lists the month's paid settlements at the top", () => {
+    data.settlements = [{
+      id: 's1', month: '2026-10', fromUid: 'priya', toUid: 'mike', amount: 4120, paid: true,
+      paidAt: { toDate: () => new Date(2026, 9, 2), toMillis: () => 0 } as unknown as SettlementDoc['paidAt'],
+    }];
     renderList();
-    // A date section header (p with uppercase tracking class) is present
-    const headers = document.querySelectorAll('p.text-xs.font-semibold.uppercase');
-    expect(headers.length).toBeGreaterThan(0);
+    expect(screen.getByText('Settled 2 Oct: Priya paid you A$41.20')).toBeInTheDocument();
   });
 
-  it('renders a category badge on each expense item', () => {
-    const expWithDate = {
-      ...mockExpense,
-      id: 'e3',
-      date: { seconds: 1781352000, nanoseconds: 0, toDate: () => new Date(1781352000 * 1000) },
-    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    const itemWithCat = {
-      id: 'i1', name: 'Milk', amount: 350, categoryId: 'c1',
-      category: 'Food', shared: true, payerUid: 'u1',
-      expenseId: 'e3', groupId: 'g1', month: '2026-06',
-    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [expWithDate],
-      itemsByExpense: { e3: [itemWithCat] },
-      loading: false,
-    });
+  it('expands one row at a time on mobile', async () => {
     renderList();
-    // Badge is visible in the card header without expanding
-    expect(screen.getByText('Food')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /Woolworths/ }));
+    expect(screen.getByText('Bananas')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Bunnings/ }));
+    expect(screen.queryByText('Bananas')).toBeNull();
+    expect(screen.getByText('Potting mix')).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseList on desktop', () => {
+  beforeEach(() => {
+    desktop.value = true;
   });
 
-  it('renders the discount line and correct net total when discountPercent is set', () => {
-    const expWithDiscount = {
-      ...mockExpense,
-      id: 'e4',
-      total: 10000,
-      discountPercent: 2,
-    };
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [expWithDiscount], itemsByExpense: { e4: [] }, loading: false,
-    });
+  const detail = () => screen.getByRole('complementary', { name: 'Expense detail' });
+
+  it('selects the first expense and shows it in the detail pane', () => {
     renderList();
-    expect(screen.getByText(/card discount \(2%\)/i)).toBeTruthy();
-    // group.currency is 'AUD' — formatMoney renders it as "A$X.XX".
-    const expectedNet = 10000 - computeDiscountCents(10000, 2);
-    expect(screen.getByText(formatMoney(expectedNet, 'AUD'))).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Woolworths/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listbox')).toHaveLength(2);
   });
 
-  it('combines gift card and discount in the net total', () => {
-    const expWithBoth = {
-      ...mockExpense,
-      id: 'e5',
-      total: 10000,
-      giftCardAmount: 5000,
-      discountPercent: 2,
-    };
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [expWithBoth], itemsByExpense: { e5: [] }, loading: false,
-    });
+  it('selects an expense on click', async () => {
     renderList();
-    expect(screen.getByText(new RegExp(`gift card ${formatMoney(5000, 'AUD').replace('$', '\\$')}`, 'i'))).toBeTruthy();
-    expect(screen.getByText(/card discount \(2%\)/i)).toBeTruthy();
-    const afterGiftCard = 10000 - 5000;
-    const expectedNet = afterGiftCard - computeDiscountCents(afterGiftCard, 2);
-    expect(screen.getByText(formatMoney(expectedNet, 'AUD'))).toBeTruthy();
+    await userEvent.click(screen.getByRole('option', { name: /Thai Riffic/ }));
+    expect(screen.getByRole('option', { name: /Thai Riffic/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(detail()).getByRole('heading', { name: 'Thai Riffic' })).toBeInTheDocument();
   });
 
-  it('shows a confirmation dialog instead of deleting immediately', async () => {
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
-    });
+  it('moves the selection across days with the arrow keys', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Delete'));
-    expect(screen.getByRole('alertdialog')).toBeTruthy();
-    expect(screen.getByText(/delete expense/i)).toBeTruthy();
-    expect(mockWriteBatch).not.toHaveBeenCalled();
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+    expect(within(detail()).getByRole('heading', { name: 'Thai Riffic' })).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(within(detail()).getByRole('heading', { name: 'Thai Riffic' })).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(within(detail()).getByRole('heading', { name: 'Bunnings' })).toBeInTheDocument();
   });
 
-  it('does not delete when the confirmation is cancelled', async () => {
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
-    });
+  it('ignores the arrow keys while typing in a field', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Delete'));
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(mockWriteBatch).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('textbox', { name: 'Search items' }));
+    await userEvent.keyboard('{ArrowDown}');
+    expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
   });
 
-  it('deletes the expense after confirming', async () => {
-    mockUseMonthExpenses.mockReturnValue({
-      expenses: [mockExpense], itemsByExpense: { e1: [] }, loading: false,
-    });
+  it('falls back to the first expense when the selected one disappears', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(screen.getByRole('option', { name: /Thai Riffic/ }));
+    data.expenses = [woolies, bunnings];
+    rerender(
+      <MemoryRouter>
+        <input aria-label="Search items" />
+        <ExpenseList group={pair} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+    expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
+  });
+
+  it('deletes the selected expense from the detail pane after confirming', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Delete'));
+    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
     const dialog = screen.getByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }));
-    await waitFor(() => expect(mockWriteBatch).toHaveBeenCalledTimes(1));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(dialog).toHaveTextContent('Woolworths');
+    await act(async () => {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    });
+    expect(commit).toHaveBeenCalled();
+  });
+
+  it('ignores arrow keys another control already handled, such as the gear menu', async () => {
+    render(
+      <MemoryRouter>
+        <button type="button" onKeyDown={(e) => e.preventDefault()}>Menu item</button>
+        <ExpenseList group={pair} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+    screen.getByRole('button', { name: 'Menu item' }).focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
+  });
+
+  it('ignores arrow keys while the delete dialog is open', async () => {
+    renderList();
+    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
+    await userEvent.keyboard('{ArrowDown}');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
+  });
+
+  it('moves keyboard focus with the selection when the list has focus', async () => {
+    renderList();
+    screen.getByRole('option', { name: /Woolworths/ }).focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByRole('option', { name: /Bunnings/ })).toHaveFocus();
+    expect(screen.getByRole('option', { name: /Bunnings/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('selects a focused option with Enter or Space', async () => {
+    renderList();
+    screen.getByRole('option', { name: /Thai Riffic/ }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(within(detail()).getByRole('heading', { name: 'Thai Riffic' })).toBeInTheDocument();
+    screen.getByRole('option', { name: /Bunnings/ }).focus();
+    await userEvent.keyboard(' ');
+    expect(within(detail()).getByRole('heading', { name: 'Bunnings' })).toBeInTheDocument();
   });
 });

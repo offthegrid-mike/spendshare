@@ -18,6 +18,9 @@ vi.mock('./HouseholdHeader', () => ({
 }));
 vi.mock('./TopBar', () => ({ default: () => <div data-testid="top-bar" /> }));
 vi.mock('./Dock', () => ({ default: () => <nav data-testid="dock" /> }));
+vi.mock('./MonthRail', () => ({ default: () => <nav data-testid="month-rail" /> }));
+const { desktop } = vi.hoisted(() => ({ desktop: { value: false } }));
+vi.mock('../hooks/useMediaQuery', () => ({ useIsDesktop: () => desktop.value }));
 vi.mock('./BottomSheet', () => ({
   default: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
     open ? <div data-testid="bottom-sheet">{children}</div> : null,
@@ -48,7 +51,10 @@ function renderLayout(path = '/') {
   );
 }
 
-beforeEach(() => useUIStore.setState({ selectedGroupId: 'g1', addSheetOpen: false }));
+beforeEach(() => {
+  desktop.value = false;
+  useUIStore.setState({ selectedGroupId: 'g1', addSheetOpen: false });
+});
 
 describe('Layout', () => {
   it('renders both shells around the page', () => {
@@ -76,5 +82,22 @@ describe('Layout', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save expense' }));
     expect(useUIStore.getState().addSheetOpen).toBe(false);
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
+  });
+
+  it.each(['/', '/summary', '/income'])('shows the month rail on desktop at %s', (path) => {
+    desktop.value = true;
+    renderLayout(path);
+    expect(screen.getByTestId('month-rail')).toBeInTheDocument();
+  });
+
+  it('has no month rail on desktop pages that are not month-scoped', () => {
+    desktop.value = true;
+    renderLayout('/categories');
+    expect(screen.queryByTestId('month-rail')).toBeNull();
+  });
+
+  it('has no month rail on mobile', () => {
+    renderLayout('/');
+    expect(screen.queryByTestId('month-rail')).toBeNull();
   });
 });

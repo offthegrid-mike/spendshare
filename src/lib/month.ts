@@ -48,3 +48,8 @@ export function monthRange(from: string, to: string): string[] {
   for (let k = to; k >= from; k = prevMonthKey(k)) out.push(k);
   return out;
 }
+
+/** 'October' */
+export function monthName(ym: string): string {
+  return MONTH_NAMES[parseYM(ym).month - 1];
+}

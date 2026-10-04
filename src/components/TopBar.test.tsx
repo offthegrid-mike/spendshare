@@ -17,7 +17,7 @@ function Location() {
 function renderBar(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <TopBar groups={[makeGroup('g1', 'Home')]} currentUid="mike" startMonth={null} />
+      <TopBar groups={[makeGroup('g1', 'Home')]} currentUid="mike" />
       <Routes>
         <Route path="*" element={<Location />} />
       </Routes>
@@ -42,11 +42,8 @@ describe('TopBar', () => {
     expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/expense/new');
   });
 
-  it('shows the month control on month-scoped sections only', () => {
-    const { unmount } = renderBar('/income');
-    expect(screen.getByTestId('month-control')).toBeInTheDocument();
-    unmount();
-    renderBar('/categories');
+  it('has no month control (the desktop month rail replaces it)', () => {
+    renderBar('/income');
     expect(screen.queryByTestId('month-control')).toBeNull();
   });
 

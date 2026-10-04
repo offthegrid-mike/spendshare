@@ -25,3 +25,14 @@ export function formatCompactMoney(cents: number, currency: string, locale = 'en
     minimumFractionDigits: 0,
   }).format(cents / 100);
 }
+
+/** The currency symbol and the unsigned amount, for styling them separately ("A$" + "88.29"). */
+export function splitMoney(cents: number, currency: string, locale = 'en-US'): { symbol: string; amount: string } {
+  const parts = new Intl.NumberFormat(locale, { style: 'currency', currency }).formatToParts(Math.abs(cents) / 100);
+  const symbol = parts.filter((p) => p.type === 'currency').map((p) => p.value).join('');
+  const amount = parts
+    .filter((p) => ['integer', 'group', 'decimal', 'fraction'].includes(p.type))
+    .map((p) => p.value)
+    .join('');
+  return { symbol, amount };
+}

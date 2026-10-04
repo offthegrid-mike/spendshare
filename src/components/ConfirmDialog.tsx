@@ -5,6 +5,8 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
   confirmDisabled?: boolean;
+  /** `danger` for destructive confirms (the default), `primary` otherwise. */
+  tone?: 'danger' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -16,6 +18,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   confirmDisabled = false,
+  tone = 'danger',
   onConfirm,
   onCancel,
 }: Props) {
@@ -50,10 +53,14 @@ export default function ConfirmDialog({
             type="button"
             disabled={confirmDisabled}
             onClick={onConfirm}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-negative px-4
+            className={
+              tone === 'primary'
+                ? 'btn-primary'
+                : `inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-negative px-4
               text-sm font-semibold text-on-accent transition
               hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60
-              motion-safe:active:scale-[0.98]"
+              motion-safe:active:scale-[0.98]`
+            }
           >
             {confirmLabel}
           </button>

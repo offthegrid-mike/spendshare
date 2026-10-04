@@ -61,6 +61,10 @@ export default {
         'brand-gradient': 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
       },
       keyframes: {
+        expand: {
+          from: { gridTemplateRows: '0fr', opacity: '0' },
+          to: { gridTemplateRows: '1fr', opacity: '1' },
+        },
         'menu-in': {
           from: { opacity: '0', transform: 'translateY(-8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
@@ -68,6 +72,7 @@ export default {
       },
       animation: {
         'menu-in': 'menu-in 150ms cubic-bezier(.16,1,.3,1)',
+        expand: 'expand 200ms cubic-bezier(.16,1,.3,1)',
       },
       boxShadow: {
         pop: 'var(--shadow-pop)',

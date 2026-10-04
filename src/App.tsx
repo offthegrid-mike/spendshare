@@ -88,7 +88,7 @@ function App() {
   return (
     <Routes>
       <Route element={<Layout groups={groups} user={user} />}>
-        <Route path="/" element={group ? <ExpenseList group={group} /> : <RouteSkeleton />} />
+        <Route path="/" element={group ? <ExpenseList group={group} currentUserUid={user.uid} /> : <RouteSkeleton />} />
         <Route
           path="/search"
           element={group ? <SearchScreen group={group} /> : <RouteSkeleton />}

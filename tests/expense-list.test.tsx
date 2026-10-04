@@ -8,6 +8,9 @@ import type { ExpenseDoc, ItemDoc, GroupDoc } from '../src/types/models';
 // --- Hook mock ---
 const { useMonthExpenses } = vi.hoisted(() => ({ useMonthExpenses: vi.fn() }));
 vi.mock('../src/hooks/useMonthExpenses', () => ({ useMonthExpenses }));
+vi.mock('../src/hooks/useSettlements', () => ({
+  useSettlements: () => ({ settlements: [], loading: false }),
+}));
 
 // --- Firestore mock ---
 const mockBatchDelete = vi.fn();
@@ -25,6 +28,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('../src/lib/firebase', () => ({ db: {} }));
+vi.mock('../src/lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 
 // --- Import component after mocks ---
 import ExpenseList from '../src/features/expenses/ExpenseList';
@@ -84,10 +88,13 @@ const group: GroupDoc = {
   createdAt: null as unknown as Timestamp,
 };
 
+/** The collapsed row for an expense, to scope amount checks away from the day total. */
+const row = (shop: RegExp) => within(screen.getByRole('button', { name: shop }));
+
 function renderExpenseList() {
   return render(
     <MemoryRouter>
-      <ExpenseList group={group} />
+      <ExpenseList group={group} currentUserUid="u1" />
     </MemoryRouter>,
   );
 }
@@ -127,11 +134,11 @@ describe('ExpenseList', () => {
     // Shop name
     expect(screen.getByText(/Woolworths/i)).toBeInTheDocument();
 
-    // Payer name resolved from group.members.u1
-    expect(screen.getByText(/Alice/i)).toBeInTheDocument();
+    // Payer shown as an initial badge named from group.members.u1
+    expect(screen.getByTitle('Paid by Alice')).toHaveTextContent('A');
 
     // Formatted total — AUD $42.50 in some form, e.g. "A$42.50" or "$42.50"
-    expect(screen.getByText(/42\.50/)).toBeInTheDocument();
+    expect(row(/Woolworths/).getByText(/42\.50/)).toBeInTheDocument();
 
     // Item count
     expect(screen.getByText(/2 items/i)).toBeInTheDocument();
@@ -169,6 +176,7 @@ describe('ExpenseList', () => {
     const u = userEvent.setup();
     renderExpenseList();
 
+    await u.click(screen.getByText(/Woolworths/i));
     const deleteBtn = screen.getByRole('button', { name: /delete/i });
     await u.click(deleteBtn);
 
@@ -186,6 +194,7 @@ describe('ExpenseList', () => {
     const u = userEvent.setup();
     renderExpenseList();
 
+    await u.click(screen.getByText(/Woolworths/i));
     await u.click(screen.getByRole('button', { name: /delete/i }));
     const dialog = screen.getByRole('alertdialog');
     await u.click(within(dialog).getByRole('button', { name: /cancel/i }));
@@ -204,6 +213,7 @@ describe('ExpenseList', () => {
     const u = userEvent.setup();
     renderExpenseList();
 
+    await u.click(screen.getByText(/Woolworths/i));
     await u.click(screen.getByRole('button', { name: /delete/i }));
     const dialog = screen.getByRole('alertdialog');
     await u.click(within(dialog).getByRole('button', { name: /^delete$/i }));
@@ -211,14 +221,16 @@ describe('ExpenseList', () => {
     expect(mockBatchCommit).toHaveBeenCalled();
   });
 
-  it('renders an edit link pointing to /expense/:id/edit', () => {
+  it('renders an edit link pointing to /expense/:id/edit once the row is expanded', async () => {
     useMonthExpenses.mockReturnValue({
       expenses: [expense1],
       itemsByExpense: { exp1: items1 },
       loading: false,
     });
 
+    const u = userEvent.setup();
     renderExpenseList();
+    await u.click(screen.getByText(/Woolworths/i));
 
     // Either a link or a button that navigates
     const editLink = screen.getByRole('link', { name: /edit/i });
@@ -249,19 +261,21 @@ describe('ExpenseList', () => {
 
     renderExpenseList();
 
-    expect(screen.getByText(/4\.70/)).toBeInTheDocument();
-    expect(screen.getByText(/10\.00/)).toBeInTheDocument();
+    expect(row(/FairPrice/).getByText(/4\.70/)).toBeInTheDocument();
+    expect(row(/FairPrice/).getByText(/10\.00/)).toBeInTheDocument();
   });
 
-  // 7. Gift card badge ----------------------------------------------------------
-  it('shows a gift card badge with the gift card amount', () => {
+  // 7. Gift card line in the expanded breakdown --------------------------------
+  it('shows the gift card amount in the expanded breakdown', async () => {
     useMonthExpenses.mockReturnValue({
       expenses: [expenseWithGiftCard],
       itemsByExpense: { exp2: [] },
       loading: false,
     });
 
+    const u = userEvent.setup();
     renderExpenseList();
+    await u.click(screen.getByText(/FairPrice/i));
 
     expect(screen.getByText(/gift card/i)).toBeInTheDocument();
     expect(screen.getByText(/5\.30/)).toBeInTheDocument();
@@ -277,7 +291,7 @@ describe('ExpenseList', () => {
 
     renderExpenseList();
 
-    expect(screen.getByText(/42\.50/)).toBeInTheDocument();
+    expect(row(/Woolworths/).getByText(/42\.50/)).toBeInTheDocument();
     expect(screen.queryByText(/gift card/i)).not.toBeInTheDocument();
   });
 
@@ -297,33 +311,37 @@ describe('ExpenseList', () => {
       loading: false,
     });
     renderExpenseList();
-    expect(screen.getByText(/98\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/100\.00/)).toBeInTheDocument();
+    expect(row(/Costco/).getByText(/98\.00/)).toBeInTheDocument();
+    expect(row(/Costco/).getByText(/100\.00/)).toBeInTheDocument();
   });
 
-  it('shows a card discount badge with the percent', () => {
+  it('shows the card discount with its percent in the expanded breakdown', async () => {
     useMonthExpenses.mockReturnValue({
       expenses: [expenseWithDiscount],
       itemsByExpense: { exp3: [] },
       loading: false,
     });
+    const u = userEvent.setup();
     renderExpenseList();
+    await u.click(screen.getByText(/Costco/i));
     expect(screen.getByText(/card discount/i)).toBeInTheDocument();
     expect(screen.getByText(/2%/)).toBeInTheDocument();
     // The badge shows the deducted dollar amount too, not just the percent.
     expect(screen.getByText(/2\.00/)).toBeInTheDocument();
   });
 
-  it('combines gift card and discount in the net total', () => {
+  it('combines gift card and discount in the net total', async () => {
     const both: ExpenseDoc = { ...expense1, id: 'exp4', total: 10000, giftCardAmount: 5000, discountPercent: 2 };
     useMonthExpenses.mockReturnValue({
       expenses: [both],
       itemsByExpense: { exp4: [] },
       loading: false,
     });
+    const u = userEvent.setup();
     renderExpenseList();
     // (100 - 50) * 2% = 1.00 -> net = 49.00
-    expect(screen.getByText(/49\.00/)).toBeInTheDocument();
+    expect(row(/Woolworths/).getByText(/49\.00/)).toBeInTheDocument();
+    await u.click(screen.getByText(/Woolworths/i));
     expect(screen.getByText(/gift card/i)).toBeInTheDocument();
     expect(screen.getByText(/card discount/i)).toBeInTheDocument();
   });

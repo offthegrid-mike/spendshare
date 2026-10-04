@@ -2,15 +2,12 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
-import MonthControl from './MonthControl';
 import SettingsMenu from './SettingsMenu';
-import { routeInfo } from '../lib/routes';
 import type { GroupDoc } from '../types/models';
 
 interface Props {
   groups: GroupDoc[];
   currentUid: string;
-  startMonth: string | null;
 }
 
 const SECTIONS = [
@@ -22,12 +19,11 @@ const SECTIONS = [
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** Desktop command bar (lg and up). */
-export default function TopBar({ groups, currentUid, startMonth }: Props) {
+export default function TopBar({ groups, currentUid }: Props) {
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
-  const route = routeInfo(pathname);
 
   // Mirror ?q= while on /search; keep the user's draft otherwise. Adjusting
   // state during render (not in an effect) when the URL query changes.
@@ -78,8 +74,6 @@ export default function TopBar({ groups, currentUid, startMonth }: Props) {
           </NavLink>
         ))}
       </nav>
-      {/* Interim until the month rail lands (redesign PR 2). */}
-      {route.kind === 'primary' && route.monthScoped && <MonthControl startMonth={startMonth} />}
       <form
         role="search"
         onSubmit={onSubmit}
