@@ -15,6 +15,7 @@
     "emulators": "npx -y firebase-tools emulators:start --only auth,firestore",
     "dev:emulator": "VITE_USE_EMULATOR=true VITE_FB_PROJECT_ID=demo-spendshare vite",
     "seed:emulator": "node scripts/seed-emulator.mjs",
+    "icons": "node scripts/generate-icons.mjs",
     "deploy": "npm run build && firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "test:rules": "FIRESTORE_EMULATOR_HOST=localhost:8080 vitest run tests/firestore.rules.test.ts --config vitest.rules.config.ts"
