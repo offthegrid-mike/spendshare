@@ -4,6 +4,8 @@ import { Tag, UserPlus, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import LoadingButton from '../../components/LoadingButton';
+import ThemeSwitch from '../../components/ThemeSwitch';
+import { DARK_MODE_ENABLED } from '../../lib/features';
 import { formatVersionLabel } from '../../lib/appVersion';
 
 const manageItems = [
@@ -46,6 +48,12 @@ export default function MoreScreen() {
           ))}
         </div>
       </section>
+      {DARK_MODE_ENABLED && (
+        <section>
+          <h2 className="mb-2 px-1 text-sm font-medium text-ink-muted">Appearance</h2>
+          <ThemeSwitch />
+        </section>
+      )}
       <section>
         <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Account

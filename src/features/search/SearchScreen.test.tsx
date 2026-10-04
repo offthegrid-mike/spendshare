@@ -49,9 +49,9 @@ function LocationProbe() {
   return <span data-testid="location">{pathname + search}</span>;
 }
 
-function renderScreen() {
+function renderScreen(path = '/search') {
   return render(
-    <MemoryRouter initialEntries={['/search']}>
+    <MemoryRouter initialEntries={[path]}>
       <SearchScreen group={mockGroup} />
       <LocationProbe />
     </MemoryRouter>,
@@ -61,6 +61,12 @@ function renderScreen() {
 describe('SearchScreen', () => {
   beforeEach(() => {
     mockUseAllExpenses.mockReturnValue({ expenses, itemsByExpense, loading: false, error: null });
+  });
+
+  it('starts from the ?q= query handed over by the desktop search bar', () => {
+    renderScreen('/search?q=wool');
+    expect(screen.getByRole('searchbox')).toHaveValue('wool');
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
   });
 
   it('prompts for a query before anything is typed', () => {

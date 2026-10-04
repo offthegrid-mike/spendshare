@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:emulator"],
       "port": 5173
+    },
+    {
+      "name": "firebase-emulators",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "firebase-tools", "emulators:start", "--only", "auth,firestore", "--project", "demo-spendshare"],
+      "port": 4000
     }
   ]
 }

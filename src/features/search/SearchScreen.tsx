@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatMoney } from '../../lib/money';
@@ -17,9 +17,19 @@ export default function SearchScreen({ group }: Props) {
   //
   // The query is held here rather than in the URL on purpose — mirroring it to
   // ?q= churned the address bar on every keystroke and seeded browser
-  // autocomplete with search URLs. The cost is that a reload starts from empty.
-  const [draft, setDraft] = useState('');
-  const [query, setQuery] = useState('');
+  // autocomplete with search URLs. ?q= is only read, as a hand-off from the
+  // desktop top bar's search field; adopt it whenever it changes (during
+  // render, not in an effect).
+  const [params] = useSearchParams();
+  const urlQuery = params.get('q') ?? '';
+  const [adoptedUrlQuery, setAdoptedUrlQuery] = useState(urlQuery);
+  const [draft, setDraft] = useState(urlQuery);
+  const [query, setQuery] = useState(urlQuery);
+  if (urlQuery !== adoptedUrlQuery) {
+    setAdoptedUrlQuery(urlQuery);
+    setDraft(urlQuery);
+    setQuery(urlQuery);
+  }
   const composing = useRef(false);
   const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
 

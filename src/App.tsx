@@ -19,13 +19,14 @@ import { useIncome } from './hooks/useIncome';
 import Summary from './features/summary/Summary';
 import MoreScreen from './features/more/MoreScreen';
 import SearchScreen from './features/search/SearchScreen';
+import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
 
 function IncomeRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
   const { selectedMonth } = useUIStore();
   const { income, loading } = useIncome(group.id, selectedMonth);
-  if (loading) return <div>Loading…</div>;
+  if (loading) return <RouteSkeleton />;
   return (
     <IncomeEditor
       key={selectedMonth}
@@ -45,8 +46,8 @@ function SummaryRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
 function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
   const { expense, items, loading } = useExpense(group.id, id);
-  if (loading) return <div>Loading…</div>;
-  if (!expense) return <div className="text-sm text-slate-500">Expense not found.</div>;
+  if (loading) return <RouteSkeleton />;
+  if (!expense) return <div className="text-sm text-ink-muted">Expense not found.</div>;
   return (
     <ExpenseEditor key={expense.id} group={group} currentUserUid={user.uid} expense={expense} items={items} />
   );
@@ -66,11 +67,7 @@ function App() {
   }, [groups, selectedGroupId, setGroup]);
 
   if (authLoading || (user && groupsLoading)) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-600">
-        Loading…
-      </main>
-    );
+    return <AppSplash />;
   }
 
   if (!user) return <SignIn />;
@@ -91,30 +88,30 @@ function App() {
   return (
     <Routes>
       <Route element={<Layout groups={groups} user={user} />}>
-        <Route path="/" element={group ? <ExpenseList group={group} /> : <div>Loading…</div>} />
+        <Route path="/" element={group ? <ExpenseList group={group} /> : <RouteSkeleton />} />
         <Route
           path="/search"
-          element={group ? <SearchScreen group={group} /> : <div>Loading…</div>}
+          element={group ? <SearchScreen group={group} /> : <RouteSkeleton />}
         />
         <Route
           path="/group/settings"
-          element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <div>Loading…</div>}
+          element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}
         />
         <Route
           path="/group/invites"
-          element={group ? <SendInvite key={group.id} user={user} group={group} /> : <div>Loading…</div>}
+          element={group ? <SendInvite key={group.id} user={user} group={group} /> : <RouteSkeleton />}
         />
         <Route
           path="/categories"
-          element={selectedGroupId ? <CategoryManager /> : <div>Loading…</div>}
+          element={selectedGroupId ? <CategoryManager /> : <RouteSkeleton />}
         />
         <Route
           path="/expense/new"
-          element={group ? <ExpenseEditor group={group} currentUserUid={user.uid} /> : <div>Loading…</div>}
+          element={group ? <ExpenseEditor group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}
         />
         <Route
           path="/expense/:id/edit"
-          element={group ? <EditExpenseRoute group={group} user={user} /> : <div>Loading…</div>}
+          element={group ? <EditExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
         />
         <Route
           path="/income"
@@ -122,13 +119,13 @@ function App() {
             group ? (
               <IncomeRouteWrapper group={group} user={user} />
             ) : (
-              <div>Loading…</div>
+              <RouteSkeleton />
             )
           }
         />
         <Route
           path="/summary"
-          element={group ? <SummaryRouteWrapper group={group} user={user} /> : <div>Loading…</div>}
+          element={group ? <SummaryRouteWrapper group={group} user={user} /> : <RouteSkeleton />}
         />
         <Route path="/more" element={<MoreScreen />} />
       </Route>

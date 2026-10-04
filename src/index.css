@@ -3,6 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  /* Semantic colour tokens as RGB channel triplets, so Tailwind opacity
+     modifiers keep working (bg-ink/5). Light values here, dark below. */
+  :root {
+    --canvas: 243 246 244;
+    --surface: 252 253 252;
+    --recessed: 232 238 234;
+    --ink: 16 22 20;
+    --ink-muted: 91 102 96;
+    --ink-faint: 127 137 132;
+    --line: 224 230 226;
+    --accent: 4 120 87;
+    --accent-ink: 4 120 87;
+    --accent-soft: 225 243 234;
+    --on-accent: 247 252 249;
+    --negative: 194 54 75;
+    --shadow-pop: 0 8px 24px -8px rgb(16 40 28 / 0.18);
+    color-scheme: light;
+  }
+
+  /* Dark values apply when the OS prefers dark and the user hasn't forced
+     light, or when the user forces dark. Keep both blocks identical. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --canvas: 10 13 12;
+      --surface: 20 25 23;
+      --recessed: 30 37 34;
+      --ink: 236 242 239;
+      --ink-muted: 148 160 154;
+      --ink-faint: 105 116 111;
+      --line: 35 43 40;
+      --accent: 47 208 140;
+      --accent-ink: 78 227 161;
+      --accent-soft: 18 48 38;
+      --on-accent: 3 18 11;
+      --negative: 255 138 151;
+      --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --canvas: 10 13 12;
+    --surface: 20 25 23;
+    --recessed: 30 37 34;
+    --ink: 236 242 239;
+    --ink-muted: 148 160 154;
+    --ink-faint: 105 116 111;
+    --line: 35 43 40;
+    --accent: 47 208 140;
+    --accent-ink: 78 227 161;
+    --accent-soft: 18 48 38;
+    --on-accent: 3 18 11;
+    --negative: 255 138 151;
+    --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -10,38 +67,46 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
-    /* Soft tinted aurora behind the app shell */
-    background-image: theme('backgroundImage.app-surface');
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    @apply bg-canvas font-sans text-ink;
   }
 }
 
 @layer components {
-  /* Frosted card surface */
+  /* Panel surface */
   .card {
-    @apply rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-sm;
+    @apply rounded-2xl border border-line bg-surface;
   }
 
-  /* Primary brand button */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-gradient px-4 py-2
-      text-sm font-semibold text-white shadow-brand transition
-      hover:brightness-105 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-accent px-4
+      text-sm font-semibold text-on-accent transition
+      hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60
+      motion-safe:active:scale-[0.98];
   }
 
-  /* Secondary / outline button */
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2
-      text-sm font-semibold text-slate-700 shadow-sm transition
-      hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-line bg-surface px-4
+      text-sm font-semibold text-ink transition
+      hover:bg-recessed disabled:cursor-not-allowed disabled:opacity-60
+      motion-safe:active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] px-3
+      text-sm font-medium text-ink-muted transition
+      hover:bg-recessed hover:text-ink disabled:cursor-not-allowed disabled:opacity-60
+      motion-safe:active:scale-[0.98];
   }
 
   /* Text input / select */
   .field {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
-      transition placeholder:text-slate-400
-      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+    @apply w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm text-ink
+      transition placeholder:text-ink-faint
+      focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25;
+  }
+
+  /* Money amounts */
+  .money {
+    @apply font-mono tabular-nums;
   }
 }

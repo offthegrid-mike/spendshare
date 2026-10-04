@@ -1,104 +1,80 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Layout from './Layout';
+import { useUIStore } from '../stores/uiStore';
+import { makeGroup } from '../test/fixtures';
+import type { User } from 'firebase/auth';
 
-// Mock firebase auth
 vi.mock('../lib/firebase', () => ({ auth: {} }));
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
-
-// Mock child components that hit Firestore
-vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
-vi.mock('./MonthPicker', () => ({ default: () => <div data-testid="month-picker" /> }));
 vi.mock('../features/invites/PendingInvites', () => ({ default: () => null }));
-vi.mock('./MobileHeader', () => ({ default: () => <div data-testid="mobile-header" /> }));
-vi.mock('./BottomNav', () => ({ default: () => <nav data-testid="bottom-nav" /> }));
+vi.mock('./HouseholdHeader', () => ({
+  default: ({ startMonth }: { startMonth: string | null }) => (
+    <div data-testid="household-header" data-start-month={startMonth ?? ''} />
+  ),
+}));
+vi.mock('./TopBar', () => ({ default: () => <div data-testid="top-bar" /> }));
+vi.mock('./Dock', () => ({ default: () => <nav data-testid="dock" /> }));
 vi.mock('./BottomSheet', () => ({
   default: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
     open ? <div data-testid="bottom-sheet">{children}</div> : null,
 }));
 vi.mock('../features/expenses/ExpenseEditor', () => ({
-  default: () => <div data-testid="expense-editor" />,
-}));
-vi.mock('../hooks/useGroup', () => ({
-  useGroup: () => ({ group: { id: 'g1', name: 'Family', currency: 'AUD', ownerUid: 'u1', members: {}, memberUids: [] } }),
-}));
-vi.mock('../stores/uiStore', () => ({
-  useUIStore: () => ({ selectedGroupId: 'g1', selectedMonth: '2026-06' }),
+  default: ({ onSuccess }: { onSuccess?: () => void }) => (
+    <button type="button" onClick={onSuccess}>Save expense</button>
+  ),
 }));
 
-import type { GroupDoc } from '../types/models';
-import type { User } from 'firebase/auth';
+const group = {
+  ...makeGroup('g1', 'Family'),
+  createdAt: { toDate: () => new Date(2026, 2, 15) } as unknown as ReturnType<typeof makeGroup>['createdAt'],
+};
+vi.mock('../hooks/useGroup', () => ({ useGroup: () => ({ group }) }));
 
-const mockGroups: GroupDoc[] = [{ id: 'g1', name: 'Family', currency: 'AUD', ownerUid: 'u1', members: {}, memberUids: [], createdAt: null as unknown as GroupDoc['createdAt'] }];
-const mockUser = { uid: 'u1', displayName: 'Alice', email: 'alice@example.com' } as unknown as User;
+const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
 function renderLayout(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <Layout groups={mockGroups} user={mockUser} />
-    </MemoryRouter>
+      <Routes>
+        <Route element={<Layout groups={[group]} user={mockUser} />}>
+          <Route path="*" element={<p>Page content</p>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
   );
 }
 
+beforeEach(() => useUIStore.setState({ selectedGroupId: 'g1', addSheetOpen: false }));
+
 describe('Layout', () => {
-  it('renders the SpendShare brand', () => {
+  it('renders both shells around the page', () => {
     renderLayout();
-    expect(screen.getByText('SpendShare')).toBeTruthy();
+    expect(screen.getByTestId('household-header')).toBeInTheDocument();
+    expect(screen.getByTestId('top-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('dock')).toBeInTheDocument();
+    expect(screen.getByText('Page content')).toBeInTheDocument();
   });
 
-  it('renders all navigation links', () => {
+  it("passes the group's first month to the shells", () => {
     renderLayout();
-    expect(screen.getByRole('link', { name: /expenses/i })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /income/i })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /summary/i })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /categories/i })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /invite/i })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /settings/i })).toBeTruthy();
+    expect(screen.getByTestId('household-header')).toHaveAttribute('data-start-month', '2026-03');
   });
 
-  it('renders the + Expense CTA button', () => {
-    renderLayout();
-    expect(screen.getByRole('link', { name: /^\+?\s*expense$/i })).toBeTruthy();
-  });
-
-  it('renders sign out button', () => {
-    renderLayout();
-    expect(screen.getByRole('button', { name: /sign out/i })).toBeTruthy();
-  });
-
-  it('header has gradient class', () => {
-    renderLayout();
-    const header = document.querySelector('header');
-    expect(header?.className).toContain('bg-brand-gradient');
-  });
-
-  it('renders mobile header', () => {
-    renderLayout();
-    expect(screen.getByTestId('mobile-header')).toBeTruthy();
-  });
-
-  it('renders bottom nav', () => {
-    renderLayout();
-    expect(screen.getByTestId('bottom-nav')).toBeTruthy();
-  });
-
-  it('bottom sheet is closed by default', () => {
+  it('keeps the Add Expense sheet closed by default', () => {
     renderLayout();
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
 
-  it('shows the mobile add-expense FAB on the list page', () => {
-    renderLayout('/');
-    expect(screen.getByRole('button', { name: 'Add expense' })).toBeTruthy();
+  it('opens the sheet when the store says so and closes it after a save', async () => {
+    renderLayout();
+    act(() => useUIStore.getState().openAddSheet());
+    expect(screen.getByTestId('bottom-sheet')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save expense' }));
+    expect(useUIStore.getState().addSheetOpen).toBe(false);
+    expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
-
-  it.each(['/expense/new', '/expense/abc123/edit'])(
-    'hides the mobile add-expense FAB on %s',
-    (path) => {
-      renderLayout(path);
-      expect(screen.queryByRole('button', { name: 'Add expense' })).toBeNull();
-    }
-  );
 });

@@ -1,3 +1,6 @@
+/** Maps a semantic token from src/index.css, keeping opacity modifiers working. */
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -5,6 +8,7 @@ export default {
     extend: {
       fontFamily: {
         sans: [
+          '"Geist Variable"',
           'ui-sans-serif',
           'system-ui',
           '-apple-system',
@@ -15,9 +19,30 @@ export default {
           'Arial',
           'sans-serif',
         ],
+        mono: ['"Geist Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        // Brand = fresh emerald/teal "money" palette
+        canvas: token('canvas'),
+        surface: token('surface'),
+        recessed: token('recessed'),
+        line: token('line'),
+        negative: token('negative'),
+        'on-accent': token('on-accent'),
+        ink: {
+          DEFAULT: token('ink'),
+          muted: token('ink-muted'),
+          faint: token('ink-faint'),
+        },
+        accent: {
+          DEFAULT: token('accent'),
+          ink: token('accent-ink'),
+          soft: token('accent-soft'),
+          // Legacy teal shades, removed in redesign PR 5.
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
+        },
+        // Legacy emerald scale, removed in redesign PR 5.
         brand: {
           50: '#ecfdf5',
           100: '#d1fae5',
@@ -30,18 +55,23 @@ export default {
           800: '#065f46',
           900: '#064e3b',
         },
-        accent: {
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-        },
       },
       backgroundImage: {
+        // Legacy, removed in redesign PR 5.
         'brand-gradient': 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
-        'app-surface':
-          'radial-gradient(1200px 600px at 100% -10%, #d1fae5 0%, rgba(209,250,229,0) 55%), radial-gradient(1000px 500px at -10% 0%, #cffafe 0%, rgba(207,250,254,0) 50%)',
+      },
+      keyframes: {
+        'menu-in': {
+          from: { opacity: '0', transform: 'translateY(-8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'menu-in': 'menu-in 150ms cubic-bezier(.16,1,.3,1)',
       },
       boxShadow: {
+        pop: 'var(--shadow-pop)',
+        // Legacy, removed in redesign PR 5.
         card: '0 1px 2px 0 rgba(16,24,40,0.04), 0 4px 16px -4px rgba(16,24,40,0.08)',
         'card-hover':
           '0 2px 4px 0 rgba(16,24,40,0.06), 0 12px 28px -6px rgba(16,24,40,0.16)',

@@ -6,6 +6,7 @@ import MoreScreen from './MoreScreen';
 
 const { signOut } = vi.hoisted(() => ({ signOut: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../lib/firebase', () => ({ auth: {} }));
+vi.mock('../../lib/features', () => ({ DARK_MODE_ENABLED: true }));
 vi.mock('firebase/auth', () => ({ signOut: (...args: unknown[]) => signOut(...args) }));
 
 function renderMore() {
@@ -30,6 +31,11 @@ describe('MoreScreen', () => {
     renderMore();
     const link = screen.getByRole('link', { name: /group settings/i });
     expect(link.getAttribute('href')).toBe('/group/settings');
+  });
+
+  it('renders the appearance switch', () => {
+    renderMore();
+    expect(screen.getByRole('group', { name: 'Appearance' })).toBeTruthy();
   });
 
   it('renders a Sign out button', () => {

@@ -22,7 +22,7 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
   const viewport = useVisualViewport();
 
   useEffect(() => {
-    if (!open || window.innerWidth >= 640) return;
+    if (!open || window.innerWidth >= 1024) return;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
@@ -53,18 +53,18 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 sm:hidden"
+      className="fixed inset-0 z-40 lg:hidden"
       // Track the visible area so the sheet stays above the on-screen keyboard.
       style={viewport ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' } : undefined}
     >
       <div
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-ink/40"
         data-testid="sheet-backdrop"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
-        className={`group/sheet absolute bottom-0 left-0 right-0 ${keyboardOpen ? 'max-h-full' : 'max-h-[85%]'} overflow-y-auto overscroll-contain rounded-t-2xl bg-white ${dragging ? '' : 'transition-transform duration-200'}`}
+        className={`group/sheet absolute bottom-0 left-0 right-0 ${keyboardOpen ? 'max-h-full' : 'max-h-[85%]'} overflow-y-auto overscroll-contain rounded-t-[20px] bg-surface shadow-pop ${dragging ? '' : 'transition-transform duration-200'}`}
         style={dragging ? { transform: `translateY(${dragOffset}px)` } : undefined}
         data-keyboard={keyboardOpen ? 'open' : undefined}
         role="dialog"
@@ -84,12 +84,12 @@ export default function BottomSheet({ open, onClose, title, children }: Props) {
         >
           <div className="flex justify-center pt-3 pb-1">
             <div
-              className="h-1 w-10 rounded-full bg-slate-300"
+              className="h-1 w-10 rounded-full bg-line"
               data-testid="sheet-handle"
               aria-hidden="true"
             />
           </div>
-          <h2 id="sheet-title" className="pb-4 text-lg font-bold text-slate-900">{title}</h2>
+          <h2 id="sheet-title" className="pb-4 text-lg font-semibold tracking-tight text-ink">{title}</h2>
         </div>
         <div className="px-4 pb-8">
           {children}
