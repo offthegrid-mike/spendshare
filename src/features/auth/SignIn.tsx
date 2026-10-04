@@ -136,9 +136,10 @@ export default function SignIn() {
     setBusy('google');
     try {
       await signInWithPopup(auth, googleProvider);
+      // Stay busy on success: the screen unmounts once auth state settles, and
+      // re-enabling the form in between would invite a second sign-in.
     } catch (err) {
       showError(err);
-    } finally {
       setBusy(null);
     }
   }
@@ -192,81 +193,84 @@ export default function SignIn() {
                 <p className="mt-1.5 text-sm text-ink-muted">{copy.lead}</p>
 
                 <form noValidate className="mt-8 space-y-5" onSubmit={(e) => void handleSubmit(e)}>
-                  <div>
-                    <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-ink">
-                      Email
-                    </label>
-                    <input
-                      ref={emailRef}
-                      id="email"
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      aria-invalid={fieldErrors.email ? true : undefined}
-                      aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                      className={`field h-11 text-base ${fieldErrors.email ? INVALID : ''}`}
-                    />
-                    {fieldErrors.email && (
-                      <p id="email-error" className="mt-1.5 text-sm text-negative">
-                        {fieldErrors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  {mode !== 'reset' && (
+                  {/* Locked while the Google popup is open; reopened only if it fails. */}
+                  <fieldset disabled={busy === 'google'} className="min-w-0 space-y-5">
                     <div>
-                      <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-ink">
-                        Password
+                      <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-ink">
+                        Email
                       </label>
-                      <div className="relative">
-                        <input
-                          ref={passwordRef}
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          aria-invalid={fieldErrors.password ? true : undefined}
-                          aria-describedby={passwordDescription}
-                          className={`field h-11 pr-11 text-base ${fieldErrors.password ? INVALID : ''}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((shown) => !shown)}
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                          className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-[10px] text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                        >
-                          {showPassword ? (
-                            <EyeOff size={18} strokeWidth={1.75} aria-hidden="true" />
-                          ) : (
-                            <Eye size={18} strokeWidth={1.75} aria-hidden="true" />
-                          )}
-                        </button>
-                      </div>
-                      <div className="mt-1.5 flex items-start justify-between gap-3">
-                        {fieldErrors.password ? (
-                          <p id="password-error" className="text-sm text-negative">
-                            {fieldErrors.password}
-                          </p>
-                        ) : (
-                          passwordHint && (
-                            <p id="password-hint" className="text-sm text-ink-muted">
-                              {passwordHint}
-                            </p>
-                          )
-                        )}
-                        {mode === 'signIn' && (
-                          <TextButton onClick={() => switchMode('reset')} className="ml-auto">
-                            Forgot password?
-                          </TextButton>
-                        )}
-                      </div>
+                      <input
+                        ref={emailRef}
+                        id="email"
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        aria-invalid={fieldErrors.email ? true : undefined}
+                        aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                        className={`field h-11 text-base ${fieldErrors.email ? INVALID : ''}`}
+                      />
+                      {fieldErrors.email && (
+                        <p id="email-error" className="mt-1.5 text-sm text-negative">
+                          {fieldErrors.email}
+                        </p>
+                      )}
                     </div>
-                  )}
+
+                    {mode !== 'reset' && (
+                      <div>
+                        <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-ink">
+                          Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            ref={passwordRef}
+                            id="password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            aria-invalid={fieldErrors.password ? true : undefined}
+                            aria-describedby={passwordDescription}
+                            className={`field h-11 pr-11 text-base ${fieldErrors.password ? INVALID : ''}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((shown) => !shown)}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-[10px] text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {showPassword ? (
+                              <EyeOff size={18} strokeWidth={1.75} aria-hidden="true" />
+                            ) : (
+                              <Eye size={18} strokeWidth={1.75} aria-hidden="true" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="mt-1.5 flex items-start justify-between gap-3">
+                          {fieldErrors.password ? (
+                            <p id="password-error" className="text-sm text-negative">
+                              {fieldErrors.password}
+                            </p>
+                          ) : (
+                            passwordHint && (
+                              <p id="password-hint" className="text-sm text-ink-muted">
+                                {passwordHint}
+                              </p>
+                            )
+                          )}
+                          {mode === 'signIn' && (
+                            <TextButton onClick={() => switchMode('reset')} className="ml-auto">
+                              Forgot password?
+                            </TextButton>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </fieldset>
 
                   {authError && (
                     <div
@@ -359,7 +363,7 @@ function TextButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded font-semibold text-accent-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${className}`}
+      className={`rounded font-semibold text-accent-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:no-underline ${className}`}
     >
       {children}
     </button>
