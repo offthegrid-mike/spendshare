@@ -1,108 +1,241 @@
 # SpendShare
 
-Offline-first expense-splitting web app for households and groups. Members record expenses and income; the app computes monthly per-person spending, shared totals, and a minimized "who owes whom" settlement — synced through Firebase on the free Spark plan.
+Shared expense tracking for households and small groups. Members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
+
+It works offline, installs as an app on desktop and mobile, and runs entirely on free tiers (Firebase Spark plan and Cloudflare Workers).
 
 **Live app:** https://spendshare-e5236.web.app
 
 ## Status
 
-| Milestone | Status |
-|-----------|--------|
-| M0 — Project, TDD harness & CI | ✅ Done |
-| M1 — Authentication | ✅ Done |
-| M2 — Data model, Groups, Security Rules | ✅ Done |
-| M3 — Invites | ✅ Done |
-| M4 — Categories | ✅ Done |
-| M5 — Expenses | ✅ Done |
-| M6 — Income | ✅ Done |
-| M7 — Summary & Settlement | ✅ Done |
-| M8 — Offline / PWA / Deploy | ✅ Done |
+**Stable, in daily use.** The current release is **v2.0.0**. Every merge to `main` deploys to production automatically.
 
-## Supported features
+Releases are tagged in git. `v1.0.0` is the last release before the UI redesign, and `v2.0.0` is the first release with it.
 
-- **Authentication** — sign up / sign in with email + password or Google; email verification; sign out
-- **Groups** — create a group with a name and currency (AUD/USD/EUR/GBP); group data is isolated per-member via Firestore security rules
-- **Group switcher** — switch between multiple groups; selection persists across reloads
-- **Group settings** — rename a group or change its currency
-- **Invites** — invite members by email; pending invite banner; accept or decline
-- **Categories** — seeded default categories; add, rename, delete custom categories per group
-- **Expenses** — create, edit, and delete expense transactions with line items and payer assignment
-- **Income** — record monthly income per member
-- **Summary & Settlement** — monthly per-person spending, shared totals, and a minimized "who owes whom" settlement; mark individual payments as paid (with undo)
-- **Offline support** — Firestore IndexedDB cache keeps all data readable offline; PWA service worker caches the app shell so the app loads without a network connection
-- **Installable** — install SpendShare as a PWA on desktop or mobile from the browser address bar
+The original roadmap (milestones M0–M8: authentication, groups, invites, categories, expenses, income, settlement, offline and PWA) is complete. Later releases added expense search, receipt scanning, a yearly summary, and a full UI redesign with dark mode.
+
+## Features
+
+### Expenses
+
+- Record an expense with a shop, date, payer, and line items. Each item has a category, an amount, an optional quantity and remark, and a **shared** or **personal** flag.
+- Quick-add strip: type an item, press Enter, and the next one is ready.
+- Shop and item names autocomplete from the group's history, and a remembered item fills in its category.
+- Record a gift card or a percentage discount (such as a card rebate) to show what was actually paid.
+- An unsaved new expense is kept as a draft on the device, so a reload or a closed tab doesn't lose it.
+- Browse expenses by month, grouped by day, with a detail pane. Edit or delete any expense.
+
+### Receipt scanning (optional)
+
+- **Scan receipt** reads a photo or PDF and fills in the shop, date, and line items.
+- The image is never uploaded or stored. It is downscaled in the browser, sent once for OCR, and discarded.
+- Disabled unless the OCR proxy is configured (see [Receipt scanning setup](#receipt-scanning-setup)).
+
+### Search
+
+- Search shop and item names across every month in the group, then jump straight to the matching expense.
+
+### Summary and settlement
+
+- **Month view:** settle-up comes first, with the minimum set of "who pays whom" payments, followed by each person's balance, spending, and shared totals.
+- Mark a payment as paid (with undo). Paid amounts carry into the month's balances.
+- **Year view:** spending and income for each month, and spending by category, for the whole year.
+
+### Income
+
+- Record one or more income entries per member per month, each with an optional description.
+
+### Groups and members
+
+- Create several groups, each with its own name and currency (AUD, USD, EUR, or GBP), and switch between them. The selected group is remembered across reloads.
+- Invite members by email. Invitees see a pending-invite banner and can accept or decline, and a pending invite can be revoked.
+- The group owner can add members who don't have an account (for example, a child or a housemate who won't sign in) and remove members.
+- Default categories are created with each group. Add, rename, or delete your own.
+- Firestore security rules keep each group's data visible only to its members.
+
+### Accounts
+
+- Sign in with email and password or with Google.
+- Email verification on sign-up, and password reset by email.
+
+### Offline, install, and appearance
+
+- All data stays readable offline through Firestore's IndexedDB cache, and changes made offline sync when the connection returns.
+- A service worker caches the app shell, so the app opens without a network connection.
+- Installable as a PWA from the browser.
+- Light, dark, or system theme.
+- The More screen shows the build's commit and date, so you can confirm which deploy is live.
+
+## How splitting works
+
+1. Each item belongs to the person who paid for the expense.
+2. **Personal** items count toward the payer's own spending only.
+3. **Shared** items are added up for the month and split evenly across all group members.
+4. A member's balance is what they paid toward shared items minus their even share. Positive means they're owed money, negative means they owe.
+5. Debts are matched largest-first to produce the fewest payments. Payments already marked as paid are applied before the next round.
+
+Gift cards and discounts appear against the receipt total for reference. They don't change the split, which always uses the item amounts.
+
+All money is stored as integer cents.
 
 ## Tech stack
 
-- Vite + React 19 + TypeScript
-- Firebase v12 — Auth + Firestore (with `persistentLocalCache`)
-- Zustand (UI state + localStorage persistence)
-- react-hook-form + zod
-- Tailwind CSS
-- date-fns
-- vite-plugin-pwa + Workbox
-- Vitest + Playwright (testing + functional verification)
+| Area | Tools |
+|------|-------|
+| App | Vite, React 19, TypeScript, React Router 7 |
+| Data | Firebase 12: Auth, and Firestore with `persistentLocalCache` |
+| State and forms | Zustand (UI state, persisted to localStorage), react-hook-form, zod |
+| UI | Tailwind CSS with semantic design tokens, lucide-react icons, Geist font, Recharts, react-day-picker, date-fns |
+| Offline | vite-plugin-pwa and Workbox |
+| Receipt OCR | pdf.js (PDF to image) and a Cloudflare Worker proxy to an NVIDIA-hosted vision model |
+| Testing | Vitest and Testing Library, `@firebase/rules-unit-testing`, Playwright |
+| Hosting and CI | Firebase Hosting and GitHub Actions |
+
+## Project structure
+
+```
+src/
+  features/      Screens, one folder per area (auth, expenses, summary, income, groups, invites, search, …)
+  components/    App shell and shared UI (layout, dock, top bar, sheets, ui/ primitives)
+  hooks/         Firestore data hooks (useMonthExpenses, useSettlements, useYearOverview, …)
+  lib/           Pure logic: settlement, money, discounts, search, receipt OCR, theme, routes
+  stores/        Zustand UI store
+  types/         Firestore document models and zod schemas
+tests/           Vitest tests, Firestore rules tests, Playwright offline spec
+worker/          Cloudflare Worker that proxies receipt OCR requests
+scripts/         Emulator seed data and app icon generation
+docs/            Receipt OCR research, security reviews, design specs and plans
+firestore.rules  Security rules (deployed from main by CI)
+```
 
 ## Running locally
 
 ### Prerequisites
 
-- Node.js 18+
-- Firebase CLI: `npm install -g firebase-tools`
-- Java (required by Firebase emulators): `java -version`
+- Node.js 20 or newer (CI uses 22). Node 18 fails to start Vitest.
+- Java, for the Firebase emulators (`java -version` to check)
+- Firebase CLI, for deploying by hand: `npm install -g firebase-tools`
 
-### Against the Firebase emulators (recommended for development)
+### With the Firebase emulators (recommended)
 
-No cloud account or API keys needed.
+No Firebase project or API keys needed.
 
 ```bash
 npm install
 
-# Terminal 1 — start Auth + Firestore emulators
+# Terminal 1: start the Auth and Firestore emulators
 npm run emulators
 
-# Terminal 2 — start Vite dev server (auto-connects to emulators)
+# Terminal 2 (optional): fill the emulators with a sample two-person household
+npm run seed:emulator
+
+# Terminal 2: start the dev server, which connects to the emulators
 npm run dev:emulator
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Sign up with any email/password — the emulator accepts any address with no real emails sent.
+Open http://localhost:5173. After seeding, sign in as `mike@example.com` with password `password123`. Without seed data, sign up with any email address. The emulator sends no real emails.
 
-### Against the live Firebase project
+The seed script wipes the emulators' Auth and Firestore data before writing.
 
-Copy `.env.example` to `.env.local` and fill in your Firebase project values, then:
+### With a real Firebase project
+
+Copy `.env.example` to `.env.local`, fill in the values, then run `npm run dev`.
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_FB_API_KEY`, `VITE_FB_AUTH_DOMAIN`, `VITE_FB_PROJECT_ID`, `VITE_FB_STORAGE_BUCKET`, `VITE_FB_SENDER_ID`, `VITE_FB_APP_ID` | Firebase web app config |
+| `VITE_OCR_PROXY_URL` | Optional. URL of the receipt OCR Worker. Leave blank to hide receipt scanning. |
+| `VITE_USE_EMULATOR` | Set by `npm run dev:emulator`. Leave blank. |
+
+### Receipt scanning setup
+
+Receipt scanning needs the Cloudflare Worker in `worker/`, which holds the NVIDIA API key so it never reaches the browser. Both services have free tiers that need no credit card.
+
+1. Deploy the Worker and set its secrets by following [worker/README.md](worker/README.md).
+2. Put the Worker's URL in `VITE_OCR_PROXY_URL`: in `.env.local` for local development, and as a GitHub Actions secret for deployed builds.
+
+[docs/RECEIPT_OCR.md](docs/RECEIPT_OCR.md) explains the design: why a proxy is needed, which model is used, and why no images are stored.
+
+## Scripts
 
 ```bash
-npm run dev
+npm run dev             # Dev server against the real Firebase project (needs .env.local)
+npm run dev:emulator    # Dev server against the local emulators
+npm run emulators       # Start the Auth and Firestore emulators
+npm run seed:emulator   # Wipe the emulators and load sample data
+npm run build           # Type-check and build for production into dist/
+npm run preview         # Serve the production build locally
+npm run typecheck       # TypeScript check
+npm run lint            # ESLint, which fails on any warning
+npm test                # Vitest unit and component tests
+npm run test:watch      # Vitest in watch mode
+npm run test:coverage   # Tests with a coverage report
+npm run test:rules      # Firestore security rules tests (emulators must be running)
+npm run icons           # Regenerate the PWA icons from the design tokens
+npm run deploy          # Build and deploy to Firebase Hosting
+npm run deploy:rules    # Deploy Firestore rules and indexes only
 ```
 
-## Available scripts
+## Testing
+
+Before opening a PR, run:
 
 ```bash
-npm run dev             # Vite dev server (real Firebase, needs .env.local)
-npm run dev:emulator    # Vite dev server against local emulators
-npm run emulators       # Start Firebase Auth + Firestore emulators
-npm run build           # Production build → dist/
-npm run preview         # Preview production build locally
-npm run typecheck       # TypeScript type check
-npm run lint            # ESLint
-npm test                # Vitest unit + component tests
-npm run test:coverage   # Test coverage report
-npm run deploy          # Build + deploy to Firebase Hosting
-npm run deploy:rules    # Deploy Firestore rules + indexes only
+npm run typecheck && npm run lint && npm test
 ```
 
-## Deploying
+CI runs the same checks, plus a production build, on every pull request.
+
+Security rules tests run against the Firestore emulator. Start it with `npm run emulators`, then run `npm run test:rules`.
+
+The Playwright spec checks the production PWA build (service worker, manifest, offline load). It expects a preview server on port 5174:
 
 ```bash
-# One-time setup
+npm run build && npm run preview -- --port 5174
+```
+
+Then, in a second terminal:
+
+```bash
+npx playwright test
+```
+
+## Deployment
+
+Deployment is automated through GitHub Actions:
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | Pull requests and pushes to `main` | Type-check, lint, test, build |
+| `firebase-hosting-pull-request.yml` | Pull requests | Deploy a preview channel and comment its URL on the PR |
+| `firebase-hosting-merge.yml` | Push to `main` | Deploy Firestore rules and indexes, then the app to the live channel |
+| `deploy-worker.yml` | Push to `main` that changes `worker/` | Redeploy the OCR proxy Worker |
+
+The workflows read the Firebase config, the Firebase service account, `VITE_OCR_PROXY_URL`, and `CLOUDFLARE_API_TOKEN` from repository secrets.
+
+To deploy by hand:
+
+```bash
 firebase login
 firebase use spendshare-e5236
-
-# Deploy app
-npm run deploy
-
-# Deploy Firestore rules/indexes only
-npm run deploy:rules
+npm run deploy          # app
+npm run deploy:rules    # Firestore rules and indexes
 ```
 
-The app is hosted at **https://spendshare-e5236.web.app** and also at **https://spendshare-e5236.firebaseapp.com**.
+The app is served at https://spendshare-e5236.web.app and https://spendshare-e5236.firebaseapp.com.
+
+## Contributing
+
+- Branch from `main` and open a pull request. Nothing is committed to `main` directly.
+- PRs are squash-merged.
+- Write a failing test first for any behavior change.
+- Data hooks in `src/hooks/` must not call `setState` synchronously inside an effect. The lint rule `react-hooks/set-state-in-effect` fails the build.
+
+[CLAUDE.md](CLAUDE.md) has the full workflow and code conventions.
+
+## Further reading
+
+- [docs/RECEIPT_OCR.md](docs/RECEIPT_OCR.md): receipt OCR design and free-tier research
+- [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md): security assessment
+- [docs/superpowers/specs/](docs/superpowers/specs/): feature design specs
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md): the original M0–M8 plan
