@@ -1,8 +1,8 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import MonthControl from './MonthControl';
-import { routeInfo } from '../lib/routes';
+import { isSearchReturnState, routeInfo } from '../lib/routes';
 import { useScrolled } from '../hooks/useScrolled';
 import type { GroupDoc } from '../types/models';
 
@@ -14,9 +14,18 @@ interface Props {
 
 /** Mobile header (below lg): the household on main sections, a back link + title elsewhere. */
 export default function HouseholdHeader({ groups, currentUid, startMonth }: Props) {
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const navigate = useNavigate();
   const route = routeInfo(pathname);
   const scrolled = useScrolled();
+  const returnsToSearch = isSearchReturnState(location.state);
+
+  function handleBack(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!returnsToSearch) return;
+    e.preventDefault();
+    navigate(-1);
+  }
 
   return (
     <header
@@ -27,6 +36,7 @@ export default function HouseholdHeader({ groups, currentUid, startMonth }: Prop
           <Link
             to={route.back}
             aria-label="Back"
+            onClick={handleBack}
             className="grid h-10 w-10 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink"
           >
             <ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" />

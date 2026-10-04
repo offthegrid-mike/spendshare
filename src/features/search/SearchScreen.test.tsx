@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import SearchScreen from './SearchScreen';
 
 const mockUseAllExpenses = vi.fn();
@@ -52,10 +52,18 @@ function LocationProbe() {
 function renderScreen(path = '/search') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <SearchScreen group={mockGroup} />
+      <Routes>
+        <Route path="/search" element={<SearchScreen group={mockGroup} />} />
+        <Route path="/expense/:id/edit" element={<ExpenseRoute />} />
+      </Routes>
       <LocationProbe />
     </MemoryRouter>,
   );
+}
+
+function ExpenseRoute() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate(-1)}>Back to search</button>;
 }
 
 describe('SearchScreen', () => {
@@ -102,6 +110,35 @@ describe('SearchScreen', () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), 'wool');
     expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+  });
+
+  it('restores the query and scroll position after returning from an expense', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 });
+    const user = userEvent.setup();
+
+    renderScreen();
+    await user.type(screen.getByRole('searchbox'), 'wool');
+    await user.click(screen.getByRole('link'));
+    await user.click(screen.getByRole('button', { name: 'Back to search' }));
+
+    expect(screen.getByRole('searchbox')).toHaveValue('wool');
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 240);
+    scrollTo.mockRestore();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+  });
+
+  it('does not restore focus to the search field after returning from an expense', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderScreen();
+    await user.type(screen.getByRole('searchbox'), 'wool');
+    await user.click(screen.getByRole('link'));
+    await user.click(screen.getByRole('button', { name: 'Back to search' }));
+
+    expect(screen.getByRole('searchbox')).not.toHaveFocus();
+    scrollTo.mockRestore();
   });
 
   it('shows a no-results message', async () => {

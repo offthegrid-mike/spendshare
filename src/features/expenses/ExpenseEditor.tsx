@@ -14,7 +14,7 @@ import { readDraft, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraft
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
 import { computeDiscountCents } from '../../lib/discount';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
-import { Link, useInRouterContext, useNavigate } from 'react-router-dom';
+import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ShopNameCombobox from './ShopNameCombobox';
@@ -24,6 +24,7 @@ import PayerPicker from './PayerPicker';
 import { schema, parseQty, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
+import { isSearchReturnState } from '../../lib/routes';
 
 // Default percent shown/applied when "Apply card discount" is first checked
 // (typical credit-card cashback rate).
@@ -34,6 +35,14 @@ function useSafeNavigate(): NavigateFunction {
     return useNavigate();
   } catch {
     return (() => {}) as unknown as NavigateFunction;
+  }
+}
+
+function useSafeLocationState(): unknown {
+  try {
+    return useLocation().state;
+  } catch {
+    return null;
   }
 }
 
@@ -55,6 +64,7 @@ interface Props {
 // ---------------------------------------------------------------------------
 export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess, variant = 'page' }: Props) {
   const navigate = useSafeNavigate();
+  const locationState = useSafeLocationState();
   const { active: cats } = useCategories(group.id);
   const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
@@ -354,6 +364,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   // ---------------------------------------------------------------------------
   const isSheet = variant === 'sheet';
   const inRouter = useInRouterContext();
+  const returnsToSearch = isSearchReturnState(locationState);
   // A new expense autosaves a draft once there is something worth keeping.
   const draftSaved = isNew && isDraftMeaningful(allValues as ExpenseDraftValues);
   const itemCount = (watchedItems ?? []).length;
@@ -373,6 +384,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
             <Link
               to="/"
               aria-label="Back"
+              onClick={(e) => {
+                if (!returnsToSearch) return;
+                e.preventDefault();
+                navigate(-1);
+              }}
               className="grid h-9 w-9 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink"
             >
               <ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" />

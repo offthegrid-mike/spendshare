@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import HouseholdHeader from './HouseholdHeader';
 import { makeGroup } from '../test/fixtures';
 
@@ -13,6 +13,11 @@ function renderHeader(path: string) {
       <HouseholdHeader groups={[makeGroup('g1', 'Home')]} currentUid="mike" startMonth={null} />
     </MemoryRouter>,
   );
+}
+
+function LocationProbe() {
+  const { pathname } = useLocation();
+  return <span data-testid="location">{pathname}</span>;
 }
 
 describe('HouseholdHeader', () => {
@@ -42,6 +47,25 @@ describe('HouseholdHeader', () => {
     expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', back);
     expect(screen.queryByTestId('group-switcher')).toBeNull();
     expect(screen.queryByTestId('month-control')).toBeNull();
+  });
+
+  it('returns an expense opened from search to the saved search history entry', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: '/search', state: { query: 'coles', scrollY: 240 } },
+          { pathname: '/expense/abc123/edit', state: { returnToSearch: true } },
+        ]}
+        initialIndex={1}
+      >
+        <HouseholdHeader groups={[makeGroup('g1', 'Home')]} currentUid="mike" startMonth={null} />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/search');
   });
 
   it('has no sign out button', () => {

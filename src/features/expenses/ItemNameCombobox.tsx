@@ -114,7 +114,7 @@ export default function ItemNameCombobox({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 mt-1 w-full overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-pop"
+          className="absolute z-50 mt-1 min-w-full w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-pop"
         >
           {filtered.map((s, i) => (
             <li

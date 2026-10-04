@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Gift, Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatMoney } from '../../lib/money';
@@ -9,6 +9,25 @@ import type { GroupDoc } from '../../types/models';
 
 interface Props { group: GroupDoc; }
 
+interface SearchHistoryState {
+  query: string;
+  scrollY: number;
+}
+
+function getSearchHistoryState(state: unknown): SearchHistoryState | undefined {
+  if (
+    typeof state === 'object'
+    && state !== null
+    && 'query' in state
+    && 'scrollY' in state
+    && typeof state.query === 'string'
+    && typeof state.scrollY === 'number'
+  ) {
+    return { query: state.query, scrollY: state.scrollY };
+  }
+  return undefined;
+}
+
 export default function SearchScreen({ group }: Props) {
   // `draft` is what the field shows; `query` is what we actually search. They
   // differ only mid-IME-composition: re-rendering the field from shared state on
@@ -17,23 +36,42 @@ export default function SearchScreen({ group }: Props) {
   //
   // The query is held here rather than in the URL on purpose — mirroring it to
   // ?q= churned the address bar on every keystroke and seeded browser
-  // autocomplete with search URLs. ?q= is only read, as a hand-off from the
-  // desktop top bar's search field; adopt it whenever it changes (during
-  // render, not in an effect).
+  // autocomplete with search URLs. The current query and scroll position are
+  // instead saved in the browser history entry, so they survive a visit to an
+  // expense. ?q= remains a hand-off from the desktop top bar.
   const [params] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const urlQuery = params.get('q') ?? '';
-  const [adoptedUrlQuery, setAdoptedUrlQuery] = useState(urlQuery);
-  const [draft, setDraft] = useState(urlQuery);
-  const [query, setQuery] = useState(urlQuery);
-  if (urlQuery !== adoptedUrlQuery) {
-    setAdoptedUrlQuery(urlQuery);
-    setDraft(urlQuery);
-    setQuery(urlQuery);
+  const historyState = getSearchHistoryState(location.state);
+  const initialQuery = params.has('q') ? urlQuery : historyState?.query ?? '';
+  const [adoptedQuery, setAdoptedQuery] = useState(initialQuery);
+  const [draft, setDraft] = useState(initialQuery);
+  const [query, setQuery] = useState(initialQuery);
+  const initialScrollY = useRef(historyState?.scrollY);
+  if (initialQuery !== adoptedQuery) {
+    setAdoptedQuery(initialQuery);
+    setDraft(initialQuery);
+    setQuery(initialQuery);
   }
   const composing = useRef(false);
   const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
 
-  const commit = useCallback((value: string) => setQuery(value), []);
+  const saveHistoryState = useCallback((nextQuery: string) => {
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: { query: nextQuery, scrollY: window.scrollY } },
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  const commit = useCallback((value: string) => {
+    setQuery(value);
+    saveHistoryState(value);
+  }, [saveHistoryState]);
+
+  useEffect(() => {
+    if (initialScrollY.current !== undefined) window.scrollTo(0, initialScrollY.current);
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { value } = e.target;
@@ -71,7 +109,7 @@ export default function SearchScreen({ group }: Props) {
         />
         <input
           type="search"
-          autoFocus
+          autoFocus={!historyState}
           value={draft}
           onChange={handleChange}
           onCompositionStart={() => { composing.current = true; }}
@@ -114,6 +152,8 @@ export default function SearchScreen({ group }: Props) {
               <Link
                 key={expense.id}
                 to={`/expense/${expense.id}/edit`}
+                state={{ returnToSearch: true }}
+                onClick={() => saveHistoryState(query)}
                 className="block border-b border-line last:border-0 hover:bg-recessed"
               >
                 <div className="flex min-h-[44px] items-center gap-3 px-4 py-3">

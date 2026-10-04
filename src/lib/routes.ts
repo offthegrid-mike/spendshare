@@ -3,6 +3,14 @@ export type RouteInfo =
   | { kind: 'primary'; monthScoped: boolean }
   | { kind: 'secondary'; title: string; back: string };
 
+export interface SearchReturnState {
+  returnToSearch: true;
+}
+
+export function isSearchReturnState(state: unknown): state is SearchReturnState {
+  return typeof state === 'object' && state !== null && 'returnToSearch' in state && state.returnToSearch === true;
+}
+
 const SECONDARY: Record<string, { title: string; back: string }> = {
   '/search': { title: 'Search', back: '/' },
   '/categories': { title: 'Categories', back: '/more' },

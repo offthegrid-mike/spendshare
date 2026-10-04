@@ -52,7 +52,9 @@ describe('ItemNameCombobox', () => {
     const u = userEvent.setup();
     render(<Wrapper />);
     await u.type(screen.getByRole('combobox'), 'chi');
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).toBeInTheDocument();
+    expect(listbox).toHaveClass('min-w-full', 'w-80');
     // "chi" matches: Chicken Breast, Chili Sauce, Zucchini — NOT Cheese/Chocolate
     expect(screen.getByRole('option', { name: /Chicken Breast/i })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Chili Sauce/i })).toBeInTheDocument();
