@@ -1,7 +1,6 @@
-import { config } from 'zod';
-// Zod v4's JIT compiler uses new Function() which violates strict-CSP. Disable
-// it so the CSP can remain without 'unsafe-eval'.
-config({ jitless: true });
+// Must stay first: it disables Zod's JIT before any schema is built. See the
+// module for why calling config() here instead would be too late.
+import './lib/zodConfig'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
