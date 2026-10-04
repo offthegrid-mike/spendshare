@@ -5,9 +5,9 @@
 //
 //   npm run icons
 //
-// The mark is the receipt glyph from the sign-in screen
-// (src/features/auth/SignIn.tsx) on an accent tile. Rasterising goes through
-// Playwright's Chromium, which is already a dev dependency.
+// The mark is the receipt glyph from src/components/BrandMark.tsx on an
+// accent tile. Rasterising goes through Playwright's Chromium, which is
+// already a dev dependency.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
