@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { writeBatch, doc } from 'firebase/firestore';
-import { Check, AlertCircle, Trash2 } from 'lucide-react';
+import { Check, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { incomeCol } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
+import { memberName } from '../../lib/balance';
+import { monthName } from '../../lib/month';
+import Avatar from '../../components/ui/Avatar';
 import type { GroupDoc, IncomeDoc } from '../../types/models';
 
 interface Props {
@@ -85,63 +88,59 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
     }
   }
 
+  const householdTotal = income.reduce((sum, d) => sum + d.amount, 0);
+  const others = group.memberUids.filter((uid) => uid !== currentUserUid);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Income — {selectedMonth}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Record your monthly income to calculate fair expense splits.
+      <section>
+        <h1 className="text-[13px] font-normal text-ink-muted">Household income in {monthName(selectedMonth)}</h1>
+        <p data-testid="household-income" className="money text-[32px] font-semibold tracking-[-0.03em] text-ink">
+          {formatMoney(householdTotal, group.currency)}
         </p>
-      </div>
+        <p className="mt-1 text-sm text-ink-muted">Record your monthly income to calculate fair expense splits.</p>
+      </section>
 
-      {group.memberUids.filter((uid) => uid !== currentUserUid).length > 0 && (
-        <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Other members
-          </div>
-          <ul className="divide-y divide-slate-50">
-            {group.memberUids
-              .filter((uid) => uid !== currentUserUid)
-              .map((uid) => {
-                const theirIncome = income.filter((d) => d.uid === uid);
-                const total = theirIncome.reduce((s, d) => s + d.amount, 0);
-                return (
-                  <li key={uid} className="px-4 py-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-slate-800">
-                        {group.members[uid]?.displayName ?? uid}
-                      </p>
-                      <span className="font-semibold text-slate-700">
-                        {theirIncome.length > 0 ? formatMoney(total, group.currency) : '—'}
+      {others.length > 0 && (
+        <section className="card overflow-hidden">
+          <h2 className="border-b border-line px-4 py-2.5 text-sm font-medium text-ink-muted">Other members</h2>
+          <ul className="divide-y divide-line">
+            {others.map((uid) => {
+              const theirIncome = income.filter((d) => d.uid === uid);
+              const total = theirIncome.reduce((sum, d) => sum + d.amount, 0);
+              return (
+                <li key={uid} className="flex items-start gap-3 px-4 py-3 text-sm">
+                  <Avatar name={memberName(group, uid)} tone="them" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-ink">{memberName(group, uid)}</p>
+                      <span className="money font-semibold text-ink">
+                        {theirIncome.length > 0 ? formatMoney(total, group.currency) : <span className="text-ink-muted">-</span>}
                       </span>
                     </div>
                     {theirIncome.length > 1 && (
                       <ul className="mt-1 space-y-0.5">
                         {theirIncome.map((d) => (
-                          <li
-                            key={d.id}
-                            className="flex items-center justify-between text-xs text-slate-400"
-                          >
+                          <li key={d.id} className="flex items-center justify-between text-xs text-ink-muted">
                             <span>{d.description || 'Income'}</span>
-                            <span>{formatMoney(d.amount, group.currency)}</span>
+                            <span className="money">{formatMoney(d.amount, group.currency)}</span>
                           </li>
                         ))}
                       </ul>
                     )}
                     {theirIncome.length === 1 && theirIncome[0].description && (
-                      <p className="text-xs text-slate-400">{theirIncome[0].description}</p>
+                      <p className="text-xs text-ink-muted">{theirIncome[0].description}</p>
                     )}
-                  </li>
-                );
-              })}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
-        </div>
+        </section>
       )}
 
-      <div className="rounded-xl border border-brand-100 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-brand-100 bg-brand-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-600">
-          Your income
-        </div>
+      <section className="card overflow-hidden">
+        <h2 className="border-b border-line px-4 py-2.5 text-sm font-medium text-ink">Your income</h2>
         <div className="space-y-3 p-4">
           {entries.map((entry, index) => (
             <div key={index} className="flex gap-2">
@@ -152,7 +151,7 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
                 placeholder="0.00"
                 value={entry.amount}
                 onChange={(e) => updateEntry(index, 'amount', e.target.value)}
-                className="field w-28 shrink-0"
+                className="field money w-32 shrink-0"
               />
               <input
                 type="text"
@@ -166,9 +165,9 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
                   type="button"
                   onClick={() => removeEntry(index)}
                   aria-label="Remove income source"
-                  className="shrink-0 rounded-lg p-2 text-slate-400 hover:text-rose-500"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-ink-muted hover:bg-negative/10 hover:text-negative"
                 >
-                  <Trash2 size={15} />
+                  <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -177,37 +176,33 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
           <button
             type="button"
             onClick={addEntry}
-            className="w-full rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
+            className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-recessed hover:text-ink"
           >
-            + Add income source
+            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+            Add income source
           </button>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              <AlertCircle size={15} className="shrink-0" />
+            <p className="flex items-center gap-2 text-sm text-negative">
+              <AlertCircle size={15} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
               {error}
-            </div>
+            </p>
           )}
 
-          <button
-            type="button"
-            disabled={saving || saved}
-            onClick={onSave}
-            className="btn-primary w-full py-2.5"
-          >
+          <button type="button" disabled={saving || saved} onClick={onSave} className="btn-primary h-11 w-full">
             {saving ? (
               'Saving…'
             ) : saved ? (
               <>
-                <Check size={15} />
-                Saved!
+                <Check size={15} strokeWidth={1.75} aria-hidden="true" />
+                Saved
               </>
             ) : (
               'Save income'
             )}
           </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

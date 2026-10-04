@@ -87,3 +87,37 @@ describe('IncomeEditor', () => {
     await waitFor(() => expect(screen.getByText(/failed to save/i)).toBeTruthy());
   });
 });
+
+describe('IncomeEditor (redesign)', () => {
+  const saved: IncomeDoc[] = [
+    { id: 'a', uid: 'u1', month: '2026-06', amount: 500000, description: 'Salary' },
+    { id: 'b', uid: 'u2', month: '2026-06', amount: 300000 },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWriteBatch.mockReturnValue({ set: mockBatchSet, delete: mockBatchDelete, commit: mockBatchCommit });
+    mockBatchCommit.mockResolvedValue(undefined);
+  });
+
+  it("shows the household's saved income for the month, ignoring unsaved edits", () => {
+    render(<IncomeEditor group={group} currentUserUid="u1" selectedMonth="2026-06" income={saved} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Household income in June' })).toBeInTheDocument();
+    expect(screen.getByTestId('household-income')).toHaveTextContent('AUD 8000.00');
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '9999' } });
+    expect(screen.getByTestId('household-income')).toHaveTextContent('AUD 8000.00');
+  });
+
+  it('confirms a save with "Saved", no exclamation mark', async () => {
+    render(<IncomeEditor group={group} currentUserUid="u1" selectedMonth="2026-06" income={[]} />);
+    fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: /save income/i }));
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument();
+    expect(screen.queryByText(/!/)).toBeNull();
+  });
+
+  it('has no em-dash title', () => {
+    render(<IncomeEditor group={group} currentUserUid="u1" selectedMonth="2026-06" income={[]} />);
+    expect(screen.queryByText(/—/)).toBeNull();
+  });
+});

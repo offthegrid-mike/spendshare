@@ -1,6 +1,6 @@
 // src/features/summary/Summary.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Summary from './Summary';
@@ -17,15 +17,21 @@ const { monthState } = vi.hoisted(() => ({ monthState: { loading: false } }));
 vi.mock('../../hooks/useMonthItems', () => ({
   useMonthItems: () => ({ items: [], loading: monthState.loading }),
 }));
-vi.mock('../../hooks/useSettlements', () => ({
-  useSettlements: () => ({ settlements: [], loading: false }),
+const { settlementState, summaryState, markSettlementPaid } = vi.hoisted(() => ({
+  settlementState: { settlements: [] as unknown[] },
+  summaryState: { transactions: [] as unknown[] },
+  markSettlementPaid: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../hooks/useSettlements', () => ({
+  useSettlements: () => ({ settlements: settlementState.settlements, loading: false }),
+}));
+vi.mock('../../lib/settle', () => ({ markSettlementPaid, undoSettlement: vi.fn() }));
 vi.mock('../../hooks/useIncome', () => ({
   useIncome: () => ({ income: [], loading: false }),
 }));
 vi.mock('../../lib/settlement', () => ({
   computeSummary: () => ({
-    transactions: [],
+    transactions: summaryState.transactions,
     balance: { u1: 500, u2: -500 },
     paidTotal: { u1: 1000, u2: 0 },
     shareOf: { u1: 500, u2: 500 },
@@ -74,6 +80,7 @@ describe('Summary', () => {
     renderSummary();
     const cards = document.querySelectorAll('[data-testid="balance-card"]');
     expect(cards.length).toBe(2);
+    expect(cards[0].parentElement).toHaveClass('lg:hidden');
   });
 
   it('shows All settled when no pending transactions', () => {
@@ -145,5 +152,58 @@ describe('Summary Month/Year toggle', () => {
     );
     expect(screen.queryByText('Year view 2026')).toBeNull();
     expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('Summary Month view (redesign)', () => {
+  afterEach(() => {
+    settlementState.settlements = [];
+    summaryState.transactions = [];
+  });
+
+  it("reads each member's balance from their own side", () => {
+    renderSummary();
+    const cards = screen.getAllByTestId('balance-card');
+    expect(cards[0]).toHaveTextContent('You get back A$5.00'); // Alice is the viewer
+    expect(cards[1]).toHaveTextContent('Owes A$5.00');
+    expect(document.body.textContent).not.toMatch(/owes you/i);
+  });
+
+  it('puts Settle up before Per person', () => {
+    renderSummary();
+    const settle = screen.getByRole('heading', { name: 'Settle up' });
+    const perPerson = screen.getByRole('heading', { name: 'Per person' });
+    expect(settle.compareDocumentPosition(perPerson) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('says All settled without an exclamation mark', () => {
+    renderSummary();
+    expect(screen.getByText('All settled')).toBeInTheDocument();
+    expect(screen.queryByText(/!/)).toBeNull();
+  });
+
+  it('marks a transaction paid, passing the month settlements so a repeat settle-up merges', async () => {
+    const earlier = { id: '2026-06_u2_u1', month: '2026-06', fromUid: 'u2', toUid: 'u1', amount: 200, paid: true };
+    settlementState.settlements = [earlier];
+    summaryState.transactions = [{ fromUid: 'u2', toUid: 'u1', amount: 300 }];
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
+    expect(markSettlementPaid).toHaveBeenCalledWith('g1', '2026-06', { fromUid: 'u2', toUid: 'u1', amount: 300 }, 'u1', [earlier]);
+  });
+
+  it('lists paid settlements with their date and an Undo', () => {
+    settlementState.settlements = [{
+      id: 's1', month: '2026-06', fromUid: 'u2', toUid: 'u1', amount: 500, paid: true,
+      paidAt: { toDate: () => new Date(2026, 6, 2) },
+    }];
+    renderSummary();
+    const paid = screen.getByText('Paid 2 Jul').closest('li')!;
+    expect(within(paid).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+  });
+
+  it('sums the month up in one line, without an em-dash title', () => {
+    renderSummary();
+    expect(screen.getByText(/^Spent /)).toHaveTextContent('Spent A$0.00, shared A$10.00');
+    expect(screen.queryByText(/Summary —/)).toBeNull();
   });
 });

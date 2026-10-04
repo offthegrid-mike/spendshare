@@ -58,39 +58,34 @@ describe('YearSummary', () => {
   it('shows a loading state while data loads', () => {
     data.loading = true;
     renderYear();
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
   });
 
-  it('shows year totals and net', () => {
+  it('shows the requested year stats without an extra shared or net metric', () => {
     renderYear();
     expect(screen.getByTestId('year-total-spending')).toHaveTextContent('$45.00');
-    expect(screen.getByTestId('year-total-shared')).toHaveTextContent('$40.00');
     expect(screen.getByTestId('year-total-income')).toHaveTextContent('$70.00');
-    expect(screen.getByTestId('year-net')).toHaveTextContent('$25.00');
+    expect(screen.queryByTestId('year-total-shared')).toBeNull();
+    expect(screen.queryByTestId('year-net')).toBeNull();
   });
 
-  it('colours a negative net in rose', () => {
-    data.income = [];
+  it('shows the monthly averages in the stat row', () => {
     renderYear();
-    expect(screen.getByTestId('year-net')).toHaveClass('text-rose-600');
+    // Two active months (Jan, Mar): 45.00 / 2 spent, 70.00 / 2 income.
+    expect(screen.getByTestId('year-avg-spending')).toHaveTextContent('$22.50');
+    expect(screen.getByTestId('year-avg-income')).toHaveTextContent('$35.00');
   });
 
-  it('colours a positive net in brand green', () => {
+  it('has no em-dash heading', () => {
     renderYear();
-    expect(screen.getByTestId('year-net')).toHaveClass('text-brand-700');
-  });
-
-  it('colours a zero net in slate', () => {
-    data.items = [];
-    data.income = [];
-    renderYear();
-    expect(screen.getByTestId('year-net')).toHaveClass('text-slate-500');
+    expect(screen.queryByText(/—/)).toBeNull();
   });
 
   it('renders one mobile per-person card per member', () => {
     renderYear();
     const cards = screen.getAllByTestId('year-person-card');
     expect(cards).toHaveLength(2);
+    expect(cards[0].parentElement).toHaveClass('lg:hidden');
     expect(within(cards[1]).getByText('Bob')).toBeInTheDocument();
     expect(within(cards[1]).getByText(/Paid \$35\.00/)).toBeInTheDocument();
   });

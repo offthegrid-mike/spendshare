@@ -93,3 +93,27 @@ describe('settlementEventText', () => {
     expect(settlementEventText({ ...base, paidAt: null as unknown as SettlementDoc['paidAt'] }, 'mike', pair, 'AUD')).toBe('Settled: Priya paid you A$88.29');
   });
 });
+
+import { memberBalanceCopy } from './balance';
+
+describe('memberBalanceCopy', () => {
+  it.each([
+    [8829, true, 'You get back A$88.29', 'owed'],
+    [-8829, true, 'You owe A$88.29', 'owe'],
+    [0, true, 'Settled', 'settled'],
+    [8829, false, 'Gets back A$88.29', 'owed'],
+    [-8829, false, 'Owes A$88.29', 'owe'],
+    [0, false, 'Settled', 'settled'],
+  ] as const)('balance %s (viewer: %s) reads "%s"', (balance, isViewer, text, tone) => {
+    expect(memberBalanceCopy(balance, isViewer, 'AUD')).toMatchObject({ text, tone });
+  });
+
+  it('also gives the verb and amount separately, for styling the amount', () => {
+    expect(memberBalanceCopy(-8829, false, 'AUD')).toMatchObject({ verb: 'Owes', amount: 'A$88.29' });
+    expect(memberBalanceCopy(0, true, 'AUD')).toMatchObject({ verb: 'Settled', amount: '' });
+  });
+
+  it('never tells a third party that someone "owes you"', () => {
+    expect(memberBalanceCopy(-500, false, 'AUD').text).not.toMatch(/you/i);
+  });
+});

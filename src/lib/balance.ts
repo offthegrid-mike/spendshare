@@ -63,3 +63,16 @@ export function settlementEventText(s: SettlementDoc, viewerUid: string, group: 
   const when = s.paidAt?.toDate ? ` ${format(s.paidAt.toDate(), 'd MMM')}` : '';
   return `Settled${when}: ${from} paid ${to} ${formatMoney(s.amount, currency)}`;
 }
+
+/** A member's balance as a Summary row reads it, correct from anyone's side. */
+export function memberBalanceCopy(
+  balance: number,
+  isViewer: boolean,
+  currency: string,
+): { text: string; verb: string; amount: string; tone: BalanceTone } {
+  const tone = toneOf(balance);
+  if (tone === 'settled') return { text: 'Settled', verb: 'Settled', amount: '', tone };
+  const amount = formatMoney(Math.abs(balance), currency);
+  const verb = tone === 'owed' ? (isViewer ? 'You get back' : 'Gets back') : (isViewer ? 'You owe' : 'Owes');
+  return { text: `${verb} ${amount}`, verb, amount, tone };
+}

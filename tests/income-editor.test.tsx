@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Timestamp } from 'firebase/firestore';
 import type { GroupDoc, IncomeDoc } from '../src/types/models';
@@ -107,7 +107,8 @@ describe('IncomeEditor (multi-entry)', () => {
     render(
       <IncomeEditor group={group} currentUserUid="u1" selectedMonth={selectedMonth} income={income} />,
     );
-    expect(screen.getByText(/3[,.]?000/)).toBeInTheDocument();
+    const others = screen.getByRole('heading', { name: /other members/i }).closest('section')!;
+    expect(within(others).getByText(/3[,.]?000/)).toBeInTheDocument();
   });
 
   it('"+ Add income source" button appends a new empty entry row', async () => {
