@@ -5,6 +5,7 @@ import TopBar from './TopBar';
 import Dock from './Dock';
 import MonthRail from './MonthRail';
 import BottomSheet from './BottomSheet';
+import Notice from './Notice';
 import PendingInvites from '../features/invites/PendingInvites';
 import ExpenseEditor from '../features/expenses/ExpenseEditor';
 import { useGroup } from '../hooks/useGroup';
@@ -42,8 +43,8 @@ export default function Layout({ groups, user }: Props) {
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <HouseholdHeader groups={groups} currentUid={user.uid} startMonth={startMonth} />
-      <TopBar groups={groups} currentUid={user.uid} />
+      <HouseholdHeader groups={groups} user={user} startMonth={startMonth} />
+      <TopBar groups={groups} user={user} />
 
       {showRail ? (
         <div className="grid grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[232px_minmax(0,1fr)]">
@@ -67,12 +68,16 @@ export default function Layout({ groups, user }: Props) {
 
       <Dock />
 
+      <Notice />
+
       {/* Add expense bottom sheet (mobile only; BottomSheet is lg:hidden) */}
       <BottomSheet open={addSheetOpen} onClose={closeAddSheet} title="Add expense">
         {group && (
           <ExpenseEditor
-            key={addSheetOpen ? 'open' : 'closed'}
+            key={`${group.id}-${addSheetOpen ? 'open' : 'closed'}`}
             group={group}
+            groups={groups}
+            user={user}
             currentUserUid={user.uid}
             onSuccess={closeAddSheet}
             variant="sheet"

@@ -27,6 +27,7 @@ export default {
         recessed: token('recessed'),
         line: token('line'),
         negative: token('negative'),
+        warning: token('warning'),
         'on-accent': token('on-accent'),
         ink: {
           DEFAULT: token('ink'),

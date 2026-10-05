@@ -3,6 +3,7 @@ import { Routes, Route, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useGroups } from './hooks/useGroups';
 import { useUIStore } from './stores/uiStore';
+import { resolveSelection } from './lib/groupSelection';
 import SignIn from './features/auth/SignIn';
 import Layout from './components/Layout';
 import CreateGroup from './features/groups/CreateGroup';
@@ -56,15 +57,15 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
 function App() {
   const { user, loading: authLoading } = useAuth();
   const { groups, loading: groupsLoading } = useGroups(user?.uid);
-  const { selectedGroupId, setGroup } = useUIStore();
+  const { selectedGroupId, setGroup, pendingGroupId, clearPendingGroup } = useUIStore();
   const { group } = useGroup(selectedGroupId);
 
-  // Auto-select first group if persisted selection no longer valid
+  // Keep the selection valid, and select a just-joined group once it arrives.
   useEffect(() => {
-    if (groups.length > 0 && !groups.find((g) => g.id === selectedGroupId)) {
-      setGroup(groups[0].id);
-    }
-  }, [groups, selectedGroupId, setGroup]);
+    const { select, clearPending } = resolveSelection(groups, selectedGroupId, pendingGroupId);
+    if (select) setGroup(select);
+    if (clearPending) clearPendingGroup();
+  }, [groups, selectedGroupId, pendingGroupId, setGroup, clearPendingGroup]);
 
   if (authLoading || (user && groupsLoading)) {
     return <AppSplash />;
@@ -107,7 +108,13 @@ function App() {
         />
         <Route
           path="/expense/new"
-          element={group ? <ExpenseEditor group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}
+          element={
+            group ? (
+              <ExpenseEditor key={group.id} group={group} groups={groups} user={user} currentUserUid={user.uid} />
+            ) : (
+              <RouteSkeleton />
+            )
+          }
         />
         <Route
           path="/expense/:id/edit"

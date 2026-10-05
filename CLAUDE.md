@@ -25,6 +25,9 @@ git merge-base --is-ancestor <sha> origin/main && echo "in main" || echo "NOT in
 Other standing rules:
 
 - Never commit directly to `main` — always a feature branch and a PR.
+- When a branch is finished, always push it and open a PR against `main`.
+  Never merge a branch into `main` locally, even when a workflow or skill
+  offers that option.
 - Run the `code-review` skill before merging a milestone PR.
 
 ## Testing

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { query, orderBy, onSnapshot } from 'firebase/firestore';
+import { query, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
 import { categoriesCol } from '../lib/converters';
 import { filterAndSortCategories } from '../lib/categoryHelpers';
 import type { CategoryDoc } from '../types/models';
@@ -27,4 +27,10 @@ export function useCategories(gid: string | null) {
   const loading = gid !== null && loadedGid !== gid;
 
   return { all, active, loading };
+}
+
+/** One-off read of a group's active categories, for moving an entry into it. */
+export async function fetchActiveCategories(gid: string): Promise<CategoryDoc[]> {
+  const snap = await getDocs(query(categoriesCol(gid), orderBy('order', 'asc')));
+  return filterAndSortCategories(snap.docs.map((d) => ({ ...d.data(), id: d.id }))).active;
 }

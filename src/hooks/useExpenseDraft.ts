@@ -12,6 +12,8 @@ export interface ExpenseDraftItem {
   quantity?: string;
   shared: boolean;
   remark?: string;
+  /** Set when a group change couldn't match this item's category; cleared on pick. */
+  categoryUnconfirmed?: boolean;
 }
 
 export interface ExpenseDraftValues {
@@ -22,6 +24,12 @@ export interface ExpenseDraftValues {
   applyDiscount?: boolean;
   discountPercent?: string;
   items: ExpenseDraftItem[];
+}
+
+export interface ExpenseDraftRecord {
+  values: ExpenseDraftValues;
+  /** Name of the group the entry was moved from, when it arrived by a group change. */
+  movedFrom?: string;
 }
 
 // Drafts older than this are ignored (and treated as absent).
@@ -44,24 +52,33 @@ export function isDraftMeaningful(v: ExpenseDraftValues | null | undefined): boo
   return v.items.some((it) => it.name.trim() !== '' || it.amount.trim() !== '');
 }
 
-export function readDraft(groupId: string): ExpenseDraftValues | null {
+export function readDraftRecord(groupId: string): ExpenseDraftRecord | null {
   try {
     const raw = localStorage.getItem(draftKey(groupId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { values: unknown; savedAt: unknown };
+    const parsed = JSON.parse(raw) as { values: unknown; savedAt: unknown; movedFrom?: unknown };
     if (typeof parsed.savedAt !== 'number' || isNaN(parsed.savedAt)) return null;
     if (Date.now() - parsed.savedAt > DRAFT_TTL_MS) return null;
     const values = parsed.values as ExpenseDraftValues;
     if (!values || typeof values !== 'object') return null;
     if (!Array.isArray(values.items)) return null;
     if (typeof values.shopName !== 'string' || typeof values.date !== 'string') return null;
-    return isDraftMeaningful(values) ? values : null;
+    if (!isDraftMeaningful(values)) return null;
+    return typeof parsed.movedFrom === 'string' ? { values, movedFrom: parsed.movedFrom } : { values };
   } catch {
     return null;
   }
 }
 
-export function writeDraft(groupId: string, values: ExpenseDraftValues): void {
+export function readDraft(groupId: string): ExpenseDraftValues | null {
+  return readDraftRecord(groupId)?.values ?? null;
+}
+
+export function writeDraft(
+  groupId: string,
+  values: ExpenseDraftValues,
+  meta: { movedFrom?: string } = {},
+): void {
   try {
     if (!isDraftMeaningful(values)) {
       clearDraft(groupId);
@@ -69,7 +86,7 @@ export function writeDraft(groupId: string, values: ExpenseDraftValues): void {
     }
     localStorage.setItem(
       draftKey(groupId),
-      JSON.stringify({ values, savedAt: Date.now() }),
+      JSON.stringify({ values, savedAt: Date.now(), ...(meta.movedFrom ? { movedFrom: meta.movedFrom } : {}) }),
     );
   } catch {
     // ignore storage quota / serialization errors

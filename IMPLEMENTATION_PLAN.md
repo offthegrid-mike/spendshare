@@ -344,6 +344,8 @@ service cloud.firestore {
 - [ ] Verify: signing in creates `/users/{uid}` in the emulator UI. Commit.
 
 ### Task 2.5: Create group + switcher + UI store + settings
+> Superseded: the switcher and "New group" were built per docs/superpowers/specs/2026-10-05-group-create-and-switch-design.md.
+
 **Files:** `src/stores/uiStore.ts`, `src/hooks/useGroups.ts`, `src/hooks/useGroup.ts`, `src/features/groups/CreateGroup.tsx`, `src/features/groups/GroupSettings.tsx`, `src/components/GroupSwitcher.tsx`.
 
 - [ ] **`uiStore.ts`** (Zustand): `{ selectedGroupId, selectedMonth, setGroup, setMonth }`; default month = `monthKey(new Date())`; persist `selectedGroupId` to `localStorage`.

@@ -3,7 +3,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import TopBar from './TopBar';
+import type { User } from 'firebase/auth';
 import { makeGroup } from '../test/fixtures';
+
+const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
 vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
 vi.mock('./MonthControl', () => ({ default: () => <div data-testid="month-control" /> }));
@@ -17,7 +20,7 @@ function Location() {
 function renderBar(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <TopBar groups={[makeGroup('g1', 'Home')]} currentUid="mike" />
+      <TopBar groups={[makeGroup('g1', 'Home')]} user={mockUser} />
       <Routes>
         <Route path="*" element={<Location />} />
       </Routes>

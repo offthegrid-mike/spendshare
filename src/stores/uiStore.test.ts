@@ -32,3 +32,22 @@ describe('uiStore add-expense sheet', () => {
     expect(saved).not.toHaveProperty('addSheetOpen');
   });
 });
+
+describe('uiStore group choice', () => {
+  beforeEach(() => {
+    useUIStore.setState({ selectedGroupId: 'g1', pendingGroupId: null });
+  });
+
+  it('a group the user chooses replaces any pending joined group', () => {
+    useUIStore.getState().selectGroupWhenReady('g9');
+    useUIStore.getState().chooseGroup('g2');
+    expect(useUIStore.getState().selectedGroupId).toBe('g2');
+    expect(useUIStore.getState().pendingGroupId).toBeNull();
+  });
+
+  it('setGroup keeps a pending joined group (the app repairing a selection is not a choice)', () => {
+    useUIStore.getState().selectGroupWhenReady('g9');
+    useUIStore.getState().setGroup('g2');
+    expect(useUIStore.getState().pendingGroupId).toBe('g9');
+  });
+});

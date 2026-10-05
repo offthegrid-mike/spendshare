@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import ItemRow from './ItemRow';
 import type { FormValues } from './expenseForm';
 
@@ -112,5 +112,51 @@ describe('ItemRow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+const twoCats = [
+  { id: 'c1', name: 'Fruit', order: 0, archived: false },
+  { id: 'c2', name: 'Bakery', order: 1, archived: false },
+] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+function WatchedHarness({ categoryUnconfirmed }: { categoryUnconfirmed: boolean }) {
+  const { control, register, setValue } = useForm<FormValues>({
+    defaultValues: {
+      date: '', shopName: '', payerUid: 'u1', giftCardAmount: '', applyDiscount: false,
+      items: [{ name: 'Firewood', categoryId: 'c1', amount: '18.00', shared: true, remark: '', categoryUnconfirmed }],
+    },
+  });
+  const items = useWatch({ control, name: 'items' });
+  return (
+    <ItemRow
+      index={0} control={control} register={register} setValue={setValue}
+      cats={twoCats} suggestions={[]} summary={items[0]} currency="AUD"
+      expanded onToggle={vi.fn()} onRemove={vi.fn()}
+    />
+  );
+}
+
+describe('ItemRow category check', () => {
+  it('marks an unconfirmed category and names the category it was given', () => {
+    render(<WatchedHarness categoryUnconfirmed />);
+    expect(screen.getByText('Check category: Fruit')).toBeInTheDocument();
+  });
+
+  it('shows no marker for a confirmed category', () => {
+    render(<WatchedHarness categoryUnconfirmed={false} />);
+    expect(screen.queryByText(/check category/i)).toBeNull();
+  });
+
+  it('clears the marker once a category is chosen', () => {
+    render(<WatchedHarness categoryUnconfirmed />);
+    fireEvent.change(screen.getByDisplayValue('Fruit'), { target: { value: 'c2' } });
+    expect(screen.queryByText(/check category/i)).toBeNull();
+  });
+
+  it('clears the marker when the select loses focus, so the guess can be accepted as-is', () => {
+    render(<WatchedHarness categoryUnconfirmed />);
+    fireEvent.blur(screen.getByDisplayValue('Fruit'));
+    expect(screen.queryByText(/check category/i)).toBeNull();
   });
 });

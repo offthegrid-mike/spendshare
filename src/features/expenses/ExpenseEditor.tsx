@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
-import { ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
 import { collapseWhitespace } from '../../lib/textNormalize';
 import { monthKey } from '../../lib/month';
-import { useCategories } from '../../hooks/useCategories';
+import { useCategories, fetchActiveCategories } from '../../hooks/useCategories';
+import { useUIStore } from '../../stores/uiStore';
+import { carryEntry } from '../../lib/carryEntry';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
-import { readDraft, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
+import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
 import { computeDiscountCents } from '../../lib/discount';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
@@ -21,6 +25,8 @@ import ShopNameCombobox from './ShopNameCombobox';
 import QuickAddBar from './QuickAddBar';
 import ItemRow from './ItemRow';
 import PayerPicker from './PayerPicker';
+import GroupChip from './GroupChip';
+import GroupPicker, { type GroupPickerView } from '../groups/GroupPicker';
 import { schema, parseQty, type FormValues } from './expenseForm';
 import LoadingButton from '../../components/LoadingButton';
 import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
@@ -51,6 +57,9 @@ function useSafeLocationState(): unknown {
 // ---------------------------------------------------------------------------
 interface Props {
   group: GroupDoc;
+  /** The user's groups; with `user`, lets a new expense change group. */
+  groups?: GroupDoc[];
+  user?: User;
   currentUserUid: string;
   expense?: ExpenseDoc;
   items?: ItemDoc[];
@@ -62,10 +71,10 @@ interface Props {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function ExpenseEditor({ group, currentUserUid, expense, items, onSuccess, variant = 'page' }: Props) {
+export default function ExpenseEditor({ group, groups, user, currentUserUid, expense, items, onSuccess, variant = 'page' }: Props) {
   const navigate = useSafeNavigate();
   const locationState = useSafeLocationState();
-  const { active: cats } = useCategories(group.id);
+  const { active: cats, all: allCats, loading: catsLoading } = useCategories(group.id);
   const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
   // Only new expenses are drafted — editing an existing one is never cached.
@@ -95,8 +104,11 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         : [],
   };
 
-  // Load a resumable draft once, on mount, for new expenses.
-  const [restoredDraft] = useState(() => (isNew ? readDraft(group.id) : null));
+  // Load a resumable draft once, on mount, for new expenses. `movedFrom` is set
+  // when the entry arrived here by a group change.
+  const [restored] = useState(() => (isNew ? readDraftRecord(group.id) : null));
+  const restoredDraft = restored?.values ?? null;
+  const movedFrom = restored?.movedFrom;
   const [draftBannerOpen, setDraftBannerOpen] = useState(!!restoredDraft);
 
   const {
@@ -170,6 +182,98 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   );
   const [saving, setSaving] = useState(false);
 
+  // Changing group (new expenses only).
+  const chooseGroup = useUIStore((s) => s.chooseGroup);
+  const canChangeGroup = isNew && !!groups && !!user;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerView, setPickerView] = useState<GroupPickerView>('list');
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  // Set once the entry is handed to another group: stops the debounced autosave
+  // writing it back under this group before the editor remounts, and ignores
+  // further picks.
+  const handedOffRef = useRef(false);
+  const switchingRef = useRef(false);
+  // Mirrors handedOffRef for rendering: until the editor remounts for the new
+  // group, the old form must not come back (saving would record into it).
+  const [handedOff, setHandedOff] = useState(false);
+  // The target group already has its own unsaved entry; waiting for the user
+  // to confirm replacing it.
+  const [pendingReplace, setPendingReplace] = useState<{ id: string; name: string } | null>(null);
+  const changeRef = useRef<HTMLButtonElement>(null);
+  // Cleared on unmount so a move still awaiting the target's categories cannot
+  // write drafts or switch the app after the editor is gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // After a move, land on Change so keyboard and screen-reader users keep their place.
+  // Change only renders once the categories have loaded, so wait for that, once.
+  const movedFocusDoneRef = useRef(false);
+  useEffect(() => {
+    if (!movedFrom || catsLoading || movedFocusDoneRef.current) return;
+    movedFocusDoneRef.current = true;
+    changeRef.current?.focus();
+  }, [movedFrom, catsLoading]);
+
+  function closePicker() {
+    if (handedOffRef.current) return;
+    flushSync(() => {
+      setPickerOpen(false);
+      setPickerView('list');
+      setSwitchError(null);
+      setPendingReplace(null);
+    });
+    changeRef.current?.focus();
+  }
+
+  async function handleGroupChange(targetId: string, opts: { replace?: boolean } = {}) {
+    if (handedOffRef.current || switchingRef.current) return;
+    if (targetId === group.id) {
+      closePicker();
+      return;
+    }
+    setPendingReplace(null);
+    const values = getValues();
+    if (!isDraftMeaningful(values)) {
+      handedOffRef.current = true;
+      setHandedOff(true);
+      clearDraft(group.id);
+      chooseGroup(targetId);
+      return;
+    }
+    if (!opts.replace && readDraftRecord(targetId)) {
+      const name = groups?.find((g) => g.id === targetId)?.name ?? 'That group';
+      setPendingReplace({ id: targetId, name });
+      return;
+    }
+    switchingRef.current = true;
+    setSwitching(true);
+    setSwitchError(null);
+    try {
+      const targetCats = await fetchActiveCategories(targetId);
+      if (!mountedRef.current) return;
+      const { values: moved } = carryEntry(values, allCats, targetCats, currentUserUid);
+      handedOffRef.current = true;
+      setHandedOff(true);
+      writeDraft(targetId, moved, { movedFrom: group.name });
+      // Only drop the old draft once the moved one has landed: storage can fail,
+      // and after Replace the target may still hold its previous entry.
+      const landed = readDraftRecord(targetId);
+      if (landed && JSON.stringify(landed.values) === JSON.stringify(moved)) clearDraft(group.id);
+      chooseGroup(targetId);
+    } catch {
+      setSwitchError("Couldn't load that group. Try again.");
+    } finally {
+      switchingRef.current = false;
+      setSwitching(false);
+    }
+  }
+
   function handleGiftCardToggle() {
     if (giftCardOpen) {
       setValue('giftCardAmount', '');
@@ -191,6 +295,7 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   useEffect(() => {
     if (!isNew) return;
     const timer = setTimeout(() => {
+      if (handedOffRef.current) return;
       writeDraft(group.id, getValues());
     }, 400);
     return () => clearTimeout(timer);
@@ -375,7 +480,63 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
   }, 0);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <>
+      {pickerOpen && groups && user && (
+        <div
+          className="space-y-3"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              closePicker();
+            }
+          }}
+        >
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Back to expense"
+              onClick={closePicker}
+              disabled={handedOff}
+              className="grid h-9 w-9 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink"
+            >
+              <ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <h2 className="text-base font-semibold text-ink">
+              {pickerView === 'list' ? 'Choose group' : 'New group'}
+            </h2>
+          </div>
+          <GroupPicker
+            groups={groups}
+            user={user}
+            selectedId={group.id}
+            view={pickerView}
+            onViewChange={setPickerView}
+            onPick={(id) => void handleGroupChange(id)}
+            busy={switching || handedOff}
+          />
+          {pendingReplace && (
+            <div role="alert" className="space-y-2.5 rounded-[10px] bg-recessed px-3.5 py-3">
+              <p className="text-sm text-ink">
+                {pendingReplace.name} already has an unsaved entry. Replace it with this one?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleGroupChange(pendingReplace.id, { replace: true })}
+                >
+                  Replace
+                </button>
+                <button type="button" className="btn-outline" onClick={() => setPendingReplace(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {switchError && <p role="alert" className="text-sm text-negative">{switchError}</p>}
+        </div>
+      )}
+    <form hidden={pickerOpen} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Desktop page header; on phones the app header shows the title, and
           the Add expense sheet has its own. */}
       {!isSheet && (
@@ -401,11 +562,24 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
         </div>
       )}
 
+      <GroupChip
+        group={group}
+        currentUid={currentUserUid}
+        changeRef={changeRef}
+        onChange={canChangeGroup && !catsLoading ? () => setPickerOpen(true) : undefined}
+      />
+
       {/* Resumed draft notice */}
       {draftBannerOpen && (
-        <div className="flex items-center gap-3 rounded-[10px] bg-recessed px-3.5 py-2.5">
-          <History size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
-          <p className="flex-1 text-sm text-ink">Resumed your unsaved entry.</p>
+        <div role="status" className="flex items-center gap-3 rounded-[10px] bg-recessed px-3.5 py-2.5">
+          {movedFrom ? (
+            <ArrowLeftRight size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
+          ) : (
+            <History size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
+          )}
+          <p className="flex-1 text-sm text-ink">
+            {movedFrom ? 'Moved your entry here. Paid by reset to you.' : 'Resumed your unsaved entry.'}
+          </p>
           <button
             type="button"
             onClick={handleStartFresh}
@@ -674,5 +848,6 @@ export default function ExpenseEditor({ group, currentUserUid, expense, items, o
       </div>
       </div>
     </form>
+    </>
   );
 }

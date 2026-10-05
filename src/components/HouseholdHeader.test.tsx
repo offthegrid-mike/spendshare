@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import HouseholdHeader from './HouseholdHeader';
+import type { User } from 'firebase/auth';
 import { makeGroup } from '../test/fixtures';
+
+const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
 vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
 vi.mock('./MonthControl', () => ({ default: () => <div data-testid="month-control" /> }));
@@ -10,7 +13,7 @@ vi.mock('./MonthControl', () => ({ default: () => <div data-testid="month-contro
 function renderHeader(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <HouseholdHeader groups={[makeGroup('g1', 'Home')]} currentUid="mike" startMonth={null} />
+      <HouseholdHeader groups={[makeGroup('g1', 'Home')]} user={mockUser} startMonth={null} />
     </MemoryRouter>,
   );
 }
@@ -58,7 +61,7 @@ describe('HouseholdHeader', () => {
         ]}
         initialIndex={1}
       >
-        <HouseholdHeader groups={[makeGroup('g1', 'Home')]} currentUid="mike" startMonth={null} />
+        <HouseholdHeader groups={[makeGroup('g1', 'Home')]} user={mockUser} startMonth={null} />
         <LocationProbe />
       </MemoryRouter>,
     );

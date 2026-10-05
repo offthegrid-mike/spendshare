@@ -33,6 +33,7 @@ vi.mock('../../hooks/useCategories', () => ({
       { id: 'c2', name: 'Bakery', order: 1, archived: false },
     ],
   }),
+  fetchActiveCategories: vi.fn(),
 }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [[], [], true],
@@ -41,6 +42,7 @@ vi.mock('../../hooks/useItemSuggestions', () => ({
 vi.mock('../../hooks/useExpenseDraft', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../hooks/useExpenseDraft')>()),
   readDraft: () => null,
+  readDraftRecord: () => null,
   writeDraft: vi.fn(),
   clearDraft: vi.fn(),
 }));

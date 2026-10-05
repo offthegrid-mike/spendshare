@@ -518,3 +518,52 @@ describe('/groups financial sub-collection validation (M-2)', () => {
     }));
   });
 });
+
+describe('/groups create (a second group)', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-spendshare',
+      firestore: { rules, host: 'localhost', port: 8080 },
+    });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'home'), {
+        ownerUid: 'userA',
+        name: 'Home',
+        currency: 'AUD',
+        members: { userA: { role: 'owner', displayName: 'Alice', email: 'alice@test.com' } },
+        memberUids: ['userA'],
+        createdAt: new Date(),
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const newGroup = {
+    id: '',
+    name: 'Trip',
+    currency: 'AUD',
+    ownerUid: 'userA',
+    members: { userA: { role: 'owner', displayName: 'Alice', email: 'alice@test.com', joinedAt: new Date() } },
+    memberUids: ['userA'],
+    createdAt: new Date(),
+  };
+
+  it('allows a member of one group to create a second group they own', async () => {
+    const userA = testEnv.authenticatedContext('userA');
+    await assertSucceeds(setDoc(doc(userA.firestore(), 'groups', 'trip'), newGroup));
+  });
+
+  it('allows the new owner to seed categories in the new group', async () => {
+    const userA = testEnv.authenticatedContext('userA');
+    await assertSucceeds(
+      setDoc(doc(userA.firestore(), 'groups', 'trip', 'categories', 'c1'), {
+        id: 'c1', name: 'Groceries', order: 0, archived: false,
+      }),
+    );
+  });
+});

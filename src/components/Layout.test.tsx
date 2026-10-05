@@ -53,7 +53,7 @@ function renderLayout(path = '/') {
 
 beforeEach(() => {
   desktop.value = false;
-  useUIStore.setState({ selectedGroupId: 'g1', addSheetOpen: false });
+  useUIStore.setState({ selectedGroupId: 'g1', addSheetOpen: false, notice: null });
 });
 
 describe('Layout', () => {
@@ -99,5 +99,11 @@ describe('Layout', () => {
   it('has no month rail on mobile', () => {
     renderLayout('/');
     expect(screen.queryByTestId('month-rail')).toBeNull();
+  });
+
+  it('renders the current notice', () => {
+    useUIStore.setState({ notice: { id: 1, message: 'Trip created' } });
+    renderLayout();
+    expect(screen.getByText('Trip created')).toBeInTheDocument();
   });
 });

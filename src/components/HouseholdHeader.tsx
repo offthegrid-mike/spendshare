@@ -1,3 +1,4 @@
+import type { User } from 'firebase/auth';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
@@ -8,12 +9,12 @@ import type { GroupDoc } from '../types/models';
 
 interface Props {
   groups: GroupDoc[];
-  currentUid: string;
+  user: User;
   startMonth: string | null;
 }
 
 /** Mobile header (below lg): the household on main sections, a back link + title elsewhere. */
-export default function HouseholdHeader({ groups, currentUid, startMonth }: Props) {
+export default function HouseholdHeader({ groups, user, startMonth }: Props) {
   const location = useLocation();
   const { pathname } = location;
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ export default function HouseholdHeader({ groups, currentUid, startMonth }: Prop
         <div className="space-y-2 px-4 pb-2.5 pt-2.5">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
-              <GroupSwitcher groups={groups} currentUid={currentUid} />
+              <GroupSwitcher groups={groups} user={user} mode="sheet" />
             </div>
             <Link
               to="/search"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import type { User } from 'firebase/auth';
 import { Plus, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import SettingsMenu from './SettingsMenu';
@@ -7,7 +8,7 @@ import type { GroupDoc } from '../types/models';
 
 interface Props {
   groups: GroupDoc[];
-  currentUid: string;
+  user: User;
 }
 
 const SECTIONS = [
@@ -19,7 +20,7 @@ const SECTIONS = [
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** Desktop command bar (lg and up). */
-export default function TopBar({ groups, currentUid }: Props) {
+export default function TopBar({ groups, user }: Props) {
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ export default function TopBar({ groups, currentUid }: Props) {
   return (
     <header className="sticky top-0 z-20 hidden h-[60px] items-center gap-3.5 border-b border-line bg-surface px-[18px] lg:flex">
       <div className="min-w-0 max-w-[240px]">
-        <GroupSwitcher groups={groups} currentUid={currentUid} />
+        <GroupSwitcher groups={groups} user={user} mode="popover" />
       </div>
       <nav aria-label="Sections" className="flex rounded-full bg-recessed p-[3px]">
         {SECTIONS.map(({ to, label, end }) => (

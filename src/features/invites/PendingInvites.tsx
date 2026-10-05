@@ -5,6 +5,7 @@ import {
   acceptInvite,
   declineInvite,
 } from '../../hooks/useInvites';
+import { useUIStore } from '../../stores/uiStore';
 
 interface Props {
   user: User;
@@ -12,6 +13,8 @@ interface Props {
 
 export default function PendingInvites({ user }: Props) {
   const { invites } = useIncomingInvites(user.email?.toLowerCase() ?? undefined);
+  const selectGroupWhenReady = useUIStore((s) => s.selectGroupWhenReady);
+  const showNotice = useUIStore((s) => s.showNotice);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<{ id: string; message: string } | null>(
     null,
@@ -44,6 +47,12 @@ export default function PendingInvites({ user }: Props) {
                   setPending(invite.ref.path);
                   setError(null);
                   acceptInvite(invite, user)
+                    .then(() => {
+                      const gid = invite.ref.parent.parent?.id;
+                      if (!gid) return;
+                      selectGroupWhenReady(gid);
+                      showNotice({ message: `You joined ${invite.groupName}` });
+                    })
                     .catch(() =>
                       setError({
                         id: invite.ref.path,

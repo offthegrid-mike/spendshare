@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   readDraft,
+  readDraftRecord,
   writeDraft,
   clearDraft,
   isDraftMeaningful,
@@ -178,6 +179,46 @@ describe('useExpenseDraft', () => {
       expect(draft?.shopName).toBe('Aldi');
       expect(draft?.applyDiscount).toBeUndefined();
       expect(draft?.discountPercent).toBeUndefined();
+    });
+  });
+
+  describe('draft record', () => {
+    it('round-trips movedFrom and the per-item flag', () => {
+      const d = makeDraft({
+        items: [{ name: 'Firewood', categoryId: 't-groc', amount: '18', shared: true, categoryUnconfirmed: true }],
+      });
+      writeDraft(GROUP, d, { movedFrom: 'Hartley House' });
+
+      const record = readDraftRecord(GROUP);
+      expect(record?.movedFrom).toBe('Hartley House');
+      expect(record?.values.items[0].categoryUnconfirmed).toBe(true);
+      expect(readDraft(GROUP)).toEqual(d);
+    });
+
+    it('has no movedFrom for an ordinary autosave', () => {
+      writeDraft(GROUP, makeDraft());
+      expect(readDraftRecord(GROUP)).toEqual({ values: makeDraft() });
+    });
+
+    it('still loads a draft saved before movedFrom existed', () => {
+      localStorage.setItem(
+        `expense_draft_${GROUP}`,
+        JSON.stringify({ values: makeDraft(), savedAt: Date.now() }),
+      );
+      expect(readDraftRecord(GROUP)).toEqual({ values: makeDraft() });
+      expect(readDraft(GROUP)).toEqual(makeDraft());
+    });
+
+    it('ignores a movedFrom that is not a string', () => {
+      localStorage.setItem(
+        `expense_draft_${GROUP}`,
+        JSON.stringify({ values: makeDraft(), savedAt: Date.now(), movedFrom: 42 }),
+      );
+      expect(readDraftRecord(GROUP)?.movedFrom).toBeUndefined();
+    });
+
+    it('returns null for a blank or missing draft', () => {
+      expect(readDraftRecord(GROUP)).toBeNull();
     });
   });
 });

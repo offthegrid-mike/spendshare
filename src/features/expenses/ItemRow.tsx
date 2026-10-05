@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, TriangleAlert } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
 import { iconForCategory } from '../../lib/categoryIcons';
@@ -19,7 +19,7 @@ interface ItemRowProps {
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
   summary:
-    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean; remark?: string }
+    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean; remark?: string; categoryUnconfirmed?: boolean }
     | undefined;
   currency: string;
   expanded: boolean;
@@ -32,6 +32,7 @@ export default function ItemRow({
   summary, currency, expanded, onToggle, onRemove,
 }: ItemRowProps) {
   const catName = cats.find((c) => c.id === summary?.categoryId)?.name ?? '';
+  const unconfirmed = !!summary?.categoryUnconfirmed;
   const unitCents = toCents(summary?.amount ?? '0');
   const qty = parseQty(summary?.quantity);
   const lineCents = (isNaN(unitCents) ? 0 : unitCents) * qty;
@@ -65,7 +66,7 @@ export default function ItemRow({
   };
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-line bg-surface">
+    <div className={`overflow-hidden rounded-[10px] border bg-surface ${unconfirmed ? 'border-warning/60' : 'border-line'}`}>
       <button
         type="button"
         onClick={onToggle}
@@ -80,9 +81,16 @@ export default function ItemRow({
             </span>
             {summary && !summary.shared && <Chip>Personal</Chip>}
           </span>
-          {(catName || summary?.remark) && (
+          {(catName || summary?.remark || unconfirmed) && (
             <span className="block truncate text-xs text-ink-muted">
-              {catName && <span>{catName}</span>}
+              {unconfirmed ? (
+                <span className="inline-flex items-center gap-1 font-medium text-warning">
+                  <TriangleAlert size={12} strokeWidth={1.75} aria-hidden="true" />
+                  {catName ? `Check category: ${catName}` : 'Check category'}
+                </span>
+              ) : (
+                catName && <span>{catName}</span>
+              )}
               {catName && summary?.remark && ' · '}
               {summary?.remark && <span dir="auto">{summary.remark}</span>}
             </span>
@@ -113,13 +121,24 @@ export default function ItemRow({
                 suggestions={suggestions}
                 onChange={(name, suggestion) => {
                   field.onChange(name);
-                  if (suggestion) setValue(`items.${index}.categoryId`, suggestion.categoryId);
+                  if (suggestion) {
+                    setValue(`items.${index}.categoryId`, suggestion.categoryId);
+                    setValue(`items.${index}.categoryUnconfirmed`, false);
+                  }
                 }}
               />
             )}
           />
 
-          <select {...register(`items.${index}.categoryId`)} className="field">
+          <select
+            {...register(`items.${index}.categoryId`, {
+              onChange: () => setValue(`items.${index}.categoryUnconfirmed`, false),
+              // Re-picking the same option fires no change event, so leaving the
+              // select also counts as the user having checked the category.
+              onBlur: () => setValue(`items.${index}.categoryUnconfirmed`, false),
+            })}
+            className="field"
+          >
             <option value="">No category</option>
             {cats.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
