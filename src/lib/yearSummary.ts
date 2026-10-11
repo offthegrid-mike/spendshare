@@ -28,6 +28,25 @@ export function yearMonths(year: string): string[] {
   return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
 }
 
+/** Spending per category, biggest first, each with its share of the total. */
+export function categoryTotals(items: Pick<ItemDoc, 'amount' | 'category'>[]): CategoryTotal[] {
+  const byCategory = new Map<string, number>();
+  let total = 0;
+  for (const it of items) {
+    const name = it.category || 'Uncategorized';
+    const amount = Math.round(it.amount);
+    byCategory.set(name, (byCategory.get(name) ?? 0) + amount);
+    total += amount;
+  }
+  return [...byCategory.entries()]
+    .map(([category, amount]) => ({
+      category,
+      amount,
+      pct: total > 0 ? (amount / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
+}
+
 export function computeYearSummary(
   year: string,
   members: Uid[],
@@ -58,18 +77,7 @@ export function computeYearSummary(
   for (const it of yItems) byMonth.get(it.month)!.spending += Math.round(it.amount);
   for (const inc of yIncome) byMonth.get(inc.month)!.income += inc.amount;
 
-  const byCategory = new Map<string, number>();
-  for (const it of yItems) {
-    const name = it.category || 'Uncategorized';
-    byCategory.set(name, (byCategory.get(name) ?? 0) + Math.round(it.amount));
-  }
-  const categories: CategoryTotal[] = [...byCategory.entries()]
-    .map(([category, amount]) => ({
-      category,
-      amount,
-      pct: grandTotal > 0 ? (amount / grandTotal) * 100 : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
+  const categories = categoryTotals(yItems);
 
   const activeMonths = months.filter((m) => m.spending > 0 || m.income > 0).length;
   const average = (total: number) => (activeMonths > 0 ? Math.round(total / activeMonths) : 0);

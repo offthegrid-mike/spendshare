@@ -13,9 +13,31 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
 }));
 vi.mock('../../lib/converters', () => ({ settlementsCol: vi.fn(() => ({})) }));
-const { monthState } = vi.hoisted(() => ({ monthState: { loading: false } }));
+const { monthState, prevMonthRequests } = vi.hoisted(() => ({
+  monthState: {
+    loading: false,
+    itemsLoading: false,
+    expenses: [] as unknown[],
+    itemsByExpense: {} as Record<string, unknown[]>,
+    prevItems: [] as unknown[],
+    prevLoading: false,
+  },
+  prevMonthRequests: [] as string[],
+}));
+vi.mock('../../hooks/useMonthExpenses', () => ({
+  useMonthExpenses: () => ({
+    expenses: monthState.expenses,
+    itemsByExpense: monthState.itemsByExpense,
+    loading: monthState.loading,
+    itemsLoading: monthState.itemsLoading,
+  }),
+}));
+// Summary reads the month before through useMonthItems, to compare against.
 vi.mock('../../hooks/useMonthItems', () => ({
-  useMonthItems: () => ({ items: [], loading: monthState.loading }),
+  useMonthItems: (_gid: string, month: string) => {
+    prevMonthRequests.push(month);
+    return { items: monthState.prevItems, loading: monthState.prevLoading };
+  },
 }));
 const { settlementState, summaryState, markSettlementPaid } = vi.hoisted(() => ({
   settlementState: { settlements: [] as unknown[] },
@@ -38,6 +60,13 @@ vi.mock('../../lib/settlement', () => ({
     sharedTotal: 1000,
   }),
 }));
+
+function resetMonthState() {
+  Object.assign(monthState, {
+    loading: false, itemsLoading: false, expenses: [], itemsByExpense: {}, prevItems: [], prevLoading: false,
+  });
+  prevMonthRequests.length = 0;
+}
 
 const { setMonth } = vi.hoisted(() => ({ setMonth: vi.fn() }));
 vi.mock('../../stores/uiStore', () => ({
@@ -103,6 +132,7 @@ describe('Summary Month/Year toggle', () => {
     setMonth.mockClear();
     monthState.loading = false;
   });
+  afterEach(resetMonthState);
 
   it('defaults to the Month view', () => {
     renderSummary();
@@ -201,9 +231,102 @@ describe('Summary Month view (redesign)', () => {
     expect(within(paid).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 
-  it('sums the month up in one line, without an em-dash title', () => {
+  it('has no em-dash title', () => {
     renderSummary();
-    expect(screen.getByText(/^Spent /)).toHaveTextContent('Spent A$0.00, shared A$10.00');
     expect(screen.queryByText(/Summary —/)).toBeNull();
+  });
+});
+
+const item = (expenseId: string, category: string, amount: number) => ({
+  id: `${expenseId}-${category}`, expenseId, category, amount, shared: true, payerUid: 'u1',
+});
+
+function loadJune() {
+  monthState.expenses = [
+    { id: 'e1', shopName: 'Woolworths' },
+    { id: 'e2', shopName: 'Cafe Nero' },
+  ];
+  monthState.itemsByExpense = {
+    e1: [item('e1', 'Groceries', 6000), item('e1', 'Household', 1000)],
+    e2: [item('e2', 'Dining', 2000)],
+  };
+}
+
+describe('Summary Month view breakdown', () => {
+  afterEach(resetMonthState);
+
+  it('shows the overview, categories and top shops after Per person', () => {
+    loadJune();
+    renderSummary();
+    expect(screen.getByTestId('month-spent')).toHaveTextContent('A$90.00');
+    expect(screen.getByTestId('month-details')).toHaveTextContent('A$10.00 shared');
+    const perPerson = screen.getByRole('heading', { name: 'Per person' });
+    const categories = screen.getByRole('heading', { name: 'By category' });
+    const shops = screen.getByRole('heading', { name: 'Top shops' });
+    expect(perPerson.compareDocumentPosition(categories) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(categories.compareDocumentPosition(shops) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByTestId('category-row').map((r) => r.textContent)).toEqual([
+      expect.stringContaining('Groceries'), expect.stringContaining('Dining'), expect.stringContaining('Household'),
+    ]);
+    expect(screen.getAllByTestId('shop-row')[0]).toHaveTextContent('Woolworths');
+  });
+
+  it('compares spending with the month before', () => {
+    loadJune();
+    monthState.prevItems = [item('x', 'Groceries', 4000)];
+    renderSummary();
+    expect(prevMonthRequests).toContain('2026-05');
+    expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('125% more than May');
+    expect(screen.getByLabelText('Up 50% from May')).toBeInTheDocument();
+  });
+
+  it('compares a month in progress against last month’s pace, not the whole of last month', () => {
+    // 15 days into June: 15/31 of May's 4000 is about 1935, and the 9000 spent is far above that.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 5, 15, 12));
+    try {
+      loadJune();
+      monthState.prevItems = [item('x', 'Groceries', 4000)];
+      renderSummary();
+      expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('May’s pace');
+      expect(screen.getByLabelText(/on May’s pace$/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not wait for the month before: it shows without a comparison until it loads', () => {
+    loadJune();
+    monthState.prevItems = [item('x', 'Groceries', 6000)];
+    monthState.prevLoading = true;
+    renderSummary();
+    expect(screen.getByTestId('month-spent')).toBeInTheDocument();
+    expect(screen.queryByTestId('month-vs-prev')).toBeNull();
+    expect(screen.queryByLabelText(/from May/)).toBeNull();
+  });
+
+  it('adds nothing for a month with no expenses', () => {
+    renderSummary();
+    expect(screen.queryByTestId('month-spent')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'By category' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Top shops' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Per person' })).toBeInTheDocument();
+  });
+
+  it('holds the page back until the month’s items have loaded, not just its expenses', () => {
+    loadJune();
+    monthState.itemsLoading = true;
+    renderSummary();
+    expect(screen.queryByRole('heading', { name: 'Per person' })).toBeNull();
+    expect(screen.queryByTestId('month-spent')).toBeNull();
+  });
+
+  it('leaves the month sections out of the Year view', async () => {
+    loadJune();
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'By category' })).toBeNull();
+    expect(screen.queryByTestId('month-spent')).toBeNull();
   });
 });

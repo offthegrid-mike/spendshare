@@ -5,6 +5,7 @@ import { useYearItems } from '../../hooks/useYearItems';
 import { useYearIncome } from '../../hooks/useYearIncome';
 import { RouteSkeleton } from '../../components/AppSkeletons';
 import Avatar from '../../components/ui/Avatar';
+import Stat from '../../components/ui/Stat';
 import { CategoryChart, MonthChart } from './YearCharts';
 import type { GroupDoc } from '../../types/models';
 
@@ -12,15 +13,6 @@ interface Props {
   group: GroupDoc;
   year: string;
   onSelectMonth: (month: string) => void;
-}
-
-function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
-  return (
-    <div>
-      <p className="text-xs text-ink-muted">{label}</p>
-      <p data-testid={testId} className="money text-xl font-semibold tracking-tight text-ink">{value}</p>
-    </div>
-  );
 }
 
 const Dash = () => <span className="text-ink-muted">-</span>;

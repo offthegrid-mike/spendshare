@@ -4,8 +4,10 @@ import { CircleCheck } from 'lucide-react';
 import { markSettlementPaid, undoSettlement as removeSettlement } from '../../lib/settle';
 import { computeSummary } from '../../lib/settlement';
 import { formatMoney } from '../../lib/money';
-import { formatMonthLabel } from '../../lib/month';
+import { computeMonthBreakdown } from '../../lib/monthSummary';
+import { comparablePrevShare, daysElapsedInMonth, formatMonthLabel, monthName, prevMonthKey } from '../../lib/month';
 import { memberBalanceCopy, memberName } from '../../lib/balance';
+import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useMonthItems } from '../../hooks/useMonthItems';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useIncome } from '../../hooks/useIncome';
@@ -13,6 +15,9 @@ import { useUIStore } from '../../stores/uiStore';
 import Avatar from '../../components/ui/Avatar';
 import SegmentedControl from '../../components/ui/SegmentedControl';
 import { RouteSkeleton } from '../../components/AppSkeletons';
+import MonthOverview from './MonthOverview';
+import CategoryBreakdown from './CategoryBreakdown';
+import TopShops from './TopShops';
 import type { GroupDoc } from '../../types/models';
 
 // Lazy so the Recharts bundle only loads when the Year view is opened.
@@ -41,7 +46,11 @@ const PERIODS = [
 ];
 
 export default function Summary({ group, currentUserUid, selectedMonth }: Props) {
-  const { items, loading: itemsLoading } = useMonthItems(group.id, selectedMonth);
+  const { expenses, itemsByExpense, loading: expensesLoading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
+  // The month before, to compare against. It never gates the page: the
+  // comparison just appears once it has loaded.
+  const prevMonth = prevMonthKey(selectedMonth);
+  const { items: prevItems, loading: prevLoading } = useMonthItems(group.id, prevMonth);
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
   const { income, loading: incomeLoading } = useIncome(group.id, selectedMonth);
   const [isPending, setIsPending] = useState(false);
@@ -84,7 +93,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
 
   // Month-only data gates only the Month view, so the Year view and the toggle
   // stay put while month subscriptions reload.
-  if (itemsLoading || settlementsLoading || incomeLoading) {
+  if (expensesLoading || itemsLoading || settlementsLoading || incomeLoading) {
     return (
       <div className="space-y-6">
         {header}
@@ -93,8 +102,17 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
     );
   }
 
+  const items = Object.values(itemsByExpense).flat();
   const summary = computeSummary(group.memberUids, items, settlements);
-  const grandTotal = items.reduce((sum, it) => sum + it.amount, 0);
+  const breakdown = computeMonthBreakdown({
+    items,
+    expenses,
+    income,
+    prevItems: prevLoading ? null : prevItems,
+    prevScale: comparablePrevShare(selectedMonth),
+    daysElapsed: daysElapsedInMonth(selectedMonth),
+  });
+  const prevMonthLabel = monthName(prevMonth);
   const pendingTransactions = summary.transactions;
   const paidSettlements = settlements.filter((s) => s.paid);
   const incomeOf = (uid: string) => income.filter((i) => i.uid === uid).reduce((sum, i) => sum + i.amount, 0);
@@ -177,6 +195,13 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
         {actionError && <p className="mt-2 text-sm text-negative">{actionError}</p>}
       </section>
 
+      <MonthOverview
+        breakdown={breakdown}
+        sharedTotal={summary.sharedTotal}
+        currency={group.currency}
+        prevMonthLabel={prevMonthLabel}
+      />
+
       {/* Per person */}
       <section className="card overflow-hidden p-5">
         <h2 className="mb-3 text-base font-semibold text-ink">Per person</h2>
@@ -238,10 +263,13 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
         </div>
       </section>
 
-      <p className="text-sm text-ink-muted">
-        Spent <span className="money text-ink">{money(grandTotal)}</span>, shared{' '}
-        <span className="money text-ink">{money(summary.sharedTotal)}</span>
-      </p>
+      <CategoryBreakdown
+        categories={breakdown.categories}
+        currency={group.currency}
+        prevMonthLabel={prevMonthLabel}
+        paced={breakdown.paced}
+      />
+      <TopShops shops={breakdown.topShops} currency={group.currency} />
     </div>
   );
 }

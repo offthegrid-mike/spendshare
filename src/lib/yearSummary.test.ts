@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeYearSummary, foldCategories, yearMonths } from './yearSummary';
+import { categoryTotals, computeYearSummary, foldCategories, yearMonths } from './yearSummary';
 
 const items = [
   { month: '2026-01', amount: 1000, shared: true, payerUid: 'u1', category: 'Groceries' },
@@ -122,5 +122,33 @@ describe('foldCategories', () => {
       amount: rest.reduce((s, c) => s + c.amount, 0),
       pct: rest.reduce((s, c) => s + c.pct, 0),
     });
+  });
+});
+
+describe('categoryTotals', () => {
+  it('sums rounded amounts per category, biggest first, with the share of the total', () => {
+    const totals = categoryTotals([
+      { category: 'Dining', amount: 500.4 },
+      { category: 'Groceries', amount: 1000 },
+      { category: 'Groceries', amount: 500 },
+    ]);
+    expect(totals).toEqual([
+      { category: 'Groceries', amount: 1500, pct: 75 },
+      { category: 'Dining', amount: 500, pct: 25 },
+    ]);
+  });
+
+  it('files blank categories under Uncategorized and breaks ties by name', () => {
+    const totals = categoryTotals([
+      { category: '', amount: 100 },
+      { category: 'Beta', amount: 100 },
+      { category: 'Alpha', amount: 100 },
+    ]);
+    expect(totals.map((t) => t.category)).toEqual(['Alpha', 'Beta', 'Uncategorized']);
+  });
+
+  it('has no categories, and no NaN shares, for no items', () => {
+    expect(categoryTotals([])).toEqual([]);
+    expect(categoryTotals([{ category: 'Dining', amount: 0 }])[0].pct).toBe(0);
   });
 });

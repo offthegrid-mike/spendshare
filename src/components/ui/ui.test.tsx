@@ -8,6 +8,7 @@ import SegmentedControl from './SegmentedControl';
 import CategoryTile from './CategoryTile';
 import Chip from './Chip';
 import Skeleton from './Skeleton';
+import Stat from './Stat';
 
 describe('initialOf', () => {
   it('uppercases the first letter', () => {
@@ -93,5 +94,13 @@ describe('Chip and Skeleton', () => {
   it('Skeleton is hidden from assistive tech', () => {
     const { container } = render(<Skeleton className="h-4" />);
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+  });
+});
+
+describe('Stat', () => {
+  it('shows a label above a value that tests can find by id', () => {
+    render(<Stat label="Spent" value="A$120.00" testId="spent" />);
+    expect(screen.getByText('Spent')).toBeInTheDocument();
+    expect(screen.getByTestId('spent')).toHaveTextContent('A$120.00');
   });
 });
