@@ -13,6 +13,8 @@ interface Common {
   items: ItemDoc[];
   group: GroupDoc;
   viewerUid: string;
+  /** Shown in place of the first item's category, e.g. the one the list is filtered to. */
+  category?: string;
 }
 
 type Props = Common &
@@ -23,8 +25,8 @@ type Props = Common &
 
 const plain = (cents: number) => (cents / 100).toFixed(2);
 
-function RowContent({ expense, items, group, viewerUid, selected = false }: Common & { selected?: boolean }) {
-  const category = items[0]?.category ?? '';
+function RowContent({ expense, items, group, viewerUid, category: given, selected = false }: Common & { selected?: boolean }) {
+  const category = given ?? items[0]?.category ?? '';
   const count = `${expense.itemCount} item${expense.itemCount === 1 ? '' : 's'}`;
   const adj = computeAdjustment(expense);
   const payer = memberName(group, expense.payerUid);
@@ -61,7 +63,7 @@ function RowContent({ expense, items, group, viewerUid, selected = false }: Comm
 
 /** One expense: a tap-to-expand disclosure on mobile, a selectable option on desktop. */
 export default function ExpenseRow(props: Props) {
-  const { expense, items, group, viewerUid } = props;
+  const { expense, items, group, viewerUid, category } = props;
   const rowClass = 'flex w-full items-center gap-3 px-3.5 py-[11px] text-left transition-colors';
 
   if (props.mode === 'option') {
@@ -82,7 +84,7 @@ export default function ExpenseRow(props: Props) {
           props.selected ? 'bg-accent-soft shadow-[inset_3px_0_0_rgb(var(--accent))]' : 'hover:bg-recessed/55'
         }`}
       >
-        <RowContent {...{ expense, items, group, viewerUid }} selected={props.selected} />
+        <RowContent {...{ expense, items, group, viewerUid, category }} selected={props.selected} />
       </div>
     );
   }
@@ -97,7 +99,7 @@ export default function ExpenseRow(props: Props) {
         onClick={props.onToggle}
         className={`${rowClass} hover:bg-recessed/55`}
       >
-        <RowContent {...{ expense, items, group, viewerUid }} />
+        <RowContent {...{ expense, items, group, viewerUid, category }} />
       </button>
       {props.expanded && (
         <div id={regionId} className="grid motion-safe:animate-expand">

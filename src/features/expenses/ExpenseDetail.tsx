@@ -14,16 +14,18 @@ interface Props {
   items: ItemDoc[];
   group: GroupDoc;
   viewerUid: string;
+  /** Shown in place of the first item's category, e.g. the one the list is filtered to. */
+  category?: string;
   onDelete: () => void;
   deleting?: boolean;
 }
 
 /** Desktop detail pane for the selected expense. */
-export default function ExpenseDetail({ expense, items, group, viewerUid, onDelete, deleting = false }: Props) {
+export default function ExpenseDetail({ expense, items, group, viewerUid, category: given, onDelete, deleting = false }: Props) {
   if (!expense) {
     return <p className="m-auto text-center text-xs text-ink-muted">Select an expense to see its items.</p>;
   }
-  const category = items[0]?.category ?? '';
+  const category = given ?? items[0]?.category ?? '';
   const date = expense.date?.toDate?.();
   const payer = expense.payerUid === viewerUid ? 'you' : memberName(group, expense.payerUid);
   const meta = [date ? format(date, 'EEE d MMM') : null, `paid by ${payer}`].filter(Boolean).join(' · ');

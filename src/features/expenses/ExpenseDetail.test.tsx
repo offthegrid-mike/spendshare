@@ -27,6 +27,17 @@ describe('ExpenseDetail', () => {
     expect(screen.getByText('Use ↑ ↓ to move between expenses')).toBeInTheDocument();
   });
 
+  it('shows a given category’s tile in place of the first item’s', () => {
+    render(
+      <MemoryRouter>
+        <ExpenseDetail expense={exp} items={items} group={pair} viewerUid="mike" onDelete={() => {}} category="Kids" />
+      </MemoryRouter>,
+    );
+    // Kids has no icon, so its tile shows its initial; Groceries would show a basket.
+    expect(screen.getByText('K')).toBeInTheDocument();
+    expect(document.querySelector('.lucide-shopping-basket')).toBeNull();
+  });
+
   it('names the payer when it is someone else', () => {
     render(
       <MemoryRouter>

@@ -6,10 +6,11 @@ import ExpenseList from './ExpenseList';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
-const { commit, openAddSheet, desktop, data } = vi.hoisted(() => ({
+const { commit, openAddSheet, desktop, ui, data } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
   openAddSheet: vi.fn(),
   desktop: { value: false },
+  ui: { month: '2026-10' },
   data: {
     expenses: [] as ExpenseDoc[],
     itemsByExpense: {} as Record<string, ItemDoc[]>,
@@ -26,7 +27,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 vi.mock('../../stores/uiStore', () => ({
-  useUIStore: () => ({ selectedMonth: '2026-10', openAddSheet }),
+  useUIStore: () => ({ selectedMonth: ui.month, openAddSheet }),
 }));
 vi.mock('../../hooks/useMediaQuery', () => ({ useIsDesktop: () => desktop.value }));
 vi.mock('../../hooks/useMonthExpenses', () => ({
@@ -62,6 +63,7 @@ function renderList() {
 beforeEach(() => {
   vi.clearAllMocks();
   desktop.value = false;
+  ui.month = '2026-10';
   data.expenses = [woolies, bunnings, thai];
   data.itemsByExpense = items;
   data.settlements = [];
@@ -226,5 +228,241 @@ describe('ExpenseList on desktop', () => {
     screen.getByRole('option', { name: /Bunnings/ }).focus();
     await userEvent.keyboard(' ');
     expect(within(detail()).getByRole('heading', { name: 'Bunnings' })).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseList category filter', () => {
+  const filterGroup = () => screen.getByRole('group', { name: 'Filter by category' });
+  const chip = (name: string) => within(filterGroup()).getByRole('button', { name });
+  const summary = () => screen.getByTestId('category-filter-summary');
+
+  // Woolworths also bought something Household, on the same day as Bunnings.
+  function mixedBasket() {
+    data.expenses = [{ ...woolies, total: 3500, itemCount: 2 }, bunnings, thai];
+    data.itemsByExpense = {
+      ...items,
+      e1: [...items.e1, makeItem('i9', 'e1', { name: 'Sponges', amount: 500, category: 'Household' })],
+    };
+  }
+
+  it('offers All and each category in the month, biggest spend first', () => {
+    renderList();
+    expect(within(filterGroup()).getAllByRole('button').map((b) => b.textContent))
+      .toEqual(['All', 'Dining', 'Groceries', 'Household']);
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('category-filter-summary')).toBeNull();
+  });
+
+  it('has no filter when the month has a single category', () => {
+    data.expenses = [woolies];
+    data.itemsByExpense = { e1: items.e1 };
+    renderList();
+    expect(screen.queryByRole('group', { name: 'Filter by category' })).toBeNull();
+  });
+
+  it('has no filter for a month with no expenses', () => {
+    data.expenses = [];
+    data.itemsByExpense = {};
+    renderList();
+    expect(screen.queryByRole('group', { name: 'Filter by category' })).toBeNull();
+  });
+
+  it('keeps only the expenses with an item in the chosen category', async () => {
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(chip('Household')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Bunnings/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Woolworths/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Thai Riffic/ })).toBeNull();
+    expect(screen.queryByText('Fri 2 Oct')).toBeNull();
+  });
+
+  it('sums up the filtered category and how many expenses it spans', async () => {
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(summary()).toHaveTextContent('Household · A$21.43 · 1 expense');
+  });
+
+  it('counts a category’s items only, and pluralises the expenses', async () => {
+    mixedBasket();
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(summary()).toHaveTextContent('Household · A$26.43 · 2 expenses');
+  });
+
+  it('shows each day’s total for the category alone, but each row at its full amount', async () => {
+    mixedBasket();
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(screen.getByText('Sat 3 Oct').parentElement).toHaveTextContent('26.43');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveTextContent('35.00');
+  });
+
+  it('keeps a day’s total as paid when the filter covers everything that day', async () => {
+    // Thai Riffic used a 7.40 gift card: its row, and so its day, read 40.00 even though its items add to 47.40.
+    renderList();
+    expect(screen.getByText('Fri 2 Oct').parentElement).toHaveTextContent('40.00');
+    await userEvent.click(chip('Dining'));
+    expect(screen.getByText('Fri 2 Oct').parentElement).toHaveTextContent('40.00');
+    expect(summary()).toHaveTextContent('Dining · A$47.40 · 1 expense');
+  });
+
+  it('labels each row with the category being filtered on', async () => {
+    mixedBasket();
+    renderList();
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveTextContent('Groceries · 2 items');
+    await userEvent.click(chip('Household'));
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveTextContent('Household · 2 items');
+  });
+
+  it('leaves the balance alone while filtering', async () => {
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(screen.getByText('You owe Priya')).toBeInTheDocument();
+    expect(screen.getByText('19.42')).toBeInTheDocument();
+  });
+
+  it('shows everything again on All', async () => {
+    renderList();
+    await userEvent.click(chip('Household'));
+    await userEvent.click(chip('All'));
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+    expect(screen.getByText('Sat 3 Oct').parentElement).toHaveTextContent('51.43');
+    expect(screen.queryByTestId('category-filter-summary')).toBeNull();
+  });
+
+  it('drops the filter when another month is chosen', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    ui.month = '2026-11';
+    rerender(
+      <MemoryRouter>
+        <input aria-label="Search items" />
+        <ExpenseList group={pair} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+  });
+
+  function rerenderList(rerender: (ui: React.ReactElement) => void, group = pair) {
+    rerender(
+      <MemoryRouter>
+        <input aria-label="Search items" />
+        <ExpenseList group={group} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+  }
+
+  it('drops the filter when the month falls to one category and the chips go', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    data.expenses = [bunnings];
+    data.itemsByExpense = { e2: items.e2 };
+    rerenderList(rerender);
+    expect(screen.queryByRole('group', { name: 'Filter by category' })).toBeNull();
+    expect(screen.queryByTestId('category-filter-summary')).toBeNull();
+  });
+
+  it('does not bring a dropped filter back when its month is chosen again', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    ui.month = '2026-11';
+    rerenderList(rerender);
+    ui.month = '2026-10';
+    rerenderList(rerender);
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+  });
+
+  it('does not bring a dropped filter back when its group is chosen again', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    rerenderList(rerender, makeGroup('g2', 'Beach house'));
+    rerenderList(rerender);
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not bring a dropped filter back when its category returns to the month', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    data.expenses = [woolies, thai];
+    data.itemsByExpense = { e1: items.e1, e3: items.e3 };
+    rerenderList(rerender);
+    data.expenses = [woolies, bunnings, thai];
+    data.itemsByExpense = items;
+    rerenderList(rerender);
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+  });
+
+  it('drops the filter when another group is chosen, even one with the same category', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    rerender(
+      <MemoryRouter>
+        <input aria-label="Search items" />
+        <ExpenseList group={makeGroup('g2', 'Beach house')} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+  });
+
+  it('drops the filter when its category is no longer in the month', async () => {
+    const { rerender } = renderList();
+    await userEvent.click(chip('Household'));
+    data.expenses = [woolies, thai];
+    data.itemsByExpense = { e1: items.e1, e3: items.e3 };
+    rerender(
+      <MemoryRouter>
+        <input aria-label="Search items" />
+        <ExpenseList group={pair} currentUserUid="mike" />
+      </MemoryRouter>,
+    );
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Woolworths/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Thai Riffic/ })).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseList category filter on desktop', () => {
+  beforeEach(() => {
+    desktop.value = true;
+  });
+
+  const chip = (name: string) =>
+    within(screen.getByRole('group', { name: 'Filter by category' })).getByRole('button', { name });
+  const detail = () => screen.getByRole('complementary', { name: 'Expense detail' });
+
+  it('lists only the matches and selects the first of them', async () => {
+    renderList();
+    await userEvent.click(chip('Household'));
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: /Bunnings/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(detail()).getByRole('heading', { name: 'Bunnings' })).toBeInTheDocument();
+  });
+
+  it('shows the filtered category on the detail pane, as on the selected row', async () => {
+    data.expenses = [{ ...woolies, total: 3500, itemCount: 2 }, bunnings, thai];
+    data.itemsByExpense = {
+      ...items,
+      e1: [...items.e1, makeItem('i9', 'e1', { name: 'Sponges', amount: 500, category: 'Household' })],
+    };
+    renderList();
+    await userEvent.click(chip('Household'));
+    await userEvent.click(screen.getByRole('option', { name: /Woolworths/ }));
+    expect(detail().querySelector('.lucide-house')).not.toBeNull();
+    expect(detail().querySelector('.lucide-shopping-basket')).toBeNull();
+  });
+
+  it('keeps the arrow keys within the filtered expenses', async () => {
+    data.expenses = [woolies, bunnings, { ...thai, shopName: 'Mitre 10' }];
+    data.itemsByExpense = { ...items, e3: [makeItem('i4', 'e3', { category: 'Household', amount: 900 })] };
+    renderList();
+    await userEvent.click(chip('Household'));
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+    expect(within(detail()).getByRole('heading', { name: 'Mitre 10' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Woolworths/ })).toBeNull();
   });
 });

@@ -39,6 +39,17 @@ describe('ExpenseRow (disclosure)', () => {
     expect(screen.getByText('42.50')).toBeInTheDocument();
   });
 
+  it('shows a given category in place of the first item’s', () => {
+    renderRow({ category: 'Household' });
+    expect(screen.getByText('Household · 2 items')).toBeInTheDocument();
+    expect(screen.queryByText('Groceries · 2 items')).toBeNull();
+  });
+
+  it('shows a given category on a desktop option row too', () => {
+    renderRow({ mode: 'option', selected: false, onSelect: () => {}, category: 'Household' });
+    expect(screen.getByText('Household · 2 items')).toBeInTheDocument();
+  });
+
   it('is a collapsed disclosure that reports a toggle', async () => {
     const onToggle = vi.fn();
     renderRow({ onToggle });

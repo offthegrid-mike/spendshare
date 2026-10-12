@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
+import { formatMoney } from '../../lib/money';
 import { monthName } from '../../lib/month';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
@@ -13,6 +14,8 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
 import BalanceHero from './BalanceHero';
+import CategoryFilter from './CategoryFilter';
+import { categoriesBySpend, filterByCategory } from './filterByCategory';
 import ExpenseRow from './ExpenseRow';
 import ExpenseDetail from './ExpenseDetail';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
@@ -23,12 +26,13 @@ interface DayGroup { key: string; label: string; total: number; exps: ExpenseDoc
 
 const plain = (cents: number) => (cents / 100).toFixed(2);
 
-function groupByDay(expenses: ExpenseDoc[]): DayGroup[] {
+/** Groups newest-first expenses by day; `amountOf` is what each adds to its day's total. */
+function groupByDay(expenses: ExpenseDoc[], amountOf: (exp: ExpenseDoc) => number): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const exp of expenses) {
     const date = exp.date?.toDate?.();
     const key = date ? format(date, 'yyyy-MM-dd') : 'no-date';
-    const net = computeAdjustment(exp).net;
+    const net = amountOf(exp);
     const last = groups[groups.length - 1];
     if (last && last.key === key) {
       last.exps.push(exp);
@@ -85,11 +89,35 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ exp: ExpenseDoc; items: ItemDoc[] } | null>(null);
+  const [filter, setFilter] = useState<{ groupId: string; month: string; category: string } | null>(null);
 
-  // Desktop selection: the chosen expense while it exists in this month,
-  // otherwise the first one (on load, after a month change or a delete).
-  const activeId = expenses.some((e) => e.id === selectedId) ? selectedId : expenses[0]?.id ?? null;
-  const active = expenses.find((e) => e.id === activeId) ?? null;
+  const allItems = useMemo(() => Object.values(itemsByExpense).flat(), [itemsByExpense]);
+  const categoryNames = useMemo(() => categoriesBySpend(allItems), [allItems]);
+  // A filter applies while its group and month are showing and the month
+  // still has its category alongside another (with one category the chips
+  // are gone, so there is no way back to All).
+  const category =
+    filter?.groupId === group.id &&
+    filter.month === selectedMonth &&
+    categoryNames.length > 1 &&
+    categoryNames.includes(filter.category)
+      ? filter.category
+      : null;
+  // Once it stops applying it is dropped for good, so going back to the month,
+  // the group or the category does not quietly bring it back. Adjusting state
+  // during render, not in an effect; skipped while loading, when the month's
+  // categories are not known yet.
+  if (filter && !category && !loading && !itemsLoading) setFilter(null);
+  const filtered = useMemo(
+    () => (category ? filterByCategory(expenses, itemsByExpense, category) : null),
+    [category, expenses, itemsByExpense],
+  );
+  const visible = filtered?.expenses ?? expenses;
+
+  // Desktop selection: the chosen expense while it is listed, otherwise the
+  // first one (on load, after a month change, a filter change or a delete).
+  const activeId = visible.some((e) => e.id === selectedId) ? selectedId : visible[0]?.id ?? null;
+  const active = visible.find((e) => e.id === activeId) ?? null;
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -99,10 +127,10 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       // dialog is open on top of the list.
       if (e.defaultPrevented || pendingDelete || document.querySelector('[aria-modal="true"]')) return;
       if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (expenses.length === 0) return;
+      if (visible.length === 0) return;
       e.preventDefault();
-      const i = expenses.findIndex((x) => x.id === activeId);
-      const next = expenses[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), expenses.length - 1)];
+      const i = visible.findIndex((x) => x.id === activeId);
+      const next = visible[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)];
       setSelectedId(next.id);
       const row = document.querySelector<HTMLElement>(`[data-expense-id="${next.id}"]`);
       // Keep keyboard focus on the selected option when the list has focus;
@@ -112,7 +140,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isDesktop, expenses, activeId, pendingDelete]);
+  }, [isDesktop, visible, activeId, pendingDelete]);
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);
@@ -141,9 +169,8 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
 
   if (loading || itemsLoading || settlementsLoading) return <ListSkeleton />;
 
-  const allItems = Object.values(itemsByExpense).flat();
   const paidSettlements = settlements.filter((s) => s.paid);
-  const days = groupByDay(expenses);
+  const days = groupByDay(visible, (exp) => (filtered ? filtered.paidOf[exp.id] : computeAdjustment(exp).net));
   const itemsOf = (exp: ExpenseDoc) => itemsByExpense[exp.id] ?? [];
 
   const list = (
@@ -164,6 +191,22 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
           </span>
         </div>
       ))}
+
+      <CategoryFilter
+        categories={categoryNames}
+        selected={category}
+        onSelect={(c) => setFilter(c ? { groupId: group.id, month: selectedMonth, category: c } : null)}
+      />
+
+      {filtered && category && (
+        <p data-testid="category-filter-summary" className="px-1.5 pt-3 text-[13px] text-ink-muted">
+          <span className="font-medium text-ink">{category}</span>
+          {' · '}
+          <span className="money text-ink">{formatMoney(filtered.total, group.currency)}</span>
+          {' · '}
+          {filtered.expenses.length} {filtered.expenses.length === 1 ? 'expense' : 'expenses'}
+        </p>
+      )}
 
       {expenses.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -203,6 +246,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
                     items={itemsOf(exp)}
                     group={group}
                     viewerUid={currentUserUid}
+                    category={category ?? undefined}
                     selected={exp.id === activeId}
                     onSelect={() => setSelectedId(exp.id)}
                   />
@@ -214,6 +258,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
                     items={itemsOf(exp)}
                     group={group}
                     viewerUid={currentUserUid}
+                    category={category ?? undefined}
                     expanded={expandedId === exp.id}
                     onToggle={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
                     onDelete={() => setPendingDelete({ exp, items: itemsOf(exp) })}
@@ -246,6 +291,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
               items={active ? itemsOf(active) : []}
               group={group}
               viewerUid={currentUserUid}
+              category={category ?? undefined}
               onDelete={() => active && setPendingDelete({ exp: active, items: itemsOf(active) })}
               deleting={active !== null && deletingId === active.id}
             />
