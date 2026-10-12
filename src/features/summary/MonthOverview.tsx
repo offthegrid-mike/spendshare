@@ -7,31 +7,27 @@ interface Props {
   breakdown: MonthBreakdown;
   sharedTotal: number;
   currency: string;
-  /** Name of the month before, e.g. "September". */
-  prevMonthLabel: string;
+  /** What spending is measured against: "September", or "1–12 September" while this month is in progress. */
+  comparedWith: string;
 }
 
 interface VsPrevProps {
   vsPrev: NonNullable<MonthBreakdown['vsPrev']>;
-  /** Measured against last month's pace, because this month isn't over. */
-  paced: boolean;
-  prevMonthLabel: string;
+  comparedWith: string;
 }
 
-function VsPrev({ vsPrev, paced, prevMonthLabel }: VsPrevProps) {
+function VsPrev({ vsPrev, comparedWith }: VsPrevProps) {
   const pct = Math.round(Math.abs(vsPrev.pct));
   if (pct === 0) {
     return (
       <p data-testid="month-vs-prev" className="text-sm text-ink-muted">
-        {paced ? `On par with ${prevMonthLabel}’s pace` : `About the same as ${prevMonthLabel}`}
+        About the same as {comparedWith}
       </p>
     );
   }
   const up = vsPrev.amount > 0;
   const Icon = up ? TrendingUp : TrendingDown;
-  const text = paced
-    ? `${pct}% ${up ? 'above' : 'below'} ${prevMonthLabel}’s pace`
-    : `${pct}% ${up ? 'more' : 'less'} than ${prevMonthLabel}`;
+  const text = `${pct}% ${up ? 'more' : 'less'} than ${comparedWith}`;
   return (
     <p data-testid="month-vs-prev" className={`flex items-center gap-1.5 text-sm font-medium ${up ? 'text-negative' : 'text-accent-ink'}`}>
       <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -41,7 +37,7 @@ function VsPrev({ vsPrev, paced, prevMonthLabel }: VsPrevProps) {
 }
 
 /** The Month view's headline: spending, what is left of the income, and how it compares with last month. */
-export default function MonthOverview({ breakdown: b, sharedTotal, currency, prevMonthLabel }: Props) {
+export default function MonthOverview({ breakdown: b, sharedTotal, currency, comparedWith }: Props) {
   if (b.spent === 0) return null;
   const money = (cents: number) => formatMoney(cents, currency);
 
@@ -59,7 +55,7 @@ export default function MonthOverview({ breakdown: b, sharedTotal, currency, pre
           </>
         )}
       </div>
-      {b.vsPrev && <VsPrev vsPrev={b.vsPrev} paced={b.paced} prevMonthLabel={prevMonthLabel} />}
+      {b.vsPrev && <VsPrev vsPrev={b.vsPrev} comparedWith={comparedWith} />}
       <p data-testid="month-details" className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-ink-muted">
         <span><span className="money text-ink">{money(sharedTotal)}</span> shared</span>
         {b.dailyAverage > 0 && (

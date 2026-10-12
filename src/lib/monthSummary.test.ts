@@ -15,9 +15,12 @@ const items = [
 
 function breakdown(over: Partial<MonthBreakdownInput> = {}) {
   return computeMonthBreakdown({
-    items, expenses, income: [], prevItems: null, prevScale: 1, daysElapsed: 10, ...over,
+    items, expenses, income: [], prevItems: null, prevExpenses: [], prevThroughDay: null, daysElapsed: 10, ...over,
   });
 }
+
+/** An expense on a given day of the previous month, midday local time. */
+const prevExpense = (id: string, day: number) => ({ id, date: { toDate: () => new Date(2026, 8, day, 12) } as never });
 
 describe('computeMonthBreakdown totals', () => {
   it('sums spending and income, and what is left over', () => {
@@ -128,30 +131,54 @@ describe('computeMonthBreakdown shops and biggest expense', () => {
 });
 
 describe('computeMonthBreakdown comparing a month still in progress', () => {
+  // Last month: 16000 of Groceries on day 3, 4000 of Travel on day 20.
   const prevItems = [
-    { expenseId: 'x', category: 'Groceries', amount: 16000 },
-    { expenseId: 'x', category: 'Travel', amount: 4000 },
+    { expenseId: 'early', category: 'Groceries', amount: 16000 },
+    { expenseId: 'late', category: 'Travel', amount: 4000 },
   ];
+  const prevExpenses = [prevExpense('early', 3), prevExpense('late', 20)];
 
-  it('sets spending beside the same share of last month, not all of it', () => {
-    // Half of last month's 20000 is 10000; this month's 12000 is 20% above that.
-    const b = breakdown({ prevItems, prevScale: 0.5 });
-    expect(b.paced).toBe(true);
-    expect(b.vsPrev).toEqual({ amount: 2000, pct: 20 });
+  it('sets spending beside what last month had spent by the same day, not all of it', () => {
+    // By day 10 last month had spent 16000; this month's 12000 is 25% below that.
+    const b = breakdown({ prevItems, prevExpenses, prevThroughDay: 10 });
+    expect(b.vsPrev).toEqual({ amount: -4000, pct: -25 });
   });
 
-  it('scales each category’s comparison the same way', () => {
-    // Groceries: half of 16000 is 8000, and 9000 is 12.5% above it.
-    const groceries = breakdown({ prevItems, prevScale: 0.5 }).categories.find((c) => c.category === 'Groceries');
-    expect(groceries?.change).toBe(12.5);
+  it('counts an expense on the cut-off day itself', () => {
+    expect(breakdown({ prevItems, prevExpenses, prevThroughDay: 3 }).vsPrev).toEqual({ amount: -4000, pct: -25 });
+    expect(breakdown({ prevItems, prevExpenses, prevThroughDay: 2 }).vsPrev).toBeNull();
   });
 
-  it('is not paced when comparing against the whole of last month', () => {
-    expect(breakdown({ prevItems, prevScale: 1 }).paced).toBe(false);
+  it('compares each category the same way, without spreading lump payments across the month', () => {
+    // Groceries was paid on day 3, so it counts in full by day 10; Travel hadn't happened yet.
+    const by = Object.fromEntries(
+      breakdown({ prevItems, prevExpenses, prevThroughDay: 10 }).categories.map((c) => [c.category, c.change]),
+    );
+    expect(by).toEqual({ Groceries: -43.75, Dining: 'new', Household: 'new' });
   });
 
-  it('has no comparison when none of last month falls in the share', () => {
-    expect(breakdown({ prevItems, prevScale: 0 }).vsPrev).toBeNull();
+  it('calls a category new when last month had not spent on it yet by that day', () => {
+    // Last month's Travel was on day 20, past the cut-off.
+    const travel = breakdown({
+      items: [{ expenseId: 'e1', category: 'Travel', amount: 500 }],
+      prevItems, prevExpenses, prevThroughDay: 10,
+    });
+    expect(travel.categories[0].change).toBe('new');
+  });
+
+  it('compares against all of last month when no cut-off applies, whatever day its expenses fell on', () => {
+    expect(breakdown({ prevItems, prevExpenses, prevThroughDay: null }).vsPrev).toEqual({ amount: -8000, pct: -40 });
+  });
+
+  it('leaves out last month’s items it cannot date when a cut-off applies, but keeps them for the whole month', () => {
+    const orphan = [{ expenseId: 'ghost', category: 'Groceries', amount: 10000 }];
+    expect(breakdown({ prevItems: orphan, prevExpenses: [], prevThroughDay: 10 }).vsPrev).toBeNull();
+    expect(breakdown({ prevItems: orphan, prevExpenses: [], prevThroughDay: null }).vsPrev)
+      .toEqual({ amount: 2000, pct: 20 });
+  });
+
+  it('has no comparison when none of last month falls in the days compared', () => {
+    expect(breakdown({ prevItems, prevExpenses, prevThroughDay: 0 }).vsPrev).toBeNull();
   });
 });
 

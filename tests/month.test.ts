@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  monthKey, prevMonthKey, nextMonthKey, formatMonthLabel, monthRange, daysElapsedInMonth, comparablePrevShare,
+  monthKey, prevMonthKey, nextMonthKey, formatMonthLabel, monthRange, daysElapsedInMonth, comparablePrevDays, comparisonLabel,
 } from '../src/lib/month';
 describe('month', () => {
   it('formats a date as YYYY-MM', () => {
@@ -58,26 +58,46 @@ describe('month', () => {
     });
   });
 
-  describe('comparablePrevShare', () => {
+  describe('comparablePrevDays', () => {
     const noon = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12).getTime();
 
-    it('is all of the previous month once the month is over', () => {
-      expect(comparablePrevShare('2026-06', noon(2026, 10, 11))).toBe(1);
+    it('is the days gone so far for a month in progress', () => {
+      // 11 days into October, against September's first 11.
+      expect(comparablePrevDays('2026-10', noon(2026, 10, 11))).toBe(11);
+      expect(comparablePrevDays('2026-10', noon(2026, 10, 1))).toBe(1);
     });
 
-    it('is as many days of the previous month as have passed, while the month is in progress', () => {
-      // 11 days into October, against September's 30.
-      expect(comparablePrevShare('2026-10', noon(2026, 10, 11))).toBeCloseTo(11 / 30);
-      // 15 days into March, against February's 28.
-      expect(comparablePrevShare('2026-03', noon(2026, 3, 15))).toBeCloseTo(15 / 28);
+    it('is null, meaning all of last month, once the month is over', () => {
+      expect(comparablePrevDays('2026-06', noon(2026, 10, 11))).toBeNull();
     });
 
-    it('is all of it on the last day of the month', () => {
-      expect(comparablePrevShare('2026-10', noon(2026, 10, 31))).toBe(1);
+    it('is null on the last day of the month', () => {
+      expect(comparablePrevDays('2026-10', noon(2026, 10, 31))).toBeNull();
     });
 
-    it('is none of it for a month that has not started', () => {
-      expect(comparablePrevShare('2026-11', noon(2026, 10, 11))).toBe(0);
+    it('is null once the days gone cover the whole of a shorter last month', () => {
+      // February has 28 days, so from March 28 there is nothing more of it to leave out.
+      expect(comparablePrevDays('2026-03', noon(2026, 3, 27))).toBe(27);
+      expect(comparablePrevDays('2026-03', noon(2026, 3, 28))).toBeNull();
+      expect(comparablePrevDays('2026-03', noon(2026, 3, 30))).toBeNull();
+    });
+
+    it('is 0 for a month that has not started', () => {
+      expect(comparablePrevDays('2026-11', noon(2026, 10, 11))).toBe(0);
+    });
+  });
+
+  describe('comparisonLabel', () => {
+    it('names the month when all of it is compared', () => {
+      expect(comparisonLabel('2026-09', null)).toBe('September');
+    });
+
+    it('names the stretch of days when only part of the month is compared', () => {
+      expect(comparisonLabel('2026-09', 12)).toBe('1–12 September');
+    });
+
+    it('names a single day without a range', () => {
+      expect(comparisonLabel('2026-09', 1)).toBe('1 September');
     });
   });
 });

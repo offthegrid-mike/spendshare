@@ -4,6 +4,8 @@ import type { ExpenseDoc, IncomeDoc, ItemDoc } from '../types/models';
 
 export type MonthItem = Pick<ItemDoc, 'expenseId' | 'category' | 'amount'>;
 export type MonthExpense = Pick<ExpenseDoc, 'id' | 'shopName'>;
+/** An expense of the previous month, whose date places its items within the month. */
+export type PrevExpense = Pick<ExpenseDoc, 'id' | 'date'>;
 
 export interface MonthCategory extends CategoryTotal {
   /** Percent change against the previous month, 'new' if it had none, null with nothing to compare. */
@@ -20,8 +22,6 @@ export interface MonthBreakdown {
   savingsRate: number | null;
   /** Spending against the previous month; null while it loads or if it had none. */
   vsPrev: { amount: number; pct: number } | null;
-  /** True when `vsPrev` and the category changes are against a share of last month, not all of it. */
-  paced: boolean;
   dailyAverage: number;
   biggestExpense: { shopName: string; amount: number } | null;
   categories: MonthCategory[];
@@ -34,8 +34,13 @@ export interface MonthBreakdownInput {
   income: Pick<IncomeDoc, 'amount'>[];
   /** The previous month's items, or null while they load. */
   prevItems: MonthItem[] | null;
-  /** The share of the previous month to compare against: 1 once this month is over, less while it is in progress. */
-  prevScale: number;
+  /** The previous month's expenses, to date its items. */
+  prevExpenses: PrevExpense[];
+  /**
+   * The last day of the previous month to compare against, so a month in
+   * progress is set beside the same days of the last one. null compares all of it.
+   */
+  prevThroughDay: number | null;
   /** Days of the month that have passed, the divisor for the daily average. */
   daysElapsed: number;
 }
@@ -45,17 +50,24 @@ const TOP_SHOPS = 5;
 const total = (items: MonthItem[]) => items.reduce((sum, it) => sum + Math.round(it.amount), 0);
 const percentChange = (now: number, before: number) => ((now - before) * 100) / before;
 
+/** The items of expenses dated on or before `day` of their month; all of them for null. Undated items are left out. */
+function itemsThroughDay(items: MonthItem[], expenses: PrevExpense[], day: number | null): MonthItem[] {
+  if (day === null) return items;
+  const dayOf = new Map(expenses.map((e) => [e.id, e.date.toDate().getDate()]));
+  return items.filter((it) => (dayOf.get(it.expenseId) ?? Infinity) <= day);
+}
+
 /** Everything the Summary's Month view shows beyond the settlement maths, from item amounts. */
 export function computeMonthBreakdown({
-  items, expenses, income, prevItems, prevScale, daysElapsed,
+  items, expenses, income, prevItems, prevExpenses, prevThroughDay, daysElapsed,
 }: MonthBreakdownInput): MonthBreakdown {
   const spent = total(items);
   const incomeTotal = income.reduce((sum, i) => sum + i.amount, 0);
   const saved = incomeTotal - spent;
 
-  const scaled = (cents: number) => Math.round(cents * prevScale);
-  const prevSpent = prevItems ? scaled(total(prevItems)) : 0;
-  const prevByCategory = new Map(categoryTotals(prevItems ?? []).map((c) => [c.category, scaled(c.amount)]));
+  const compared = prevItems ? itemsThroughDay(prevItems, prevExpenses, prevThroughDay) : [];
+  const prevSpent = total(compared);
+  const prevByCategory = new Map(categoryTotals(compared).map((c) => [c.category, c.amount]));
   const categories: MonthCategory[] = categoryTotals(items).map((c) => {
     const before = prevByCategory.get(c.category);
     let change: MonthCategory['change'] = null;
@@ -94,7 +106,6 @@ export function computeMonthBreakdown({
     saved,
     savingsRate: incomeTotal > 0 ? (saved * 100) / incomeTotal : null,
     vsPrev: prevSpent > 0 ? { amount: spent - prevSpent, pct: percentChange(spent, prevSpent) } : null,
-    paced: prevScale !== 1,
     dailyAverage: daysElapsed > 0 ? Math.round(spent / daysElapsed) : 0,
     biggestExpense,
     categories,

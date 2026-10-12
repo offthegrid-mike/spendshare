@@ -5,10 +5,9 @@ import { markSettlementPaid, undoSettlement as removeSettlement } from '../../li
 import { computeSummary } from '../../lib/settlement';
 import { formatMoney } from '../../lib/money';
 import { computeMonthBreakdown } from '../../lib/monthSummary';
-import { comparablePrevShare, daysElapsedInMonth, formatMonthLabel, monthName, prevMonthKey } from '../../lib/month';
+import { comparablePrevDays, comparisonLabel, daysElapsedInMonth, formatMonthLabel, prevMonthKey } from '../../lib/month';
 import { memberBalanceCopy, memberName } from '../../lib/balance';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
-import { useMonthItems } from '../../hooks/useMonthItems';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useIncome } from '../../hooks/useIncome';
 import { useUIStore } from '../../stores/uiStore';
@@ -48,9 +47,11 @@ const PERIODS = [
 export default function Summary({ group, currentUserUid, selectedMonth }: Props) {
   const { expenses, itemsByExpense, loading: expensesLoading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
   // The month before, to compare against. It never gates the page: the
-  // comparison just appears once it has loaded.
+  // comparison just appears once it has loaded. Its expenses are needed too,
+  // for their dates, so a month in progress is set beside the same days of it.
   const prevMonth = prevMonthKey(selectedMonth);
-  const { items: prevItems, loading: prevLoading } = useMonthItems(group.id, prevMonth);
+  const prev = useMonthExpenses(group.id, prevMonth);
+  const prevLoading = prev.loading || prev.itemsLoading;
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
   const { income, loading: incomeLoading } = useIncome(group.id, selectedMonth);
   const [isPending, setIsPending] = useState(false);
@@ -103,16 +104,18 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   }
 
   const items = Object.values(itemsByExpense).flat();
+  const prevThroughDay = comparablePrevDays(selectedMonth);
   const summary = computeSummary(group.memberUids, items, settlements);
   const breakdown = computeMonthBreakdown({
     items,
     expenses,
     income,
-    prevItems: prevLoading ? null : prevItems,
-    prevScale: comparablePrevShare(selectedMonth),
+    prevItems: prevLoading ? null : Object.values(prev.itemsByExpense).flat(),
+    prevExpenses: prev.expenses,
+    prevThroughDay,
     daysElapsed: daysElapsedInMonth(selectedMonth),
   });
-  const prevMonthLabel = monthName(prevMonth);
+  const comparedWith = comparisonLabel(prevMonth, prevThroughDay);
   const pendingTransactions = summary.transactions;
   const paidSettlements = settlements.filter((s) => s.paid);
   const incomeOf = (uid: string) => income.filter((i) => i.uid === uid).reduce((sum, i) => sum + i.amount, 0);
@@ -199,7 +202,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
         breakdown={breakdown}
         sharedTotal={summary.sharedTotal}
         currency={group.currency}
-        prevMonthLabel={prevMonthLabel}
+        comparedWith={comparedWith}
       />
 
       {/* Per person */}
@@ -266,8 +269,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
       <CategoryBreakdown
         categories={breakdown.categories}
         currency={group.currency}
-        prevMonthLabel={prevMonthLabel}
-        paced={breakdown.paced}
+        comparedWith={comparedWith}
       />
       <TopShops shops={breakdown.topShops} currency={group.currency} />
     </div>

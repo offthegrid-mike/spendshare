@@ -13,30 +13,37 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
 }));
 vi.mock('../../lib/converters', () => ({ settlementsCol: vi.fn(() => ({})) }));
-const { monthState, prevMonthRequests } = vi.hoisted(() => ({
+const { monthState, requestedMonths } = vi.hoisted(() => ({
   monthState: {
     loading: false,
     itemsLoading: false,
     expenses: [] as unknown[],
     itemsByExpense: {} as Record<string, unknown[]>,
-    prevItems: [] as unknown[],
+    prevExpenses: [] as unknown[],
+    prevItemsByExpense: {} as Record<string, unknown[]>,
     prevLoading: false,
+    prevItemsLoading: false,
   },
-  prevMonthRequests: [] as string[],
+  requestedMonths: [] as string[],
 }));
+// The month under test is June 2026; Summary also reads May, to compare against.
 vi.mock('../../hooks/useMonthExpenses', () => ({
-  useMonthExpenses: () => ({
-    expenses: monthState.expenses,
-    itemsByExpense: monthState.itemsByExpense,
-    loading: monthState.loading,
-    itemsLoading: monthState.itemsLoading,
-  }),
-}));
-// Summary reads the month before through useMonthItems, to compare against.
-vi.mock('../../hooks/useMonthItems', () => ({
-  useMonthItems: (_gid: string, month: string) => {
-    prevMonthRequests.push(month);
-    return { items: monthState.prevItems, loading: monthState.prevLoading };
+  useMonthExpenses: (_gid: string, month: string) => {
+    requestedMonths.push(month);
+    if (month === '2026-05') {
+      return {
+        expenses: monthState.prevExpenses,
+        itemsByExpense: monthState.prevItemsByExpense,
+        loading: monthState.prevLoading,
+        itemsLoading: monthState.prevItemsLoading,
+      };
+    }
+    return {
+      expenses: monthState.expenses,
+      itemsByExpense: monthState.itemsByExpense,
+      loading: monthState.loading,
+      itemsLoading: monthState.itemsLoading,
+    };
   },
 }));
 const { settlementState, summaryState, markSettlementPaid } = vi.hoisted(() => ({
@@ -63,9 +70,10 @@ vi.mock('../../lib/settlement', () => ({
 
 function resetMonthState() {
   Object.assign(monthState, {
-    loading: false, itemsLoading: false, expenses: [], itemsByExpense: {}, prevItems: [], prevLoading: false,
+    loading: false, itemsLoading: false, expenses: [], itemsByExpense: {},
+    prevExpenses: [], prevItemsByExpense: {}, prevLoading: false, prevItemsLoading: false,
   });
-  prevMonthRequests.length = 0;
+  requestedMonths.length = 0;
 }
 
 const { setMonth } = vi.hoisted(() => ({ setMonth: vi.fn() }));
@@ -252,6 +260,19 @@ function loadJune() {
   };
 }
 
+/** May's Groceries: `early` on the 5th, `late` on the 25th. */
+function loadMay(early: number, late = 0) {
+  const on = (day: number) => ({ toDate: () => new Date(2026, 4, day, 12) });
+  monthState.prevExpenses = [
+    { id: 'early', shopName: 'Woolworths', date: on(5) },
+    { id: 'late', shopName: 'Woolworths', date: on(25) },
+  ];
+  monthState.prevItemsByExpense = {
+    early: [item('early', 'Groceries', early)],
+    late: late ? [item('late', 'Groceries', late)] : [],
+  };
+}
+
 describe('Summary Month view breakdown', () => {
   afterEach(resetMonthState);
 
@@ -273,23 +294,26 @@ describe('Summary Month view breakdown', () => {
 
   it('compares spending with the month before', () => {
     loadJune();
-    monthState.prevItems = [item('x', 'Groceries', 4000)];
+    loadMay(4000);
     renderSummary();
-    expect(prevMonthRequests).toContain('2026-05');
+    expect(requestedMonths).toContain('2026-05');
     expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('125% more than May');
     expect(screen.getByLabelText('Up 50% from May')).toBeInTheDocument();
+    expect(screen.getByText('Change vs May')).toBeInTheDocument();
   });
 
-  it('compares a month in progress against last month’s pace, not the whole of last month', () => {
-    // 15 days into June: 15/31 of May's 4000 is about 1935, and the 9000 spent is far above that.
+  it('compares a month in progress with the same days of last month, not the whole of it', () => {
+    // 15 days into June: May had spent 4000 by the 15th and another 6000 after it.
+    // June's 9000 is 125% above the 4000, but 10% below the full 10000.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 5, 15, 12));
     try {
       loadJune();
-      monthState.prevItems = [item('x', 'Groceries', 4000)];
+      loadMay(4000, 6000);
       renderSummary();
-      expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('May’s pace');
-      expect(screen.getByLabelText(/on May’s pace$/)).toBeInTheDocument();
+      expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('125% more than 1–15 May');
+      expect(screen.getByLabelText('Up 50% from 1–15 May')).toBeInTheDocument();
+      expect(screen.getByText('Change vs 1–15 May')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -297,12 +321,22 @@ describe('Summary Month view breakdown', () => {
 
   it('does not wait for the month before: it shows without a comparison until it loads', () => {
     loadJune();
-    monthState.prevItems = [item('x', 'Groceries', 6000)];
+    loadMay(6000);
     monthState.prevLoading = true;
     renderSummary();
     expect(screen.getByTestId('month-spent')).toBeInTheDocument();
     expect(screen.queryByTestId('month-vs-prev')).toBeNull();
     expect(screen.queryByLabelText(/from May/)).toBeNull();
+    expect(screen.queryByText(/Change vs/)).toBeNull();
+  });
+
+  it('holds the comparison back until the month before has its items, not just its expenses', () => {
+    loadJune();
+    loadMay(6000);
+    monthState.prevItemsLoading = true;
+    renderSummary();
+    expect(screen.getByTestId('month-spent')).toBeInTheDocument();
+    expect(screen.queryByTestId('month-vs-prev')).toBeNull();
   });
 
   it('adds nothing for a month with no expenses', () => {

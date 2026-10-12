@@ -9,8 +9,8 @@ const categories: MonthCategory[] = [
   { category: 'Household', amount: 1000, pct: 8.33, change: 'new' },
 ];
 
-function renderCategories(list = categories, paced = false) {
-  return render(<CategoryBreakdown categories={list} currency="AUD" prevMonthLabel="September" paced={paced} />);
+function renderCategories(list = categories, comparedWith = 'September') {
+  return render(<CategoryBreakdown categories={list} currency="AUD" comparedWith={comparedWith} />);
 }
 
 describe('CategoryBreakdown', () => {
@@ -55,9 +55,24 @@ describe('CategoryBreakdown', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('words the change against last month’s pace while the month is in progress', () => {
-    renderCategories(categories, true);
-    expect(screen.getByLabelText('Up 50% on September’s pace')).toBeInTheDocument();
-    expect(screen.getByLabelText('Down 50% on September’s pace')).toBeInTheDocument();
+  it('names the days of last month a month in progress is compared with', () => {
+    renderCategories(categories, '1–12 September');
+    expect(screen.getByLabelText('Up 50% from 1–12 September')).toBeInTheDocument();
+    expect(screen.getByLabelText('Down 50% from 1–12 September')).toBeInTheDocument();
+  });
+
+  it('says in plain view what the changes are measured against', () => {
+    renderCategories(categories, '1–12 September');
+    expect(screen.getByText('Change vs 1–12 September')).toBeInTheDocument();
+  });
+
+  it('names the whole month when that is what is compared', () => {
+    renderCategories();
+    expect(screen.getByText('Change vs September')).toBeInTheDocument();
+  });
+
+  it('leaves the comparison note out when there is nothing to compare', () => {
+    renderCategories([{ category: 'Groceries', amount: 9000, pct: 100, change: null }]);
+    expect(screen.queryByText(/Change vs/)).toBeNull();
   });
 });

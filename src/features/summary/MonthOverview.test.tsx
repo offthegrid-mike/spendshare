@@ -9,16 +9,15 @@ const breakdown: MonthBreakdown = {
   saved: 18000,
   savingsRate: 60,
   vsPrev: { amount: 2000, pct: 20 },
-  paced: false,
   dailyAverage: 1200,
   biggestExpense: { shopName: 'Woolworths', amount: 7000 },
   categories: [],
   topShops: [],
 };
 
-function renderOverview(over: Partial<MonthBreakdown> = {}, sharedTotal = 8000) {
+function renderOverview(over: Partial<MonthBreakdown> = {}, comparedWith = 'September', sharedTotal = 8000) {
   return render(
-    <MonthOverview breakdown={{ ...breakdown, ...over }} sharedTotal={sharedTotal} currency="AUD" prevMonthLabel="September" />,
+    <MonthOverview breakdown={{ ...breakdown, ...over }} sharedTotal={sharedTotal} currency="AUD" comparedWith={comparedWith} />,
   );
 }
 
@@ -83,15 +82,15 @@ describe('MonthOverview', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('measures a month in progress against last month’s pace', () => {
-    renderOverview({ paced: true });
-    expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('20% above September’s pace');
+  it('names the days of last month a month in progress is compared with', () => {
+    renderOverview({}, '1–12 September');
+    expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('20% more than 1–12 September');
   });
 
-  it('says when a month in progress is below last month’s pace, or level with it', () => {
-    renderOverview({ paced: true, vsPrev: { amount: -2000, pct: -20 } });
-    expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('20% below September’s pace');
-    renderOverview({ paced: true, vsPrev: { amount: 10, pct: 0.2 } });
-    expect(screen.getAllByTestId('month-vs-prev')[1]).toHaveTextContent('On par with September’s pace');
+  it('says so when a month in progress is below that stretch of last month, or level with it', () => {
+    renderOverview({ vsPrev: { amount: -2000, pct: -20 } }, '1–12 September');
+    expect(screen.getByTestId('month-vs-prev')).toHaveTextContent('20% less than 1–12 September');
+    renderOverview({ vsPrev: { amount: 10, pct: 0.2 } }, '1–12 September');
+    expect(screen.getAllByTestId('month-vs-prev')[1]).toHaveTextContent('About the same as 1–12 September');
   });
 });

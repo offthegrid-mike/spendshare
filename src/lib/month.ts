@@ -79,14 +79,22 @@ export function daysElapsedInMonth(ym: string, now: number = Date.now()): number
 }
 
 /**
- * How much of the month before `ym` to set beside it: all of it once `ym` is
- * over, otherwise as many days' worth as have passed, so a month part-way
- * through isn't measured against a whole one.
+ * The last day of the month before `ym` to set beside it: the same day of the
+ * month as today while `ym` is in progress, so a month part-way through isn't
+ * measured against a whole one. null means all of it: `ym` is over, or the days
+ * gone already cover the whole of a shorter month before.
  */
-export function comparablePrevShare(ym: string, now: number = Date.now()): number {
+export function comparablePrevDays(ym: string, now: number = Date.now()): number | null {
   const elapsed = daysElapsedInMonth(ym, now);
   const { year, month } = parseYM(ym);
-  if (elapsed >= daysInMonth(year, month)) return 1;
   const prev = parseYM(prevMonthKey(ym));
-  return elapsed / daysInMonth(prev.year, prev.month);
+  if (elapsed >= daysInMonth(year, month) || elapsed >= daysInMonth(prev.year, prev.month)) return null;
+  return elapsed;
+}
+
+/** What a comparison is against: 'September', or '1–12 September' for its first twelve days. */
+export function comparisonLabel(prevYm: string, throughDay: number | null): string {
+  const name = monthName(prevYm);
+  if (throughDay === null) return name;
+  return throughDay === 1 ? `1 ${name}` : `1–${throughDay} ${name}`;
 }
