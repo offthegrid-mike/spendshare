@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseRow from './ExpenseRow';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
+import { paths } from '../../lib/paths';
 
 const pair = makeGroup('g1', 'Home');
 const exp = makeExpense('e1', { shopName: 'Woolworths', total: 4250, itemCount: 2, payerUid: 'priya' });
@@ -65,7 +66,7 @@ describe('ExpenseRow (disclosure)', () => {
     renderRow({ expanded: true, onDelete });
     expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Milk')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/expense/e1/edit');
+    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();
   });

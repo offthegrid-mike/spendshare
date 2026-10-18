@@ -1,34 +1,37 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { User } from 'firebase/auth';
-import { Plus, Search } from 'lucide-react';
+import { ChevronLeft, Plus, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import SettingsMenu from './SettingsMenu';
+import { paths } from '../lib/paths';
 import type { GroupDoc } from '../types/models';
 
 interface Props {
   groups: GroupDoc[];
   user: User;
+  /** Show a link back to the Home screen before the household switcher. */
+  showHome?: boolean;
 }
 
 const SECTIONS = [
-  { to: '/', label: 'Expenses', end: true },
-  { to: '/summary', label: 'Summary', end: false },
-  { to: '/income', label: 'Income', end: false },
+  { to: paths.spend, label: 'Expenses', end: true },
+  { to: paths.summary, label: 'Summary', end: false },
+  { to: paths.income, label: 'Income', end: false },
 ];
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** Desktop command bar (lg and up). */
-export default function TopBar({ groups, user }: Props) {
+export default function TopBar({ groups, user, showHome = false }: Props) {
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Mirror ?q= while on /search; keep the user's draft otherwise. Adjusting
+  // Mirror ?q= while on the search page; keep the user's draft otherwise. Adjusting
   // state during render (not in an effect) when the URL query changes.
-  const urlQuery = pathname === '/search' ? params.get('q') ?? '' : '';
+  const urlQuery = pathname === paths.search ? params.get('q') ?? '' : '';
   const [syncedQuery, setSyncedQuery] = useState(urlQuery);
   const [draft, setDraft] = useState(urlQuery);
   if (urlQuery !== syncedQuery) {
@@ -51,11 +54,20 @@ export default function TopBar({ groups, user }: Props) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const q = draft.trim();
-    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
+    navigate(q ? `${paths.search}?q=${encodeURIComponent(q)}` : paths.search);
   }
 
   return (
     <header className="sticky top-0 z-20 hidden h-[60px] items-center gap-3.5 border-b border-line bg-surface px-[18px] lg:flex">
+      {showHome && (
+        <Link
+          to={paths.home}
+          className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink"
+        >
+          <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          Home
+        </Link>
+      )}
       <div className="min-w-0 max-w-[240px]">
         <GroupSwitcher groups={groups} user={user} mode="popover" />
       </div>
@@ -97,7 +109,7 @@ export default function TopBar({ groups, user }: Props) {
           {isMac ? '⌘K' : 'Ctrl K'}
         </kbd>
       </form>
-      <Link to="/expense/new" className="btn-primary">
+      <Link to={paths.newExpense} className="btn-primary">
         <Plus size={16} strokeWidth={2} aria-hidden="true" />
         Add expense
       </Link>

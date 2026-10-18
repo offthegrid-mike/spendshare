@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc } from '../../types/models';
+import { paths } from '../../lib/paths';
 
 const { commit, openAddSheet, desktop, ui, data } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
@@ -93,7 +94,7 @@ describe('ExpenseList', () => {
     data.expenses = [];
     data.itemsByExpense = {};
     renderList();
-    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/expense/new');
+    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', paths.newExpense);
   });
 
   it('groups expenses by day with the day net total', () => {

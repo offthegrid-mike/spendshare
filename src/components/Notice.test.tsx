@@ -3,6 +3,7 @@ import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Notice from './Notice';
 import { useUIStore } from '../stores/uiStore';
+import { paths } from '../lib/paths';
 
 function renderNotice() {
   return render(
@@ -26,14 +27,14 @@ describe('Notice', () => {
 
   it('shows the message and its action link', () => {
     renderNotice();
-    act(() => useUIStore.getState().showNotice({ message: 'Trip created', action: { label: 'Invite people', to: '/group/invites' } }));
+    act(() => useUIStore.getState().showNotice({ message: 'Trip created', action: { label: 'Invite people', to: paths.groupInvites } }));
     expect(screen.getByText('Trip created')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Invite people' })).toHaveAttribute('href', '/group/invites');
+    expect(screen.getByRole('link', { name: 'Invite people' })).toHaveAttribute('href', paths.groupInvites);
   });
 
   it('clears when the action link is followed', () => {
     renderNotice();
-    act(() => useUIStore.getState().showNotice({ message: 'Trip created', action: { label: 'Invite people', to: '/group/invites' } }));
+    act(() => useUIStore.getState().showNotice({ message: 'Trip created', action: { label: 'Invite people', to: paths.groupInvites } }));
     fireEvent.click(screen.getByRole('link', { name: 'Invite people' }));
     expect(useUIStore.getState().notice).toBeNull();
   });

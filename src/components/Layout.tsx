@@ -13,6 +13,8 @@ import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useUIStore } from '../stores/uiStore';
 import { monthKey } from '../lib/month';
 import { isExpenseEditorPath, routeInfo } from '../lib/routes';
+import { paths } from '../lib/paths';
+import { WORK_ENABLED } from '../lib/features';
 import type { GroupDoc } from '../types/models';
 
 interface Props { groups: GroupDoc[]; user: User; }
@@ -43,8 +45,8 @@ export default function Layout({ groups, user }: Props) {
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <HouseholdHeader groups={groups} user={user} startMonth={startMonth} />
-      <TopBar groups={groups} user={user} />
+      <HouseholdHeader groups={groups} user={user} startMonth={startMonth} showHome={WORK_ENABLED} />
+      <TopBar groups={groups} user={user} showHome={WORK_ENABLED} />
 
       {showRail ? (
         <div className="grid grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[232px_minmax(0,1fr)]">
@@ -52,8 +54,8 @@ export default function Layout({ groups, user }: Props) {
             <MonthRail group={group} viewerUid={user.uid} />
           </aside>
           {/* The Expenses home lays out its own list + detail columns. */}
-          <main className={pathname === '/' ? 'min-w-0' : 'mx-auto w-full min-w-0 max-w-[760px] px-8 pb-12 pt-6'}>
-            {pathname === '/' ? invites('mx-auto max-w-[760px] px-8 pt-4 empty:hidden') : invites()}
+          <main className={pathname === paths.spend ? 'min-w-0' : 'mx-auto w-full min-w-0 max-w-[760px] px-8 pb-12 pt-6'}>
+            {pathname === paths.spend ? invites('mx-auto max-w-[760px] px-8 pt-4 empty:hidden') : invites()}
             <Outlet />
           </main>
         </div>

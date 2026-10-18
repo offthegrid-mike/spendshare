@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseEditor from './ExpenseEditor';
 import { formatMoney } from '../../lib/money';
+import { paths } from '../../lib/paths';
 
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/converters', () => ({
@@ -228,7 +229,7 @@ describe('ExpenseEditor (hybrid)', () => {
   it('has a page header with a back link and title', () => {
     renderEditor();
     expect(screen.getByRole('heading', { level: 1, name: 'New expense' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', paths.spend);
   });
 
   it('leaves the title to the sheet when shown in the Add expense sheet', () => {

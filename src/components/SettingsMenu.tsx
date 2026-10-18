@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LogOut, Settings, Settings2, Tag, UserPlus } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useUIStore } from '../stores/uiStore';
 import { THEME_OPTIONS } from '../lib/theme';
 import { DARK_MODE_ENABLED } from '../lib/features';
+import { initialOf } from '../lib/initials';
+import { SPEND_LINKS, type SettingsLink } from '../lib/settingsLinks';
 
-const LINKS = [
-  { to: '/categories', label: 'Categories', icon: Tag },
-  { to: '/group/invites', label: 'Invite', icon: UserPlus },
-  { to: '/group/settings', label: 'Group settings', icon: Settings2 },
-];
+interface SettingsMenuProps {
+  /** Manage links at the top of the menu. Defaults to the SpendShare set. */
+  links?: SettingsLink[];
+  /** When set, the trigger is an initial avatar and the menu opens with the name and email. */
+  account?: { name: string; email: string };
+}
 
 const MENU_ITEMS = '[role="menuitem"], [role="menuitemradio"]';
 
@@ -19,8 +22,8 @@ const item =
   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink ' +
   'hover:bg-recessed focus:bg-recessed focus:outline-none';
 
-/** Desktop gear menu: manage links, appearance and sign out. */
-export default function SettingsMenu() {
+/** Desktop menu: manage links, appearance and sign out, behind a gear or an account avatar. */
+export default function SettingsMenu({ links = SPEND_LINKS, account }: SettingsMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -64,6 +67,9 @@ export default function SettingsMenu() {
     items[next].focus();
   }
 
+  // A hairline only goes between sections that both exist, so an empty `links` leaves no stray divider.
+  const hasLinks = links.length > 0;
+
   return (
     <div
       ref={wrapperRef}
@@ -79,22 +85,35 @@ export default function SettingsMenu() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Settings menu"
+        aria-label={account ? 'Account menu' : 'Settings menu'}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="grid h-9 w-9 place-items-center rounded-[10px] text-ink-muted transition-colors hover:bg-recessed hover:text-ink"
+        className={
+          account
+            ? 'grid h-9 w-9 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-soft/70'
+            : 'grid h-9 w-9 place-items-center rounded-[10px] text-ink-muted transition-colors hover:bg-recessed hover:text-ink'
+        }
       >
-        <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
+        {account ? initialOf(account.name) : <Settings size={18} strokeWidth={1.75} aria-hidden="true" />}
       </button>
       {open && (
         <div
           ref={menuRef}
           role="menu"
-          aria-label="Settings"
+          aria-label={account ? 'Account' : 'Settings'}
           className="absolute right-0 top-11 z-40 w-60 rounded-[14px] border border-line bg-surface p-1.5 shadow-pop motion-safe:animate-menu-in"
         >
-          {LINKS.map(({ to, label, icon: Icon }) => (
+          {account && (
+            <>
+              <div className="px-2.5 pb-1 pt-1.5">
+                <p className="text-sm font-medium text-ink">{account.name}</p>
+                <p className="truncate text-xs text-ink-muted">{account.email}</p>
+              </div>
+              <hr className="my-1.5 border-line" />
+            </>
+          )}
+          {links.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} role="menuitem" className={item} onClick={() => close({ refocus: false })}>
               <Icon size={16} strokeWidth={1.75} className="text-ink-muted" aria-hidden="true" />
               {label}
@@ -102,7 +121,7 @@ export default function SettingsMenu() {
           ))}
           {DARK_MODE_ENABLED && (
             <>
-              <hr className="my-1.5 border-line" />
+              {hasLinks && <hr className="my-1.5 border-line" />}
               <div role="group" aria-labelledby="settings-appearance-label">
                 <p id="settings-appearance-label" className="px-2.5 pb-1 pt-1.5 text-xs text-ink-muted">Appearance</p>
                 <div className="mx-1.5 mb-1.5 flex rounded-full bg-recessed p-[3px]">
@@ -124,7 +143,7 @@ export default function SettingsMenu() {
               </div>
             </>
           )}
-          <hr className="my-1.5 border-line" />
+          {(hasLinks || DARK_MODE_ENABLED) && <hr className="my-1.5 border-line" />}
           <button
             type="button"
             role="menuitem"

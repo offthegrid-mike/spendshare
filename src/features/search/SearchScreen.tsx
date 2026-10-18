@@ -4,6 +4,7 @@ import { Gift, Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatMoney } from '../../lib/money';
 import { searchExpenses, highlightMatch } from '../../lib/search';
+import { paths } from '../../lib/paths';
 import { useAllExpenses } from '../../hooks/useAllExpenses';
 import type { GroupDoc } from '../../types/models';
 
@@ -151,7 +152,7 @@ export default function SearchScreen({ group }: Props) {
             {results.map(({ expense, matchedItems }) => (
               <Link
                 key={expense.id}
-                to={`/expense/${expense.id}/edit`}
+                to={paths.editExpense(expense.id)}
                 state={{ returnToSearch: true }}
                 onClick={() => saveHistoryState(query)}
                 className="block border-b border-line last:border-0 hover:bg-recessed"

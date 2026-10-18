@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { Timestamp } from 'firebase/firestore';
 import type { ExpenseDoc, ItemDoc, GroupDoc } from '../src/types/models';
+import { paths } from '../src/lib/paths';
 
 // --- Hook mock ---
 const { useMonthExpenses } = vi.hoisted(() => ({ useMonthExpenses: vi.fn() }));
@@ -234,7 +235,7 @@ describe('ExpenseList', () => {
 
     // Either a link or a button that navigates
     const editLink = screen.getByRole('link', { name: /edit/i });
-    expect(editLink).toHaveAttribute('href', '/expense/exp1/edit');
+    expect(editLink).toHaveAttribute('href', paths.editExpense('exp1'));
   });
 
   // --- Fixtures for new features ---

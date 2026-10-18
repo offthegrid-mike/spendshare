@@ -4,16 +4,17 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import HouseholdHeader from './HouseholdHeader';
 import type { User } from 'firebase/auth';
 import { makeGroup } from '../test/fixtures';
+import { paths } from '../lib/paths';
 
 const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
 vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
 vi.mock('./MonthControl', () => ({ default: () => <div data-testid="month-control" /> }));
 
-function renderHeader(path: string) {
+function renderHeader(path: string, showHome?: boolean) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <HouseholdHeader groups={[makeGroup('g1', 'Home')]} user={mockUser} startMonth={null} />
+      <HouseholdHeader groups={[makeGroup('g1', 'Home')]} user={mockUser} startMonth={null} showHome={showHome} />
     </MemoryRouter>,
   );
 }
@@ -24,26 +25,26 @@ function LocationProbe() {
 }
 
 describe('HouseholdHeader', () => {
-  it.each(['/', '/summary', '/income'])('shows the household cluster and month control on %s', (path) => {
+  it.each([paths.spend, paths.summary, paths.income])('shows the household cluster and month control on %s', (path) => {
     renderHeader(path);
     expect(screen.getByTestId('group-switcher')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', paths.search);
     expect(screen.getByTestId('month-control')).toBeInTheDocument();
   });
 
-  it('shows the household cluster without a month control on /more', () => {
-    renderHeader('/more');
+  it('shows the household cluster without a month control on /spend/more', () => {
+    renderHeader(paths.more);
     expect(screen.getByTestId('group-switcher')).toBeInTheDocument();
     expect(screen.queryByTestId('month-control')).toBeNull();
   });
 
   it.each([
-    ['/search', 'Search', '/'],
-    ['/categories', 'Categories', '/more'],
-    ['/group/invites', 'Invite', '/more'],
-    ['/group/settings', 'Group settings', '/more'],
-    ['/expense/new', 'New expense', '/'],
-    ['/expense/abc123/edit', 'Edit expense', '/'],
+    [paths.search, 'Search', paths.spend],
+    [paths.categories, 'Categories', paths.more],
+    [paths.groupInvites, 'Invite', paths.more],
+    [paths.groupSettings, 'Group settings', paths.more],
+    [paths.newExpense, 'New expense', paths.spend],
+    [paths.editExpense('abc123'), 'Edit expense', paths.spend],
   ])('secondary route %s shows title "%s" and a back link to %s', (path, title, back) => {
     renderHeader(path);
     expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
@@ -56,8 +57,8 @@ describe('HouseholdHeader', () => {
     render(
       <MemoryRouter
         initialEntries={[
-          { pathname: '/search', state: { query: 'coles', scrollY: 240 } },
-          { pathname: '/expense/abc123/edit', state: { returnToSearch: true } },
+          { pathname: paths.search, state: { query: 'coles', scrollY: 240 } },
+          { pathname: paths.editExpense('abc123'), state: { returnToSearch: true } },
         ]}
         initialIndex={1}
       >
@@ -68,16 +69,31 @@ describe('HouseholdHeader', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Back' }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/search');
+    expect(screen.getByTestId('location')).toHaveTextContent(paths.search);
+  });
+
+  it('links to Home on a primary route when showHome is on', () => {
+    renderHeader(paths.spend, true);
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', paths.home);
+  });
+
+  it('has no Home link without showHome', () => {
+    renderHeader(paths.spend);
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull();
+  });
+
+  it('has no Home link on a secondary route even with showHome', () => {
+    renderHeader(paths.categories, true);
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull();
   });
 
   it('has no sign out button', () => {
-    renderHeader('/');
+    renderHeader(paths.spend);
     expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull();
   });
 
   it('sits on a solid canvas and gains its bottom border only once the page scrolls', () => {
-    renderHeader('/');
+    renderHeader(paths.spend);
     const header = screen.getByRole('banner');
     expect(header.className).toContain('bg-canvas');
     expect(header.className).not.toContain('backdrop-blur');

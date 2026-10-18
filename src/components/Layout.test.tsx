@@ -7,16 +7,19 @@ import Layout from './Layout';
 import { useUIStore } from '../stores/uiStore';
 import { makeGroup } from '../test/fixtures';
 import type { User } from 'firebase/auth';
+import { paths } from '../lib/paths';
 
 vi.mock('../lib/firebase', () => ({ auth: {} }));
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
 vi.mock('../features/invites/PendingInvites', () => ({ default: () => null }));
 vi.mock('./HouseholdHeader', () => ({
-  default: ({ startMonth }: { startMonth: string | null }) => (
-    <div data-testid="household-header" data-start-month={startMonth ?? ''} />
+  default: ({ startMonth, showHome }: { startMonth: string | null; showHome?: boolean }) => (
+    <div data-testid="household-header" data-start-month={startMonth ?? ''} data-show-home={String(showHome)} />
   ),
 }));
-vi.mock('./TopBar', () => ({ default: () => <div data-testid="top-bar" /> }));
+vi.mock('./TopBar', () => ({
+  default: ({ showHome }: { showHome?: boolean }) => <div data-testid="top-bar" data-show-home={String(showHome)} />,
+}));
 vi.mock('./Dock', () => ({ default: () => <nav data-testid="dock" /> }));
 vi.mock('./MonthRail', () => ({ default: () => <nav data-testid="month-rail" /> }));
 const { desktop } = vi.hoisted(() => ({ desktop: { value: false } }));
@@ -39,7 +42,7 @@ vi.mock('../hooks/useGroup', () => ({ useGroup: () => ({ group }) }));
 
 const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
-function renderLayout(path = '/') {
+function renderLayout(path = paths.spend) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -70,6 +73,12 @@ describe('Layout', () => {
     expect(screen.getByTestId('household-header')).toHaveAttribute('data-start-month', '2026-03');
   });
 
+  it('does not show the Home link while the work flag is off', () => {
+    renderLayout();
+    expect(screen.getByTestId('household-header')).toHaveAttribute('data-show-home', 'false');
+    expect(screen.getByTestId('top-bar')).toHaveAttribute('data-show-home', 'false');
+  });
+
   it('keeps the Add Expense sheet closed by default', () => {
     renderLayout();
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
@@ -84,7 +93,7 @@ describe('Layout', () => {
     expect(screen.queryByTestId('bottom-sheet')).toBeNull();
   });
 
-  it.each(['/', '/summary', '/income'])('shows the month rail on desktop at %s', (path) => {
+  it.each([paths.spend, paths.summary, paths.income])('shows the month rail on desktop at %s', (path) => {
     desktop.value = true;
     renderLayout(path);
     expect(screen.getByTestId('month-rail')).toBeInTheDocument();
@@ -92,12 +101,12 @@ describe('Layout', () => {
 
   it('has no month rail on desktop pages that are not month-scoped', () => {
     desktop.value = true;
-    renderLayout('/categories');
+    renderLayout(paths.categories);
     expect(screen.queryByTestId('month-rail')).toBeNull();
   });
 
   it('has no month rail on mobile', () => {
-    renderLayout('/');
+    renderLayout(paths.spend);
     expect(screen.queryByTestId('month-rail')).toBeNull();
   });
 

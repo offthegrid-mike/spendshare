@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth';
 import GroupSwitcher from './GroupSwitcher';
 import { useUIStore } from '../stores/uiStore';
 import { makeGroup } from '../test/fixtures';
+import { paths } from '../lib/paths';
 
 const { createGroup } = vi.hoisted(() => ({ createGroup: vi.fn() }));
 vi.mock('../lib/createGroup', () => ({ createGroup, CURRENCIES: ['AUD', 'USD', 'EUR', 'GBP'] }));
@@ -18,7 +19,7 @@ function Location() {
   return <output data-testid="location">{useLocation().pathname}</output>;
 }
 
-function renderSwitcher({ groups = [home, trip], uid = 'mike', mode = 'popover' as 'sheet' | 'popover', path = '/' } = {}) {
+function renderSwitcher({ groups = [home, trip], uid = 'mike', mode = 'popover' as 'sheet' | 'popover', path = paths.spend } = {}) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <GroupSwitcher groups={groups} user={asUser(uid)} mode={mode} />
@@ -104,15 +105,15 @@ describe('GroupSwitcher', () => {
     await waitFor(() => expect(useUIStore.getState().selectedGroupId).toBe('g-new'));
     expect(useUIStore.getState().notice).toMatchObject({
       message: 'Studio rent created',
-      action: { label: 'Invite people', to: '/group/invites' },
+      action: { label: 'Invite people', to: paths.groupInvites },
     });
   });
 
   it('leaves an expense being edited for the list when the group changes', async () => {
-    renderSwitcher({ path: '/expense/e1/edit' });
+    renderSwitcher({ path: paths.editExpense('e1') });
     await userEvent.click(trigger());
     await userEvent.click(screen.getByRole('option', { name: /Ski trip/ }));
-    expect(screen.getByTestId('location').textContent).toBe('/');
+    expect(screen.getByTestId('location').textContent).toBe(paths.spend);
   });
 
   it('drops a pending joined group when the user picks a group', async () => {
@@ -139,9 +140,9 @@ describe('GroupSwitcher', () => {
   });
 
   it('stays on other pages when the group changes', async () => {
-    renderSwitcher({ path: '/summary' });
+    renderSwitcher({ path: paths.summary });
     await userEvent.click(trigger());
     await userEvent.click(screen.getByRole('option', { name: /Ski trip/ }));
-    expect(screen.getByTestId('location').textContent).toBe('/summary');
+    expect(screen.getByTestId('location').textContent).toBe(paths.summary);
   });
 });

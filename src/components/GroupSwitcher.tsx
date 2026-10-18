@@ -8,10 +8,9 @@ import { AvatarStack } from './ui/Avatar';
 import BottomSheet from './BottomSheet';
 import GroupPicker, { type GroupPickerView, type PickInfo } from '../features/groups/GroupPicker';
 import { membersOf } from '../lib/groupMembers';
+import { isEditExpensePath } from '../lib/routes';
+import { paths } from '../lib/paths';
 import type { GroupDoc } from '../types/models';
-
-// An existing expense belongs to the group it was opened from.
-const EDIT_EXPENSE_PATH = /^\/expense\/[^/]+\/edit$/;
 
 interface Props {
   groups: GroupDoc[];
@@ -55,9 +54,10 @@ export default function GroupSwitcher({ groups, user, mode }: Props) {
     if (id === group.id) return;
     chooseGroup(id);
     if (info.created) {
-      showNotice({ message: `${info.name} created`, action: { label: 'Invite people', to: '/group/invites' } });
+      showNotice({ message: `${info.name} created`, action: { label: 'Invite people', to: paths.groupInvites } });
     }
-    if (EDIT_EXPENSE_PATH.test(pathname)) navigate('/');
+    // An existing expense belongs to the group it was opened from.
+    if (isEditExpensePath(pathname)) navigate(paths.spend);
   }
 
   const title = view === 'list' ? 'Your groups' : 'New group';

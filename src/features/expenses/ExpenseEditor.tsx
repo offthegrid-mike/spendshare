@@ -17,6 +17,7 @@ import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
 import { computeDiscountCents } from '../../lib/discount';
+import { paths } from '../../lib/paths';
 import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
 import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
@@ -460,7 +461,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
     await batch.commit();
     if (newSuggestions !== null && newShops !== null) writeCache(group.id, newSuggestions, newShops);
     clearDraft(group.id);
-    navigate('/');
+    navigate(paths.spend);
     onSuccess?.();
   }
 
@@ -543,7 +544,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         <div className="hidden items-center gap-1 lg:flex">
           {inRouter && (
             <Link
-              to="/"
+              to={paths.spend}
               aria-label="Back"
               onClick={(e) => {
                 if (!returnsToSearch) return;

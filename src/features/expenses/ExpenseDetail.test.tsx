@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseDetail from './ExpenseDetail';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
+import { paths } from '../../lib/paths';
 
 const pair = makeGroup('g1', 'Home');
 const exp = makeExpense('e1', { shopName: 'Woolworths', total: 4250, day: '2026-10-03' });
@@ -21,7 +22,7 @@ describe('ExpenseDetail', () => {
     expect(screen.getByText('Sat 3 Oct · paid by you')).toBeInTheDocument();
     expect(screen.getByText('A$42.50')).toBeInTheDocument();
     expect(screen.getByText('Milk')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/expense/e1/edit');
+    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();
     expect(screen.getByText('Use ↑ ↓ to move between expenses')).toBeInTheDocument();

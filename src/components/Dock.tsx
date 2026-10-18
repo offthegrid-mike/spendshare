@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { BarChart2, MoreHorizontal, Plus, ReceiptText, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useUIStore } from '../stores/uiStore';
 import { isExpenseEditorPath } from '../lib/routes';
+import { paths } from '../lib/paths';
 
 function DockLink({ to, label, icon: Icon, end = false }: { to: string; label: string; icon: LucideIcon; end?: boolean }) {
   return (
@@ -31,8 +32,8 @@ export default function Dock() {
       aria-label="Main"
       className="fixed inset-x-3.5 bottom-[max(14px,env(safe-area-inset-bottom))] z-30 flex items-center rounded-full border border-line bg-surface px-2 py-1 shadow-pop lg:hidden"
     >
-      <DockLink to="/" end label="Expenses" icon={ReceiptText} />
-      <DockLink to="/summary" label="Summary" icon={BarChart2} />
+      <DockLink to={paths.spend} end label="Expenses" icon={ReceiptText} />
+      <DockLink to={paths.summary} label="Summary" icon={BarChart2} />
       <span className="flex flex-1 justify-center">
         <button
           type="button"
@@ -43,8 +44,8 @@ export default function Dock() {
           <Plus size={24} strokeWidth={2} aria-hidden="true" />
         </button>
       </span>
-      <DockLink to="/income" label="Income" icon={TrendingUp} />
-      <DockLink to="/more" label="More" icon={MoreHorizontal} />
+      <DockLink to={paths.income} label="Income" icon={TrendingUp} />
+      <DockLink to={paths.more} label="More" icon={MoreHorizontal} />
     </nav>
   );
 }

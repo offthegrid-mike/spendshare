@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import MoreScreen from './MoreScreen';
+import { paths } from '../../lib/paths';
 
-const { signOut } = vi.hoisted(() => ({ signOut: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../lib/firebase', () => ({ auth: {} }));
 vi.mock('../../lib/features', () => ({ DARK_MODE_ENABLED: true }));
-vi.mock('firebase/auth', () => ({ signOut: (...args: unknown[]) => signOut(...args) }));
+vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
 
 function renderMore() {
   return render(<MemoryRouter><MoreScreen /></MemoryRouter>);
@@ -18,52 +17,29 @@ describe('MoreScreen', () => {
     renderMore();
     const link = screen.getByRole('link', { name: /categories/i });
     expect(link).toBeTruthy();
-    expect(link.getAttribute('href')).toBe('/categories');
+    expect(link.getAttribute('href')).toBe(paths.categories);
   });
 
   it('renders Invites link pointing to /group/invites', () => {
     renderMore();
     const link = screen.getByRole('link', { name: /invites/i });
-    expect(link.getAttribute('href')).toBe('/group/invites');
+    expect(link.getAttribute('href')).toBe(paths.groupInvites);
   });
 
   it('renders Group settings link pointing to /group/settings', () => {
     renderMore();
     const link = screen.getByRole('link', { name: /group settings/i });
-    expect(link.getAttribute('href')).toBe('/group/settings');
+    expect(link.getAttribute('href')).toBe(paths.groupSettings);
   });
 
-  it('renders the appearance switch', () => {
+  it('renders the shared account controls: Appearance and Sign out', () => {
     renderMore();
     expect(screen.getByRole('group', { name: 'Appearance' })).toBeTruthy();
-  });
-
-  it('renders a Sign out button', () => {
-    renderMore();
-    expect(screen.getByRole('button', { name: /sign out/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 
   it('renders the build version stamp', () => {
     renderMore();
     expect(screen.getByText(/built \d{4}-\d{2}-\d{2}/)).toBeTruthy();
-  });
-
-  it('disables the button and shows a loading indicator while signing out, then re-enables if it fails', async () => {
-    let rejectSignOut!: (e: unknown) => void;
-    signOut.mockReturnValue(new Promise((_resolve, reject) => { rejectSignOut = reject; }));
-
-    const u = userEvent.setup();
-    renderMore();
-
-    await u.click(screen.getByRole('button', { name: /sign out/i }));
-
-    expect(await screen.findByRole('button', { name: /signing out/i })).toBeDisabled();
-
-    await act(async () => {
-      rejectSignOut(new Error('network error'));
-      await Promise.resolve().catch(() => {});
-    });
-
-    expect(screen.getByRole('button', { name: /sign out/i })).not.toBeDisabled();
   });
 });

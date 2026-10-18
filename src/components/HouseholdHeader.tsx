@@ -4,6 +4,7 @@ import { ChevronLeft, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
 import MonthControl from './MonthControl';
 import { isSearchReturnState, routeInfo } from '../lib/routes';
+import { paths } from '../lib/paths';
 import { useScrolled } from '../hooks/useScrolled';
 import type { GroupDoc } from '../types/models';
 
@@ -11,10 +12,12 @@ interface Props {
   groups: GroupDoc[];
   user: User;
   startMonth: string | null;
+  /** Show a link back to the Home screen above the household switcher. */
+  showHome?: boolean;
 }
 
 /** Mobile header (below lg): the household on main sections, a back link + title elsewhere. */
-export default function HouseholdHeader({ groups, user, startMonth }: Props) {
+export default function HouseholdHeader({ groups, user, startMonth, showHome = false }: Props) {
   const location = useLocation();
   const { pathname } = location;
   const navigate = useNavigate();
@@ -46,12 +49,21 @@ export default function HouseholdHeader({ groups, user, startMonth }: Props) {
         </div>
       ) : (
         <div className="space-y-2 px-4 pb-2.5 pt-2.5">
+          {showHome && (
+            <Link
+              to={paths.home}
+              className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink"
+            >
+              <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+              Home
+            </Link>
+          )}
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <GroupSwitcher groups={groups} user={user} mode="sheet" />
             </div>
             <Link
-              to="/search"
+              to={paths.search}
               aria-label="Search"
               className="grid h-10 w-10 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink"
             >

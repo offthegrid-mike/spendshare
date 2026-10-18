@@ -6,6 +6,7 @@ import ExpenseBreakdown from './ExpenseBreakdown';
 import { computeAdjustment } from '../../lib/adjustment';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
+import { paths } from '../../lib/paths';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 interface Common {
@@ -106,7 +107,7 @@ export default function ExpenseRow(props: Props) {
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
             <div className="flex gap-2">
-              <Link to={`/expense/${expense.id}/edit`} className="btn-outline flex-1">
+              <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                 Edit
               </Link>

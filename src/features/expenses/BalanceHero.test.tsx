@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { makeGroup } from '../../test/fixtures';
 import type { SettlementDoc } from '../../types/models';
+import { paths } from '../../lib/paths';
 
 const { markSettlementPaid, undoSettlement } = vi.hoisted(() => ({
   markSettlementPaid: vi.fn().mockResolvedValue(undefined),
@@ -89,7 +90,7 @@ describe('BalanceHero', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("You're owed")).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Settle up' })).toHaveAttribute('href', '/summary');
+    expect(screen.getByRole('link', { name: 'Settle up' })).toHaveAttribute('href', paths.summary);
   });
 
   it('says there is nothing to settle in an empty month', () => {

@@ -1,3 +1,5 @@
+import { paths } from './paths';
+
 /** How the app shell treats a route: a main section, or a secondary page with a back link. */
 export type RouteInfo =
   | { kind: 'primary'; monthScoped: boolean }
@@ -12,22 +14,29 @@ export function isSearchReturnState(state: unknown): state is SearchReturnState 
 }
 
 const SECONDARY: Record<string, { title: string; back: string }> = {
-  '/search': { title: 'Search', back: '/' },
-  '/categories': { title: 'Categories', back: '/more' },
-  '/group/invites': { title: 'Invite', back: '/more' },
-  '/group/settings': { title: 'Group settings', back: '/more' },
-  '/expense/new': { title: 'New expense', back: '/' },
+  [paths.search]: { title: 'Search', back: paths.spend },
+  [paths.categories]: { title: 'Categories', back: paths.more },
+  [paths.groupInvites]: { title: 'Invite', back: paths.more },
+  [paths.groupSettings]: { title: 'Group settings', back: paths.more },
+  [paths.newExpense]: { title: 'New expense', back: paths.spend },
 };
 
-const MONTH_SCOPED = new Set(['/', '/summary', '/income']);
+const MONTH_SCOPED = new Set([paths.spend, paths.summary, paths.income]);
+
+const EDIT_EXPENSE_PATH = /^\/spend\/expense\/[^/]+\/edit$/;
 
 export function routeInfo(pathname: string): RouteInfo {
   const secondary = SECONDARY[pathname];
   if (secondary) return { kind: 'secondary', ...secondary };
-  if (/^\/expense\/[^/]+\/edit$/.test(pathname)) return { kind: 'secondary', title: 'Edit expense', back: '/' };
+  if (isEditExpensePath(pathname)) return { kind: 'secondary', title: 'Edit expense', back: paths.spend };
   return { kind: 'primary', monthScoped: MONTH_SCOPED.has(pathname) };
 }
 
+/** An existing expense being edited. */
+export function isEditExpensePath(pathname: string): boolean {
+  return EDIT_EXPENSE_PATH.test(pathname);
+}
+
 export function isExpenseEditorPath(pathname: string): boolean {
-  return pathname.startsWith('/expense/');
+  return pathname.startsWith('/spend/expense/');
 }

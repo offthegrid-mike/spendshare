@@ -8,6 +8,7 @@ import { describeBalance, memberName } from '../../lib/balance';
 import { formatMoney, splitMoney } from '../../lib/money';
 import { monthName } from '../../lib/month';
 import { markSettlementPaid, undoSettlement } from '../../lib/settle';
+import { paths } from '../../lib/paths';
 import type { GroupDoc, SettlementDoc } from '../../types/models';
 
 interface Props {
@@ -73,7 +74,7 @@ export default function BalanceHero({ group, viewerUid, month, items, settlement
       </button>
     );
   } else if (pending) {
-    action = <Link to="/summary" className="btn-primary">Settle up</Link>;
+    action = <Link to={paths.summary} className="btn-primary">Settle up</Link>;
   } else if (undoable) {
     action = (
       <button

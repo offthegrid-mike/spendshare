@@ -7,6 +7,7 @@ import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney } from '../../lib/money';
 import { monthName } from '../../lib/month';
+import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
@@ -215,7 +216,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
           </span>
           <p className="text-sm text-ink-muted">No expenses in {monthName(selectedMonth)} yet</p>
           {isDesktop ? (
-            <Link to="/expense/new" className="btn-primary">
+            <Link to={paths.newExpense} className="btn-primary">
               <Plus size={16} strokeWidth={2} aria-hidden="true" />
               Add expense
             </Link>

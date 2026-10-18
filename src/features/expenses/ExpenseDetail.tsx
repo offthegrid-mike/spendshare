@@ -7,6 +7,7 @@ import { computeAdjustment } from '../../lib/adjustment';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
 import { formatMoney } from '../../lib/money';
+import { paths } from '../../lib/paths';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 interface Props {
@@ -44,7 +45,7 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <div className="mt-auto flex gap-2 pt-2">
-        <Link to={`/expense/${expense.id}/edit`} className="btn-outline flex-1">
+        <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
           <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
           Edit
         </Link>

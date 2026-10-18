@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import SearchScreen from './SearchScreen';
+import { paths } from '../../lib/paths';
 
 const mockUseAllExpenses = vi.fn();
 vi.mock('../../hooks/useAllExpenses', () => ({
@@ -49,12 +50,12 @@ function LocationProbe() {
   return <span data-testid="location">{pathname + search}</span>;
 }
 
-function renderScreen(path = '/search') {
+function renderScreen(path = paths.search) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/search" element={<SearchScreen group={mockGroup} />} />
-        <Route path="/expense/:id/edit" element={<ExpenseRoute />} />
+        <Route path={paths.search} element={<SearchScreen group={mockGroup} />} />
+        <Route path={paths.editExpense(':id')} element={<ExpenseRoute />} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -72,9 +73,9 @@ describe('SearchScreen', () => {
   });
 
   it('starts from the ?q= query handed over by the desktop search bar', () => {
-    renderScreen('/search?q=wool');
+    renderScreen(`${paths.search}?q=wool`);
     expect(screen.getByRole('searchbox')).toHaveValue('wool');
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e1'));
   });
 
   it('prompts for a query before anything is typed', () => {
@@ -87,7 +88,7 @@ describe('SearchScreen', () => {
     await userEvent.type(screen.getByRole('searchbox'), 'wool');
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toBe('/expense/e1/edit');
+    expect(links[0].getAttribute('href')).toBe(paths.editExpense('e1'));
     expect(links[0].textContent).toContain('Woolworths');
   });
 
@@ -95,21 +96,21 @@ describe('SearchScreen', () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), 'worth');
     expect(screen.getByRole('link')).toBeTruthy();
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e1'));
   });
 
   it('finds an expense from another month by item name, including Chinese', async () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), '白');
     const link = screen.getByRole('link');
-    expect(link.getAttribute('href')).toBe('/expense/e2/edit');
+    expect(link.getAttribute('href')).toBe(paths.editExpense('e2'));
     expect(link.textContent).toContain('白菜');
   });
 
   it('links each result to its edit page', async () => {
     renderScreen();
     await userEvent.type(screen.getByRole('searchbox'), 'wool');
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e1'));
   });
 
   it('restores the query and scroll position after returning from an expense', async () => {
@@ -193,7 +194,7 @@ describe('SearchScreen', () => {
     fireEvent.compositionEnd(input, { target: { value: '街' } });
 
     expect(input.value).toBe('街');
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e2/edit');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e2'));
   });
 
   it('keeps searching normally for input typed without an IME', () => {
@@ -202,7 +203,7 @@ describe('SearchScreen', () => {
 
     fireEvent.change(input, { target: { value: 'wool' } });
 
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e1'));
   });
 
   // The query is deliberately kept out of the URL: it churned the address bar on
@@ -211,8 +212,8 @@ describe('SearchScreen', () => {
     renderScreen();
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'wool' } });
 
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e1/edit');
-    expect(screen.getByTestId('location').textContent).toBe('/search');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e1'));
+    expect(screen.getByTestId('location').textContent).toBe(paths.search);
   });
 
   it('keeps the query out of the URL when an IME composition commits', () => {
@@ -223,8 +224,8 @@ describe('SearchScreen', () => {
     fireEvent.change(input, { target: { value: '街' } });
     fireEvent.compositionEnd(input, { target: { value: '街' } });
 
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/expense/e2/edit');
-    expect(screen.getByTestId('location').textContent).toBe('/search');
+    expect(screen.getByRole('link').getAttribute('href')).toBe(paths.editExpense('e2'));
+    expect(screen.getByTestId('location').textContent).toBe(paths.search);
   });
 
   it('shows an error message when the fetch failed', () => {

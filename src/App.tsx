@@ -1,15 +1,12 @@
 import { useEffect } from 'react';
-import { Routes, Route, useParams } from 'react-router-dom';
+import { Navigate, Routes, Route, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useGroups } from './hooks/useGroups';
 import { useUIStore } from './stores/uiStore';
 import { resolveSelection } from './lib/groupSelection';
 import SignIn from './features/auth/SignIn';
-import Layout from './components/Layout';
-import CreateGroup from './features/groups/CreateGroup';
 import GroupSettings from './features/groups/GroupSettings';
 import SendInvite from './features/invites/SendInvite';
-import PendingInvites from './features/invites/PendingInvites';
 import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
@@ -20,6 +17,11 @@ import { useIncome } from './hooks/useIncome';
 import Summary from './features/summary/Summary';
 import MoreScreen from './features/more/MoreScreen';
 import SearchScreen from './features/search/SearchScreen';
+import HomeScreen from './features/home/HomeScreen';
+import SpendGate from './features/shell/SpendGate';
+import LegacyRedirect from './features/shell/LegacyRedirect';
+import { paths } from './lib/paths';
+import { WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
 import type { User } from 'firebase/auth';
 import type { GroupDoc } from './types/models';
@@ -73,41 +75,34 @@ function App() {
 
   if (!user) return <SignIn />;
 
-  // No groups yet → create one (but still surface pending invites so an
-  // invited user with no groups of their own can accept and gain access)
-  if (groups.length === 0) {
-    return (
-      <>
-        <div className="mx-auto max-w-sm px-4 pt-8 empty:hidden">
-          <PendingInvites user={user} />
-        </div>
-        <CreateGroup user={user} />
-      </>
-    );
-  }
-
   return (
     <Routes>
-      <Route element={<Layout groups={groups} user={user} />}>
-        <Route path="/" element={group ? <ExpenseList group={group} currentUserUid={user.uid} /> : <RouteSkeleton />} />
+      <Route
+        path={paths.home}
+        element={
+          WORK_ENABLED ? <HomeScreen user={user} groups={groups} group={group} /> : <Navigate to={paths.spend} replace />
+        }
+      />
+      <Route path={paths.spend} element={<SpendGate groups={groups} user={user} />}>
+        <Route index element={group ? <ExpenseList group={group} currentUserUid={user.uid} /> : <RouteSkeleton />} />
         <Route
-          path="/search"
+          path="search"
           element={group ? <SearchScreen group={group} /> : <RouteSkeleton />}
         />
         <Route
-          path="/group/settings"
+          path="group/settings"
           element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}
         />
         <Route
-          path="/group/invites"
+          path="group/invites"
           element={group ? <SendInvite key={group.id} user={user} group={group} /> : <RouteSkeleton />}
         />
         <Route
-          path="/categories"
+          path="categories"
           element={selectedGroupId ? <CategoryManager /> : <RouteSkeleton />}
         />
         <Route
-          path="/expense/new"
+          path="expense/new"
           element={
             group ? (
               <ExpenseEditor key={group.id} group={group} groups={groups} user={user} currentUserUid={user.uid} />
@@ -117,11 +112,11 @@ function App() {
           }
         />
         <Route
-          path="/expense/:id/edit"
+          path="expense/:id/edit"
           element={group ? <EditExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
         />
         <Route
-          path="/income"
+          path="income"
           element={
             group ? (
               <IncomeRouteWrapper group={group} user={user} />
@@ -131,11 +126,12 @@ function App() {
           }
         />
         <Route
-          path="/summary"
+          path="summary"
           element={group ? <SummaryRouteWrapper group={group} user={user} /> : <RouteSkeleton />}
         />
-        <Route path="/more" element={<MoreScreen />} />
+        <Route path="more" element={<MoreScreen />} />
       </Route>
+      <Route path="*" element={<LegacyRedirect />} />
     </Routes>
   );
 }
