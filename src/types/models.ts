@@ -54,6 +54,38 @@ export interface SuggestionsDoc {
   updatedAt: Timestamp;
 }
 
+export type WorkDayType = 'home' | 'office' | 'leave';
+
+export interface WorkRevision {
+  at: Timestamp;                       // device clock; serverTimestamp cannot go inside an array
+  kind: 'save' | 'confirm' | 'include' | 'exclude';
+  type: WorkDayType | null;
+  startTime?: string; finishTime?: string; minutes?: number;
+  addedLater: boolean; countedInClaim: boolean; finishConfirmed: boolean;
+}
+
+export interface WorkDayDoc {
+  date: string;                        // 'YYYY-MM-DD' (= document id)
+  incomeYear: string;                  // '2026-27'
+  type: WorkDayType | null;            // null = cleared
+  startTime?: string; finishTime?: string; minutes?: number;   // home only
+  addedLater: boolean;
+  countedInClaim: boolean;
+  finishConfirmed: boolean;
+  finishConfirmedAt?: Timestamp;
+  firstRecordedAt: Timestamp;
+  recordedAt: Timestamp;               // latest change of type or times
+  syncedAt: Timestamp | null;          // serverTimestamp() of the latest write; null until the server acknowledges it
+  revisions: WorkRevision[];           // append-only
+}
+
+export interface WorkSettingsDoc {
+  workWeekdays: number[];              // ISO 1 (Mon) to 7 (Sun)
+  defaultMinutes: number;
+  ratesCentsPerHour: Record<string, number>;
+  trackingStartDate: string | null;
+}
+
 export const itemSchema = z.object({
   groupId: z.string(), expenseId: z.string(), month: z.string().regex(/^\d{4}-\d{2}$/),
   name: z.string().min(1), categoryId: z.string(), category: z.string(),

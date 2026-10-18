@@ -31,6 +31,51 @@ service cloud.firestore {
       allow create, update, delete: if signedIn() && request.auth.uid == uid;
     }
 
+    // Work tracker. Rules do not inherit from users/{uid}, so the subcollections
+    // need their own blocks. A Work day is a tax record: it is never deleted and
+    // every save appends exactly one revision (the app writes it with arrayUnion).
+    function validWorkDay(d, day) {
+      return d.date == day
+        && (d.type == null || d.type in ['home', 'office', 'leave'])
+        && (!('minutes' in d) || (d.minutes is int && d.minutes >= 1 && d.minutes <= 1440))
+        && d.addedLater is bool && d.countedInClaim is bool && d.finishConfirmed is bool
+        // size() also works on a string or a map, so the history must be a real list.
+        && d.revisions is list;
+    }
+
+    match /users/{uid}/workDays/{day} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && validWorkDay(request.resource.data, day)
+        && request.resource.data.revisions.size() == 1;
+      allow update: if signedIn() && request.auth.uid == uid
+        && validWorkDay(request.resource.data, day)
+        && request.resource.data.revisions.size() == resource.data.revisions.size() + 1
+        && request.resource.data.revisions[0:resource.data.revisions.size()] == resource.data.revisions;
+      allow delete: if false;
+    }
+
+    match /users/{uid}/workSettings/{doc} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && doc == 'main'
+        && (!('workWeekdays' in request.resource.data)
+            || request.resource.data.workWeekdays.hasOnly([1, 2, 3, 4, 5, 6, 7]))
+        && (!('defaultMinutes' in request.resource.data)
+            || (request.resource.data.defaultMinutes is int
+                && request.resource.data.defaultMinutes >= 1 && request.resource.data.defaultMinutes <= 1440))
+        // Rules cannot iterate a map's values, so the client validates each rate
+        // (a finite number, 0 or more); this only keeps the field a map.
+        && (!('ratesCentsPerHour' in request.resource.data)
+            || request.resource.data.ratesCentsPerHour is map)
+        // A malformed start date can make the app's missing-days scan throw.
+        && (!('trackingStartDate' in request.resource.data)
+            || request.resource.data.trackingStartDate == null
+            || (request.resource.data.trackingStartDate is string
+                && request.resource.data.trackingStartDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')));
+      allow delete: if false;
+    }
+
     match /groups/{groupId} {
       allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
       allow create: if signedIn()

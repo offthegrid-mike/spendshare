@@ -35,7 +35,7 @@ export function formatMonthLabel(ym: string): string {
 }
 
 /** 'YYYY-MM-DD' for a timestamp, via Intl (avoids `new Date()`). */
-function isoDay(now: number): string {
+export function isoDay(now: number): string {
   return new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
     month: '2-digit',
