@@ -15,6 +15,12 @@ describe('paths', () => {
     expect(paths.groupSettings).toBe('/spend/group/settings');
     expect(paths.groupInvites).toBe('/spend/group/invites');
   });
+
+  it('puts the Work tracker under /work', () => {
+    expect(paths.work).toBe('/work');
+    expect(paths.workMonth).toBe('/work/month');
+    expect(paths.workMore).toBe('/work/more');
+  });
 });
 
 describe('legacyTarget', () => {

@@ -20,6 +20,10 @@ import SearchScreen from './features/search/SearchScreen';
 import HomeScreen from './features/home/HomeScreen';
 import SpendGate from './features/shell/SpendGate';
 import LegacyRedirect from './features/shell/LegacyRedirect';
+import WorkLayout from './features/work/WorkLayout';
+import TodayTab from './features/work/TodayTab';
+import MonthTab from './features/work/MonthTab';
+import WorkSettings from './features/work/WorkSettings';
 import { paths } from './lib/paths';
 import { WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
@@ -83,6 +87,13 @@ function App() {
           WORK_ENABLED ? <HomeScreen user={user} groups={groups} group={group} /> : <Navigate to={paths.spend} replace />
         }
       />
+      {WORK_ENABLED && (
+        <Route path={paths.work} element={<WorkLayout user={user} />}>
+          <Route index element={<TodayTab />} />
+          <Route path="month" element={<MonthTab />} />
+          <Route path="more" element={<WorkSettings />} />
+        </Route>
+      )}
       <Route path={paths.spend} element={<SpendGate groups={groups} user={user} />}>
         <Route index element={group ? <ExpenseList group={group} currentUserUid={user.uid} /> : <RouteSkeleton />} />
         <Route

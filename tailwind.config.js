@@ -28,6 +28,7 @@ export default {
         line: token('line'),
         negative: token('negative'),
         warning: token('warning'),
+        'warning-soft': token('warning-soft'),
         'on-accent': token('on-accent'),
         ink: {
           DEFAULT: token('ink'),

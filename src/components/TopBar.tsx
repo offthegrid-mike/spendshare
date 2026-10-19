@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import { ChevronLeft, Plus, Search } from 'lucide-react';
 import GroupSwitcher from './GroupSwitcher';
+import SectionPills from './SectionPills';
 import SettingsMenu from './SettingsMenu';
 import { paths } from '../lib/paths';
 import type { GroupDoc } from '../types/models';
@@ -71,22 +72,7 @@ export default function TopBar({ groups, user, showHome = false }: Props) {
       <div className="min-w-0 max-w-[240px]">
         <GroupSwitcher groups={groups} user={user} mode="popover" />
       </div>
-      <nav aria-label="Sections" className="flex rounded-full bg-recessed p-[3px]">
-        {SECTIONS.map(({ to, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-surface text-ink ring-1 ring-line' : 'text-ink-muted hover:text-ink'
-              }`
-            }
-          >
-            {label}
-          </NavLink>
-        ))}
-      </nav>
+      <SectionPills sections={SECTIONS} />
       <form
         role="search"
         onSubmit={onSubmit}

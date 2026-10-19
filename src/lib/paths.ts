@@ -1,4 +1,4 @@
-/** Every SpendShare screen lives under /spend; '/' is the Home screen. */
+/** Every SpendShare screen lives under /spend, the Work tracker under /work; '/' is the Home screen. */
 export const paths = {
   home: '/',
   spend: '/spend',
@@ -11,6 +11,9 @@ export const paths = {
   categories: '/spend/categories',
   groupSettings: '/spend/group/settings',
   groupInvites: '/spend/group/invites',
+  work: '/work',
+  workMonth: '/work/month',
+  workMore: '/work/more',
 };
 
 // The pre-/spend URLs, kept so old bookmarks and shared links still land.

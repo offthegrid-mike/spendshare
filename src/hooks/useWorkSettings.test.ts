@@ -42,6 +42,25 @@ describe('useWorkSettings', () => {
     expect(result.current.loading).toBe(false);
   });
 
+  it('is not loaded until a snapshot arrives, and is loaded after one with no document', () => {
+    const { result } = renderHook(() => useWorkSettings('u1'));
+    expect(result.current.loaded).toBe(false);
+
+    act(() => {
+      callbacks.get('SETTINGS_REF:u1')!(missingSnap());
+    });
+    expect(result.current.loaded).toBe(true);
+  });
+
+  it('is loaded after a snapshot of an existing document', () => {
+    const { result } = renderHook(() => useWorkSettings('u1'));
+
+    act(() => {
+      callbacks.get('SETTINGS_REF:u1')!(existingSnap({ defaultMinutes: 450 }));
+    });
+    expect(result.current.loaded).toBe(true);
+  });
+
   it('gives the defaults when the settings document does not exist', () => {
     const { result } = renderHook(() => useWorkSettings('u1'));
 
@@ -114,6 +133,7 @@ describe('useWorkSettings', () => {
     const { result } = renderHook(() => useWorkSettings(undefined));
 
     expect(result.current.loading).toBe(false);
+    expect(result.current.loaded).toBe(false);
     expect(result.current.settings).toEqual(DEFAULT_WORK_SETTINGS);
     expect(callbacks.size).toBe(0);
   });
@@ -129,6 +149,7 @@ describe('useWorkSettings', () => {
 
     rerender({ uid: 'u2' });
     expect(result.current.loading).toBe(true);
+    expect(result.current.loaded).toBe(false);
     expect(result.current.settings).toEqual(DEFAULT_WORK_SETTINGS);
     expect(callbacks.has('SETTINGS_REF:u1')).toBe(false);
     expect(callbacks.has('SETTINGS_REF:u2')).toBe(true);
@@ -148,6 +169,7 @@ describe('useWorkSettings', () => {
     rerender({ uid: 'u2' });
     rerender({ uid: 'u1' });
     expect(result.current.loading).toBe(true);
+    expect(result.current.loaded).toBe(false);
     expect(result.current.settings).toEqual(DEFAULT_WORK_SETTINGS);
 
     // A's new listener then loads as normal.
@@ -167,6 +189,16 @@ describe('useWorkSettings', () => {
     });
     expect(result.current.loading).toBe(false);
     expect(result.current.settings).toEqual(DEFAULT_WORK_SETTINGS);
+  });
+
+  it('is not loaded after a listener error, because the settings are only the defaults', () => {
+    const { result } = renderHook(() => useWorkSettings('u1'));
+
+    act(() => {
+      errorCallbacks.get('SETTINGS_REF:u1')!();
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.loaded).toBe(false);
   });
 
   it('unsubscribes when the component unmounts', () => {

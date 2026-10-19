@@ -7,13 +7,16 @@ import type { WorkSettingsDoc } from '../types/models';
 /**
  * A user's Work settings, with the defaults filling anything not saved yet.
  * `settings` keeps its identity between renders until the document changes, so
- * callers can safely list it in an effect's dependencies.
+ * callers can safely list it in an effect's dependencies. `loaded` is true only
+ * once a real snapshot has arrived: after a listener error `loading` ends but the
+ * settings are only the defaults, so writes must not treat them as the user's.
  */
 export function useWorkSettings(
   uid: string | undefined,
-): { settings: WorkSettingsDoc; loading: boolean } {
+): { settings: WorkSettingsDoc; loading: boolean; loaded: boolean } {
   const [raw, setRaw] = useState<WorkSettingsDoc | undefined>(undefined);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [snapshotKey, setSnapshotKey] = useState<string | null>(null);
 
   const key = uid || null;
 
@@ -25,6 +28,7 @@ export function useWorkSettings(
     const unsub = onSnapshot(workSettingsRef(uid), (snap) => {
       setRaw(snap.exists() ? snap.data() : undefined);
       setLoadedKey(uid);
+      setSnapshotKey(uid);
     }, () => {
       // Unblock loading so a failed listener cannot hang the screen; the
       // defaults stand in until a snapshot arrives.
@@ -38,11 +42,13 @@ export function useWorkSettings(
       // loading instead of the defaults as if they were A's settings.
       setRaw(undefined);
       setLoadedKey(null);
+      setSnapshotKey(null);
     };
   }, [uid]);
 
   const settings = useMemo(() => withDefaults(raw), [raw]);
   const loading = key !== null && loadedKey !== key;
+  const loaded = key !== null && snapshotKey === key;
 
-  return { settings, loading };
+  return { settings, loading, loaded };
 }

@@ -28,6 +28,10 @@ vi.mock('./hooks/useExpense', () => ({
   useExpense: () => ({ expense: state.expense, items: [], loading: false }),
 }));
 vi.mock('./hooks/useIncome', () => ({ useIncome: () => ({ income: null, loading: false }) }));
+vi.mock('./hooks/useWorkSettings', async () => {
+  const { DEFAULT_WORK_SETTINGS } = await import('./lib/work/workSettings');
+  return { useWorkSettings: () => ({ settings: DEFAULT_WORK_SETTINGS, loading: false, loaded: true }) };
+});
 
 vi.mock('./components/Layout', async () => {
   const { Outlet } = await import('react-router-dom');
@@ -49,6 +53,9 @@ vi.mock('./features/income/IncomeEditor', () => ({ default: () => <div data-test
 vi.mock('./features/summary/Summary', () => ({ default: () => <div data-testid="summary" /> }));
 vi.mock('./features/more/MoreScreen', () => ({ default: () => <div data-testid="more-screen" /> }));
 vi.mock('./features/search/SearchScreen', () => ({ default: () => <div data-testid="search-screen" /> }));
+vi.mock('./features/work/TodayTab', () => ({ default: () => <div data-testid="work-today" /> }));
+vi.mock('./features/work/MonthTab', () => ({ default: () => <div data-testid="work-month" /> }));
+vi.mock('./features/work/WorkSettings', () => ({ default: () => <div data-testid="work-more" /> }));
 vi.mock('./features/home/HomeScreen', () => ({
   default: ({ user, groups, group }: { user: { uid: string }; groups: unknown[]; group: { id: string } | null }) => (
     <div data-testid="home-screen" data-user={user.uid} data-groups={groups.length} data-group={group?.id ?? ''} />
@@ -119,6 +126,17 @@ describe('App routes', () => {
     expect(screen.getByTestId('expense-list')).toBeInTheDocument();
     expect(location()).toBe('/spend');
   });
+
+  it.each([paths.work, paths.workMonth, paths.workMore])(
+    'sends %s to the expenses list while the work tracker is off',
+    (path) => {
+      renderApp(path);
+      expect(screen.getByTestId('expense-list')).toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Work' })).toBeNull();
+      expect(screen.queryByTestId('work-today')).toBeNull();
+      expect(location()).toBe('/spend');
+    },
+  );
 });
 
 describe('App route table', () => {
@@ -244,5 +262,40 @@ describe('App with the work tracker on', () => {
     renderApp('/');
     expect(screen.getByTestId('sign-in')).toBeInTheDocument();
     expect(screen.queryByTestId('home-screen')).toBeNull();
+  });
+
+  it('serves the Work layout and the Today tab at /work without redirecting', () => {
+    renderApp(paths.work);
+    expect(screen.getByRole('navigation', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByTestId('work-today')).toBeInTheDocument();
+    expect(location()).toBe('/work');
+  });
+
+  it('serves the Month and More tabs inside the Work layout', () => {
+    const { unmount } = renderApp(paths.workMonth);
+    expect(screen.getByTestId('work-month')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Work' })).toBeInTheDocument();
+    expect(location()).toBe('/work/month');
+    unmount();
+
+    renderApp(paths.workMore);
+    expect(screen.getByTestId('work-more')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Work' })).toBeInTheDocument();
+    expect(location()).toBe('/work/more');
+  });
+
+  it('works for a user with no groups', () => {
+    state.groups = [];
+    renderApp(paths.work);
+    expect(screen.getByTestId('work-today')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-group')).toBeNull();
+  });
+
+  it('shows the sign-in screen at /work when signed out', () => {
+    state.user = null;
+    renderApp(paths.work);
+    expect(screen.getByTestId('sign-in')).toBeInTheDocument();
+    expect(screen.queryByTestId('work-today')).toBeNull();
   });
 });

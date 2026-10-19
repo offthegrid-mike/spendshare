@@ -19,6 +19,7 @@
     --on-accent: 247 252 249;
     --negative: 194 54 75;
     --warning: 146 84 5;
+    --warning-soft: 253 241 217;
     --shadow-pop: 0 8px 24px -8px rgb(16 40 28 / 0.18);
     color-scheme: light;
   }
@@ -40,6 +41,7 @@
       --on-accent: 3 18 11;
       --negative: 255 138 151;
       --warning: 251 191 36;
+      --warning-soft: 58 42 8;
       --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
       color-scheme: dark;
     }
@@ -59,6 +61,7 @@
     --on-accent: 3 18 11;
     --negative: 255 138 151;
     --warning: 251 191 36;
+    --warning-soft: 58 42 8;
     --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }

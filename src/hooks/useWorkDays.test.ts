@@ -142,7 +142,7 @@ describe('useWorkDays', () => {
   it('does not subscribe without a uid and reports no days and no loading', () => {
     const { result } = renderHook(() => useWorkDays(undefined, '2026-27'));
 
-    expect(result.current).toEqual({ days: [], loading: false });
+    expect(result.current).toEqual({ days: [], loading: false, error: false });
     expect(callbacks.size).toBe(0);
     expect(queryCalls).toHaveLength(0);
   });
@@ -156,6 +156,72 @@ describe('useWorkDays', () => {
     });
     expect(result.current.loading).toBe(false);
     expect(result.current.days).toEqual([]);
+  });
+
+  describe('error', () => {
+    it('is false while loading and once the days have loaded', () => {
+      const { result } = renderHook(() => useWorkDays('u1', '2026-27'));
+      expect(result.current.error).toBe(false);
+
+      act(() => {
+        callbacks.get('WORK_DAYS_COL:u1')!(fakeSnap([{ id: '2026-07-01', data: { type: 'home' } }]));
+      });
+      expect(result.current.error).toBe(false);
+    });
+
+    // Without it an empty list after a failure reads as a year with no days.
+    it('is set when the listener fails before any snapshot', () => {
+      const { result } = renderHook(() => useWorkDays('u1', '2026-27'));
+      act(() => {
+        errorCallbacks.get('WORK_DAYS_COL:u1')!();
+      });
+      expect(result.current).toEqual({ days: [], loading: false, error: true });
+    });
+
+    it('is cleared by a later snapshot', () => {
+      const { result } = renderHook(() => useWorkDays('u1', '2026-27'));
+      act(() => {
+        errorCallbacks.get('WORK_DAYS_COL:u1')!();
+      });
+      expect(result.current.error).toBe(true);
+
+      act(() => {
+        callbacks.get('WORK_DAYS_COL:u1')!(fakeSnap([{ id: '2026-07-01', data: { type: 'home' } }]));
+      });
+      expect(result.current.error).toBe(false);
+      expect(result.current.days).toHaveLength(1);
+    });
+
+    it('is cleared when the income year changes, and stays clear on stepping back', () => {
+      const { result, rerender } = renderHook(({ year }) => useWorkDays('u1', year), {
+        initialProps: { year: '2026-27' },
+      });
+      act(() => {
+        errorCallbacks.get('WORK_DAYS_COL:u1')!();
+      });
+      expect(result.current.error).toBe(true);
+
+      rerender({ year: '2027-28' });
+      expect(result.current.error).toBe(false);
+      expect(result.current.loading).toBe(true);
+
+      rerender({ year: '2026-27' });
+      expect(result.current.error).toBe(false);
+      expect(result.current.loading).toBe(true);
+    });
+
+    it('is cleared when the user changes', () => {
+      const { result, rerender } = renderHook(({ uid }) => useWorkDays(uid, '2026-27'), {
+        initialProps: { uid: 'u1' as string | undefined },
+      });
+      act(() => {
+        errorCallbacks.get('WORK_DAYS_COL:u1')!();
+      });
+      expect(result.current.error).toBe(true);
+
+      rerender({ uid: undefined });
+      expect(result.current.error).toBe(false);
+    });
   });
 
   it('unsubscribes when the component unmounts', () => {
