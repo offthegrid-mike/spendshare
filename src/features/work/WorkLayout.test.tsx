@@ -28,6 +28,7 @@ function renderLayout(path: string = paths.work) {
         <Route path={paths.work} element={<WorkLayout user={mike} />}>
           <Route index element={<Page />} />
           <Route path="month" element={<Page />} />
+          <Route path="year" element={<Page />} />
           <Route path="more" element={<Page />} />
         </Route>
       </Routes>
@@ -47,12 +48,21 @@ describe('WorkLayout on a phone', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Work' })).toBeInTheDocument();
   });
 
-  it('docks Today, Month and More under a navigation named Work', () => {
+  it('docks Today, Month, Year and More under a navigation named Work', () => {
     renderLayout();
     const dock = screen.getByRole('navigation', { name: 'Work' });
+    const links = within(dock).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['Today', 'Month', 'Year', 'More']);
     expect(within(dock).getByRole('link', { name: 'Today' })).toHaveAttribute('href', '/work');
     expect(within(dock).getByRole('link', { name: 'Month' })).toHaveAttribute('href', '/work/month');
+    expect(within(dock).getByRole('link', { name: 'Year' })).toHaveAttribute('href', '/work/year');
     expect(within(dock).getByRole('link', { name: 'More' })).toHaveAttribute('href', '/work/more');
+  });
+
+  it('marks Year current on /work/year', () => {
+    renderLayout(paths.workYear);
+    const dock = screen.getByRole('navigation', { name: 'Work' });
+    expect(within(dock).getByRole('link', { name: 'Year' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('marks Today current on /work but not on /work/month', () => {
@@ -101,9 +111,11 @@ describe('WorkLayout on desktop', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
   });
 
-  it('offers Today and Month as sections, and a link to the settings on More', () => {
+  it('offers Today, Month and Year as sections, and a link to the settings on More', () => {
     renderLayout();
     const sections = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(sections).getAllByRole('link').map((link) => link.textContent)).toEqual(['Today', 'Month', 'Year']);
+    expect(within(sections).getByRole('link', { name: 'Year' })).toHaveAttribute('href', '/work/year');
     expect(within(sections).getByRole('link', { name: 'Today' })).toHaveAttribute('href', '/work');
     expect(within(sections).getByRole('link', { name: 'Month' })).toHaveAttribute('href', '/work/month');
     expect(screen.getByRole('link', { name: 'Work settings' })).toHaveAttribute('href', '/work/more');

@@ -103,4 +103,31 @@ describe('YearToDateCard', () => {
     expect(screen.getByText('Added later · 1 day · 7.6 h · not in the claim')).toBeInTheDocument();
     expect(screen.getByText('Not confirmed · 3 days · 22.8 h · still counted')).toBeInTheDocument();
   });
+
+  it('links the added-later line to the review on the Year tab', () => {
+    renderCard({ summary: { ...SUMMARY, addedLater: { days: 2, minutes: 912 } } });
+    expect(screen.getByRole('link', { name: 'Include ›' })).toHaveAttribute('href', '/work/year#late');
+    expect(screen.queryByRole('link', { name: 'Review ›' })).toBeNull();
+  });
+
+  it('links the not-confirmed line to the review on the Year tab', () => {
+    renderCard({ summary: { ...SUMMARY, notConfirmed: { days: 1, minutes: 456 } } });
+    expect(screen.getByRole('link', { name: 'Review ›' })).toHaveAttribute('href', '/work/year#confirm');
+    expect(screen.queryByRole('link', { name: 'Include ›' })).toBeNull();
+  });
+
+  it('leaves the links out on the Year tab itself', () => {
+    renderCard({
+      linkToYear: false,
+      summary: { ...SUMMARY, addedLater: { days: 1, minutes: 456 }, notConfirmed: { days: 1, minutes: 456 } },
+    });
+    expect(screen.getByText('Added later · 1 day · 7.6 h · not in the claim')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Include ›' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Review ›' })).toBeNull();
+  });
+
+  it('drops "so far" from the heading of a year that has ended', () => {
+    renderCard({ incomeYear: '2025-26', finished: true });
+    expect(screen.getByRole('heading', { name: 'Income year 2025–26' })).toBeInTheDocument();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstNameOf, greeting, hourOf, longDate } from './greeting';
+import { firstNameOf, greeting, longDate } from './greeting';
 
 describe('greeting', () => {
   it('says good morning before noon', () => {
@@ -36,16 +36,10 @@ describe('firstNameOf', () => {
   });
 });
 
-describe('longDate and hourOf', () => {
-  const monday9am = new Date(2026, 9, 19, 9, 0).getTime();
-
-  it('formats the weekday, day and month with single spaces', () => {
-    expect(longDate(monday9am)).toBe('Monday 19 October');
-  });
-
-  it('reads the local hour, 0 to 23', () => {
-    expect(hourOf(monday9am)).toBe(9);
-    expect(hourOf(new Date(2026, 9, 19, 0, 30).getTime())).toBe(0);
-    expect(hourOf(new Date(2026, 9, 19, 23, 59).getTime())).toBe(23);
+describe('longDate', () => {
+  it('writes a local date as the weekday, day and month with single spaces', () => {
+    expect(longDate('2026-10-19')).toBe('Monday 19 October');
+    expect(longDate('2026-10-18')).toBe('Sunday 18 October');
+    expect(longDate('2027-01-01')).toBe('Friday 1 January');
   });
 });

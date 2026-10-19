@@ -73,10 +73,10 @@ describe('Layout', () => {
     expect(screen.getByTestId('household-header')).toHaveAttribute('data-start-month', '2026-03');
   });
 
-  it('does not show the Home link while the work flag is off', () => {
+  it('shows the Home link now that Work is on', () => {
     renderLayout();
-    expect(screen.getByTestId('household-header')).toHaveAttribute('data-show-home', 'false');
-    expect(screen.getByTestId('top-bar')).toHaveAttribute('data-show-home', 'false');
+    expect(screen.getByTestId('household-header')).toHaveAttribute('data-show-home', 'true');
+    expect(screen.getByTestId('top-bar')).toHaveAttribute('data-show-home', 'true');
   });
 
   it('keeps the Add Expense sheet closed by default', () => {

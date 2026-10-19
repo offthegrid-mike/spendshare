@@ -23,6 +23,7 @@ import LegacyRedirect from './features/shell/LegacyRedirect';
 import WorkLayout from './features/work/WorkLayout';
 import TodayTab from './features/work/TodayTab';
 import MonthTab from './features/work/MonthTab';
+import YearTab from './features/work/YearTab';
 import WorkSettings from './features/work/WorkSettings';
 import { paths } from './lib/paths';
 import { WORK_ENABLED } from './lib/features';
@@ -91,6 +92,7 @@ function App() {
         <Route path={paths.work} element={<WorkLayout user={user} />}>
           <Route index element={<TodayTab />} />
           <Route path="month" element={<MonthTab />} />
+          <Route path="year" element={<YearTab />} />
           <Route path="more" element={<WorkSettings />} />
         </Route>
       )}

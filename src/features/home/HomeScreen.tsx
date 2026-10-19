@@ -1,11 +1,12 @@
-import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import BrandMark from '../../components/BrandMark';
 import Notice from '../../components/Notice';
 import SettingsMenu from '../../components/SettingsMenu';
-import { firstNameOf, greeting, hourOf, longDate } from '../../lib/greeting';
+import { useWorkClock } from '../../hooks/useWorkClock';
+import { firstNameOf, greeting, longDate } from '../../lib/greeting';
 import PendingInvites from '../invites/PendingInvites';
 import SpendTile from './SpendTile';
+import WorkTile from './WorkTile';
 import type { GroupDoc } from '../../types/models';
 
 interface Props {
@@ -17,8 +18,9 @@ interface Props {
 
 /** The screen after sign-in: a greeting, any pending invites, and a tile for each side of the app. */
 export default function HomeScreen({ user, groups, group }: Props) {
-  // Read once on mount: the greeting and date don't need to tick.
-  const [now] = useState(() => Date.now());
+  // The Work clock ticks each minute (and on returning to the tab), so a Home
+  // screen left open overnight greets the new morning with the new date.
+  const clock = useWorkClock();
   const firstName = firstNameOf(user.displayName, user.email);
 
   return (
@@ -31,14 +33,19 @@ export default function HomeScreen({ user, groups, group }: Props) {
           </div>
           <SettingsMenu links={[]} account={{ name: user.displayName?.trim() || firstName, email: user.email ?? '' }} />
         </header>
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">{greeting(hourOf(now), firstName)}</h1>
-        <p className="mb-4 mt-0.5 text-[13px] text-ink-muted">{longDate(now)}</p>
-        <div className="mb-4 empty:hidden">
-          <PendingInvites user={user} />
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SpendTile groups={groups} group={group} viewerUid={user.uid} />
-        </div>
+        <main>
+          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">
+            {greeting(Math.floor(clock.nowMinutes / 60), firstName)}
+          </h1>
+          <p className="mb-4 mt-0.5 text-[13px] text-ink-muted">{longDate(clock.today)}</p>
+          <div className="mb-4 empty:hidden">
+            <PendingInvites user={user} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SpendTile groups={groups} group={group} viewerUid={user.uid} />
+            <WorkTile uid={user.uid} />
+          </div>
+        </main>
       </div>
       <Notice />
     </div>

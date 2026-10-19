@@ -77,6 +77,12 @@ describe('HouseholdHeader', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', paths.home);
   });
 
+  it('gives the Home link a tap target of at least 40px without moving it', () => {
+    renderHeader(paths.spend, true);
+    // 20px of text plus 10px of padding above and below, taken back out of the layout by the negative margin.
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveClass('py-2.5', '-my-2.5');
+  });
+
   it('has no Home link without showHome', () => {
     renderHeader(paths.spend);
     expect(screen.queryByRole('link', { name: 'Home' })).toBeNull();

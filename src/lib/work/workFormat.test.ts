@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dayLabel, dayListLabel } from './workFormat';
+import { byDate, dayLabel, dayListLabel, shortDayLabel, weekdayShort } from './workFormat';
 
 describe('dayLabel', () => {
   it('is the short weekday, day and short month', () => {
@@ -48,5 +48,24 @@ describe('dayListLabel', () => {
   it('honours a custom max', () => {
     const dates = ['2026-10-12', '2026-10-13', '2026-10-14'];
     expect(dayListLabel(dates, 1)).toBe('Mon 12 Oct +2 more');
+  });
+});
+
+describe('weekdayShort and shortDayLabel', () => {
+  it('gives the three-letter weekday', () => {
+    expect(weekdayShort('2026-10-19')).toBe('Mon');
+    expect(weekdayShort('2026-10-18')).toBe('Sun');
+  });
+
+  it('gives the weekday and unpadded day without the month', () => {
+    expect(shortDayLabel('2026-10-19')).toBe('Mon 19');
+    expect(shortDayLabel('2026-10-01')).toBe('Thu 1');
+  });
+});
+
+describe('byDate', () => {
+  it('orders days ascending by date', () => {
+    const days = [{ date: '2026-10-14' }, { date: '2026-09-30' }, { date: '2026-10-14' }, { date: '2026-10-01' }];
+    expect([...days].sort(byDate).map((day) => day.date)).toEqual(['2026-09-30', '2026-10-01', '2026-10-14', '2026-10-14']);
   });
 });

@@ -13,6 +13,7 @@ export const paths = {
   groupInvites: '/spend/group/invites',
   work: '/work',
   workMonth: '/work/month',
+  workYear: '/work/year',
   workMore: '/work/more',
 };
 

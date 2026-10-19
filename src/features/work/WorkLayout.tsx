@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { Link, Outlet } from 'react-router-dom';
-import { CalendarCheck, CalendarDays, ChevronLeft, Settings } from 'lucide-react';
+import { CalendarCheck, CalendarDays, ChartNoAxesColumn, ChevronLeft, Settings } from 'lucide-react';
 import NavDock from '../../components/NavDock';
 import Notice from '../../components/Notice';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
@@ -14,6 +14,7 @@ interface Props { user: User; }
 const DOCK_ITEMS = [
   { to: paths.work, label: 'Today', icon: CalendarCheck, end: true },
   { to: paths.workMonth, label: 'Month', icon: CalendarDays },
+  { to: paths.workYear, label: 'Year', icon: ChartNoAxesColumn },
   { to: paths.workMore, label: 'More', icon: Settings },
 ];
 

@@ -6,6 +6,7 @@ import { paths } from '../../lib/paths';
 const SECTIONS = [
   { to: paths.work, label: 'Today', end: true },
   { to: paths.workMonth, label: 'Month', end: false },
+  { to: paths.workYear, label: 'Year', end: false },
 ];
 
 /** Desktop command bar for Work (lg and up). */

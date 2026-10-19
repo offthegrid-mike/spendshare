@@ -2,19 +2,36 @@
 
 Shared expense tracking for households and small groups. Members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
 
+Alongside it, a personal **Work tracker** records which days you worked from home, at the office or on leave, and totals the hours for the fixed rate working-from-home deduction. A **Home screen** after sign-in leads to both.
+
 It works offline, installs as an app on desktop and mobile, and runs entirely on free tiers (Firebase Spark plan and Cloudflare Workers).
 
 **Live app:** https://spendshare-e5236.web.app
 
 ## Status
 
-**Stable, in daily use.** The current release is **v2.0.0**. Every merge to `main` deploys to production automatically.
+**Stable, in daily use.** The current release is **v2.1.0**. Every merge to `main` deploys to production automatically.
 
-Releases are tagged in git. `v1.0.0` is the last release before the UI redesign, and `v2.0.0` is the first release with it.
+Releases are tagged in git. `v1.0.0` is the last release before the UI redesign, `v2.0.0` is the first release with it, and `v2.1.0` adds the Home screen and the Work tracker.
 
-The original roadmap (milestones M0–M8: authentication, groups, invites, categories, expenses, income, settlement, offline and PWA) is complete. Later releases added expense search, receipt scanning, a yearly summary, and a full UI redesign with dark mode.
+The original roadmap (milestones M0–M8: authentication, groups, invites, categories, expenses, income, settlement, offline and PWA) is complete. Later releases added expense search, receipt scanning, a yearly summary, a full UI redesign with dark mode, and the Work tracker.
 
 ## Features
+
+### Home
+
+- After sign-in, Home greets you and shows two tiles: **SpendShare** (the household's spending this month and your balance) and **Work** (today's status, weekdays not filled in, days to confirm, hours from home this income year, and the last five working days).
+- SpendShare lives under `/spend` and the Work tracker under `/work`. Old links such as `/summary` still land on their `/spend` page.
+
+### Work tracker
+
+- Record each day as **Home**, **Office** or **Leave**. A Home day has a start, a finish and hours (7.6 by default): type the start in the morning and the finish fills in.
+- When the finish time arrives, **Confirm finish** confirms it or changes it. An unconfirmed day still counts, and is listed for review one day at a time (there is no confirm-all).
+- A day filled in after the day is marked **added later** and stays out of the claim until you include it. Every save, confirm, include and exclude is kept as a revision.
+- Weekdays you usually work that have no record are shown as missing, from the date of your first saved day.
+- **Year tab:** totals per month for each income year (1 July to 30 June), the claim at the fixed rate per hour (with cents dropped), and reviews of late and unconfirmed days.
+- **Export:** two CSV files per income year, one row per day with the year's totals, and one row per revision.
+- Set the rate for each income year (known rates are built in), your usual work days and your default hours. Work data is private to each user, not shared with a household.
 
 ### Expenses
 
@@ -95,10 +112,10 @@ All money is stored as integer cents.
 
 ```
 src/
-  features/      Screens, one folder per area (auth, expenses, summary, income, groups, invites, search, …)
+  features/      Screens, one folder per area (home, work, auth, expenses, summary, income, groups, invites, search, …)
   components/    App shell and shared UI (layout, dock, top bar, sheets, ui/ primitives)
-  hooks/         Firestore data hooks (useMonthExpenses, useSettlements, useYearOverview, …)
-  lib/           Pure logic: settlement, money, discounts, search, receipt OCR, theme, routes
+  hooks/         Firestore data hooks (useMonthExpenses, useSettlements, useYearOverview, useWorkDays, …)
+  lib/           Pure logic: settlement, money, discounts, search, receipt OCR, theme, routes; lib/work/ for the Work tracker
   stores/        Zustand UI store
   types/         Firestore document models and zod schemas
 tests/           Vitest tests, Firestore rules tests, Playwright offline spec

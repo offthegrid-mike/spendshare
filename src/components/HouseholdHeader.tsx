@@ -50,9 +50,10 @@ export default function HouseholdHeader({ groups, user, startMonth, showHome = f
       ) : (
         <div className="space-y-2 px-4 pb-2.5 pt-2.5">
           {showHome && (
+            // The padding makes a 40px tap target; the negative margin keeps the layout as it was.
             <Link
               to={paths.home}
-              className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink"
+              className="-my-2.5 inline-flex items-center gap-1 py-2.5 text-sm font-medium text-ink-muted hover:text-ink"
             >
               <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
               Home

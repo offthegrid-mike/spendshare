@@ -55,6 +55,7 @@ vi.mock('./features/more/MoreScreen', () => ({ default: () => <div data-testid="
 vi.mock('./features/search/SearchScreen', () => ({ default: () => <div data-testid="search-screen" /> }));
 vi.mock('./features/work/TodayTab', () => ({ default: () => <div data-testid="work-today" /> }));
 vi.mock('./features/work/MonthTab', () => ({ default: () => <div data-testid="work-month" /> }));
+vi.mock('./features/work/YearTab', () => ({ default: () => <div data-testid="work-year" /> }));
 vi.mock('./features/work/WorkSettings', () => ({ default: () => <div data-testid="work-more" /> }));
 vi.mock('./features/home/HomeScreen', () => ({
   default: ({ user, groups, group }: { user: { uid: string }; groups: unknown[]; group: { id: string } | null }) => (
@@ -127,7 +128,7 @@ describe('App routes', () => {
     expect(location()).toBe('/spend');
   });
 
-  it.each([paths.work, paths.workMonth, paths.workMore])(
+  it.each([paths.work, paths.workMonth, paths.workYear, paths.workMore])(
     'sends %s to the expenses list while the work tracker is off',
     (path) => {
       renderApp(path);
@@ -272,11 +273,17 @@ describe('App with the work tracker on', () => {
     expect(location()).toBe('/work');
   });
 
-  it('serves the Month and More tabs inside the Work layout', () => {
-    const { unmount } = renderApp(paths.workMonth);
+  it('serves the Month, Year and More tabs inside the Work layout', () => {
+    let { unmount } = renderApp(paths.workMonth);
     expect(screen.getByTestId('work-month')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Work' })).toBeInTheDocument();
     expect(location()).toBe('/work/month');
+    unmount();
+
+    ({ unmount } = renderApp(paths.workYear));
+    expect(screen.getByTestId('work-year')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Work' })).toBeInTheDocument();
+    expect(location()).toBe('/work/year');
     unmount();
 
     renderApp(paths.workMore);

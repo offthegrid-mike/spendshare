@@ -1,6 +1,6 @@
 // Home's greeting and date line. Pure and built on `Intl` with a numeric
-// timestamp, so render code using them stays safe for tests that spy on the
-// Date constructor (the same approach as `month.ts`).
+// timestamp from Date.UTC (no `new Date()`), so render code using them stays
+// safe for tests that spy on the Date constructor (the same approach as `month.ts`).
 
 /** 'Good morning, Mike': morning before noon, afternoon until 18:00, evening after. */
 export function greeting(hour: number, firstName: string): string {
@@ -16,15 +16,15 @@ export function firstNameOf(displayName: string | null, email: string | null): s
   return local || 'there';
 }
 
-/** The device-local hour of a timestamp, 0 to 23. */
-export function hourOf(nowMs: number): number {
-  const parts = new Intl.DateTimeFormat('en-AU', { hour: 'numeric', hourCycle: 'h23' }).formatToParts(nowMs);
-  return Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
-}
-
-/** 'Monday 19 October' in the device's time zone; assembled from parts so locale punctuation can't change it. */
-export function longDate(nowMs: number): string {
-  const parts = new Intl.DateTimeFormat('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }).formatToParts(nowMs);
+/**
+ * 'Monday 19 October' for the local date '2026-10-19'. Formatted in UTC from the
+ * date's own parts, so the device's zone cannot shift the day; assembled from
+ * parts so locale punctuation can't change it.
+ */
+export function longDate(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const format = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
+  const parts = format.formatToParts(Date.UTC(y, m - 1, d));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('weekday')} ${part('day')} ${part('month')}`;
 }

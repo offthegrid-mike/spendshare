@@ -1,4 +1,5 @@
-import type { ExpenseDoc, GroupDoc, GroupMember, ItemDoc } from '../types/models';
+import type { Timestamp } from 'firebase/firestore';
+import type { ExpenseDoc, GroupDoc, GroupMember, ItemDoc, WorkDayDoc, WorkSettingsDoc } from '../types/models';
 
 function member(displayName: string, role: GroupMember['role'] = 'member'): GroupMember {
   return { role, displayName, email: `${displayName.toLowerCase()}@example.com`, joinedAt: null as unknown as GroupMember['joinedAt'] };
@@ -34,6 +35,36 @@ export function makeItem(id: string, expenseId: string, overrides: Partial<ItemD
   return {
     id, groupId: 'g1', expenseId, month: '2026-10', name: `Item ${id}`,
     categoryId: 'cat-groceries', category: 'Groceries', amount: 1000, shared: true, payerUid: 'mike',
+    ...overrides,
+  };
+}
+
+const WORK_STAMP = { toDate: () => new Date('2026-10-19T08:00:00Z') } as unknown as Timestamp;
+
+/** Work settings with Monday to Friday as work days, tracking from 1 July 2026. */
+export const WORK_SETTINGS: WorkSettingsDoc = {
+  workWeekdays: [1, 2, 3, 4, 5],
+  defaultMinutes: 456,
+  ratesCentsPerHour: {},
+  trackingStartDate: '2026-07-01',
+};
+
+/** A Home day of 456 minutes from 08:30 to 16:06, recorded on the day and confirmed, unless overridden. */
+export function makeWorkDay(date: string, overrides: Partial<WorkDayDoc> = {}): WorkDayDoc {
+  return {
+    date,
+    incomeYear: '2026-27',
+    type: 'home',
+    startTime: '08:30',
+    finishTime: '16:06',
+    minutes: 456,
+    addedLater: false,
+    countedInClaim: true,
+    finishConfirmed: true,
+    firstRecordedAt: WORK_STAMP,
+    recordedAt: WORK_STAMP,
+    syncedAt: WORK_STAMP,
+    revisions: [],
     ...overrides,
   };
 }
