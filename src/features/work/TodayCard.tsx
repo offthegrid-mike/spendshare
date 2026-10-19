@@ -5,9 +5,9 @@ import DayEditor from './DayEditor';
 
 // Today's day editor under a heading that says where it stands. The editor is
 // keyed by the date, so it starts afresh when the clock passes midnight. While
-// the day sheet is open for today the editor is left out, so one date never has
-// two editors: DayEditor keeps a form's edits over a new record, so edits left in
-// a second one would be written back over a save made from the first.
+// a day sheet is open, for today or any other day, the editor is left out, so
+// there is only ever one editor: DayEditor keeps a form's edits over a new record,
+// so edits left in a second one would be written back over a save made from the first.
 
 interface Props {
   uid: string;
@@ -20,7 +20,7 @@ interface Props {
   daysLoaded: boolean;
   clock: Clock;
   onSaved: () => void;
-  /** Leaves the editor out, keeping the heading and status. It mounts afresh when shown again. */
+  /** Leaves the editor out while a day is open elsewhere, keeping the heading and status. It mounts afresh when shown again. */
   editorHidden?: boolean;
 }
 

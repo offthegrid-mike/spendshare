@@ -17,7 +17,7 @@ import YearToDateCard from './YearToDateCard';
 // The Today tab: the gaps to fill, today's day, this month at a glance and the
 // income year so far. A day picked from the banner or the calendar opens in a
 // DaySheet; the editor in it is keyed by the date so each pick starts afresh.
-// Picking today hides the Today card's editor, so one date never has two editors.
+// While a day is open the Today card's editor is hidden, so there is only ever one editor.
 
 // Days at the start of an income year (1 to 14 July) in which the banner also
 // looks back at the year that has just ended.
@@ -81,7 +81,7 @@ export default function TodayTab() {
         daysLoaded={daysLoaded}
         clock={clock}
         onSaved={NOOP}
-        editorHidden={selectedDate === clock.today}
+        editorHidden={selectedDate !== null}
       />
 
       <section className="card p-4">

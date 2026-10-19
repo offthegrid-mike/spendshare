@@ -408,14 +408,6 @@ describe('TodayTab day sheet', () => {
     expect(second.getAttribute('data-mount')).not.toBe(first);
   });
 
-  it('leaves the sheet open when the Today card’s editor saves', () => {
-    renderTab();
-    fireEvent.click(screen.getByRole('button', { name: 'Thu 15 Oct' }));
-    fireEvent.click(screen.getByRole('button', { name: `Saved ${TODAY}` }));
-    expect(sheet()).toBeInTheDocument();
-    expect(within(sheet()).getByTestId('day-editor')).toHaveAttribute('data-date', '2026-10-15');
-  });
-
   // DayEditor keeps a form's edits over a new record, so two live editors for one
   // date would let edits left in one be written back over a save from the other.
   describe('for today’s date', () => {
@@ -465,21 +457,29 @@ describe('TodayTab day sheet', () => {
     it('brings the Today card’s editor back, fresh, when today is picked and then another day', () => {
       renderTab();
       pickToday();
-      const inSheet = within(sheet()).getByTestId('day-editor').getAttribute('data-mount');
       fireEvent.click(screen.getByRole('button', { name: 'Thu 15 Oct' }));
-      expect(editors()).toHaveLength(2);
-      expect(editorFor(TODAY)?.getAttribute('data-mount')).not.toBe(inSheet);
+      expect(editors()).toHaveLength(1);
       expect(within(sheet()).getByTestId('day-editor')).toHaveAttribute('data-date', '2026-10-15');
+      expect(editorFor(TODAY)).toBeUndefined();
     });
   });
 
-  it('leaves the Today card’s editor in place while another date is open', () => {
+  it('hides the Today card’s editor while another date is open, so there is one editor', () => {
     renderTab();
-    const mount = editorFor(TODAY)?.getAttribute('data-mount');
+    expect(editorFor(TODAY)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Thu 15 Oct' }));
-    expect(editors()).toHaveLength(2);
-    expect(editors().filter((el) => el.getAttribute('data-date') === TODAY)).toHaveLength(1);
-    expect(editorFor(TODAY)).toHaveAttribute('data-mount', mount);
+    expect(editors()).toHaveLength(1);
+    expect(within(sheet()).getByTestId('day-editor')).toHaveAttribute('data-date', '2026-10-15');
+    expect(editorFor(TODAY)).toBeUndefined();
+    expect(screen.getByRole('heading', { name: 'Today · Mon 19 Oct' })).toBeInTheDocument();
+  });
+
+  it('brings the Today card’s editor back when the other date is closed', () => {
+    renderTab();
+    fireEvent.click(screen.getByRole('button', { name: 'Thu 15 Oct' }));
+    fireEvent.click(screen.getByTestId('sheet-backdrop'));
+    expect(editors()).toHaveLength(1);
+    expect(editorFor(TODAY)).toBeInTheDocument();
   });
 
   describe('on desktop', () => {
