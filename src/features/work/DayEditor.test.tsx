@@ -194,11 +194,21 @@ describe('DayEditor', () => {
       );
     });
 
-    it('asks for a start time on a blank day and will not save it', () => {
-      renderEditor();
+    it('saves just the hours on a blank day, with no start or finish', async () => {
+      const { onSaved } = renderEditor();
 
-      expect(screen.getByText('Enter a start time')).toBeInTheDocument();
-      expect(button('Save today')).toBeDisabled();
+      expect(screen.queryByText('Enter a start time')).toBeNull();
+      expect(field('Hours')).toHaveValue('7.6');
+      fireEvent.click(button('Save today'));
+
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(write).toHaveBeenCalledWith(
+        'u1',
+        TODAY,
+        { kind: 'save', type: 'home', minutes: 456 },
+        null,
+        SETTINGS,
+      );
     });
 
     it('asks for a finish time when the day would run past midnight and will not save it', () => {
@@ -449,7 +459,8 @@ describe('DayEditor', () => {
       rerender({ existing: dayWithoutTimes(null) });
       expect(field('Start')).toHaveValue('');
       expect(field('Finish')).toHaveValue('');
-      expect(button('Save today')).toBeDisabled();
+      expect(field('Hours')).toHaveValue('7.6');
+      expect(button('Save today')).toBeEnabled();
       expect(screen.queryByRole('button', { name: 'Update day' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Clear day' })).not.toBeInTheDocument();
     });
@@ -575,7 +586,7 @@ describe('DayEditor', () => {
         rerender({ existing: dayWithoutTimes(null) });
         expect(button('Home')).toHaveAttribute('aria-pressed', 'true');
         expect(field('Start')).toHaveValue('');
-        expect(button('Save today')).toBeDisabled();
+        expect(button('Save today')).toBeEnabled();
         expect(screen.queryByRole('button', { name: 'Clear day' })).not.toBeInTheDocument();
       });
 

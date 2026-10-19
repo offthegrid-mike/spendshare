@@ -147,6 +147,14 @@ describe('reduceForm', () => {
       expect(run(before, { kind: 'start', value: '' })).toEqual({ ...before, startTime: '' });
     });
 
+    it('clears a finish that followed the start when the start is cleared, keeping the hours', () => {
+      const before = run(initialForm(456, null), { kind: 'start', value: '08:30' });
+      const cleared = run(before, { kind: 'start', value: '' });
+      expect(cleared).toEqual({ ...before, startTime: '', finishTime: '' });
+      expect(formError(cleared)).toBeNull();
+      expect(cleared.minutes).toBe(456);
+    });
+
     it('keeps the hours when an edited finish is no longer after the start', () => {
       const before = run(
         initialForm(456, null),
@@ -250,8 +258,12 @@ describe('reduceForm', () => {
 });
 
 describe('formError', () => {
-  it('asks for a start time when it is empty', () => {
-    expect(formError(form())).toBe('Enter a start time');
+  it('needs no start or finish to record just the hours', () => {
+    expect(formError(form())).toBeNull();
+  });
+
+  it('asks for a start time when a finish is given without one', () => {
+    expect(formError(form({ finishTime: '16:06' }))).toBe('Enter a start time');
   });
 
   it('asks for a start time when it is not a valid time', () => {
@@ -342,6 +354,12 @@ describe('formToAction', () => {
   });
 });
 
+describe('formToAction for hours alone', () => {
+  it('saves the hours with no start or finish', () => {
+    expect(formToAction(form())).toStrictEqual({ kind: 'save', type: 'home', minutes: 456 });
+  });
+});
+
 describe('confirmAction', () => {
   it('confirms the finish and hours', () => {
     const state = form({ startTime: '08:30', finishTime: '17:00', minutes: 510, finishEdited: true });
@@ -383,11 +401,16 @@ describe('a valid form always agrees with itself', () => {
       const state = run(initialForm(456, null), ...sequence);
       if (formError(state) !== null) continue;
       valid += 1;
-      const start = parseHm(state.startTime);
-      expect(start).not.toBeNull();
-      expect(minutesBetween(state.startTime, state.finishTime)).toBe(state.minutes);
       const saved = planWorkDayWrite(DAY, formToAction(state), null, DAY);
       expect(saved?.fields.minutes).toBe(state.minutes);
+      if (state.startTime === '') {
+        // Hours alone: no times to agree with, so nothing to confirm either.
+        expect(state.finishTime).toBe('');
+        expect(saved?.fields.startTime).toBeUndefined();
+        continue;
+      }
+      expect(parseHm(state.startTime)).not.toBeNull();
+      expect(minutesBetween(state.startTime, state.finishTime)).toBe(state.minutes);
       const confirmed = planWorkDayWrite(DAY, confirmAction(state), day({ startTime: state.startTime }), DAY);
       expect(confirmed?.fields.minutes).toBe(state.minutes);
     }

@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useWorkDays } from '../../hooks/useWorkDays';
 import { useWorkSettings } from '../../hooks/useWorkSettings';
+import { writeWorkDay } from '../../lib/work/workWrite';
 import { makeWorkDay, WORK_SETTINGS } from '../../test/fixtures';
 import WorkTile from './WorkTile';
+
+vi.mock('../../lib/work/workWrite', () => ({ writeWorkDay: vi.fn() }));
+const write = vi.mocked(writeWorkDay);
 
 const state = vi.hoisted(() => ({
   clock: { today: '2026-10-19', nowMinutes: 540 },
@@ -41,6 +45,8 @@ beforeEach(() => {
   state.settings = { settings: SETTINGS, loading: false, loaded: true };
   vi.mocked(useWorkDays).mockClear();
   vi.mocked(useWorkSettings).mockClear();
+  write.mockReset();
+  write.mockResolvedValue(undefined);
 });
 
 describe('WorkTile', () => {
@@ -63,6 +69,35 @@ describe('WorkTile', () => {
     const link = screen.getByRole('link', { name: 'Record today' });
     expect(link).toHaveAttribute('href', '/work');
     expect(link).toHaveClass('hidden', 'lg:inline-flex', 'btn-outline');
+  });
+
+  it('offers shortcuts to record today as Home hours or as Office while today is unrecorded', () => {
+    renderTile();
+    expect(screen.getByRole('button', { name: 'Home · 7.6 h' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Office' })).toBeEnabled();
+  });
+
+  it('records today as Home at the default hours when its Home shortcut is pressed', async () => {
+    renderTile();
+    fireEvent.click(screen.getByRole('button', { name: 'Home · 7.6 h' }));
+    await waitFor(() =>
+      expect(write).toHaveBeenCalledWith('mike', '2026-10-19', { kind: 'save', type: 'home', minutes: 456 }, null, SETTINGS),
+    );
+  });
+
+  it('records today as Office when its Office shortcut is pressed', async () => {
+    renderTile();
+    fireEvent.click(screen.getByRole('button', { name: 'Office' }));
+    await waitFor(() =>
+      expect(write).toHaveBeenCalledWith('mike', '2026-10-19', { kind: 'save', type: 'office' }, null, SETTINGS),
+    );
+  });
+
+  it('leaves out the shortcuts once today is recorded', () => {
+    state.days = { days: [...RECORDED_WEEK, makeWorkDay('2026-10-19', { finishConfirmed: false })], loading: false, error: false };
+    renderTile();
+    expect(screen.queryByRole('button', { name: 'Home · 7.6 h' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Office' })).toBeNull();
   });
 
   it('says today is not recorded, in the warning tone', () => {

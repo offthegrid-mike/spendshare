@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Briefcase, ChevronRight } from 'lucide-react';
+import LoadingButton from '../../components/LoadingButton';
 import Skeleton from '../../components/ui/Skeleton';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { useWorkDays } from '../../hooks/useWorkDays';
@@ -8,15 +10,20 @@ import { useWorkSettings } from '../../hooks/useWorkSettings';
 import { paths } from '../../lib/paths';
 import { incomeYearLabel, incomeYearOf } from '../../lib/work/workDates';
 import { shortDayLabel } from '../../lib/work/workFormat';
+import type { WorkAction } from '../../lib/work/workDay';
 import { missingDates, toConfirmDates } from '../../lib/work/workLists';
 import { resolveRate } from '../../lib/work/workRates';
 import { recentWorkingDays, todayStatus, type RecentStatus, type TodayStatus } from '../../lib/work/workRecent';
 import { formatHours } from '../../lib/work/workTime';
+import { writeWorkDay } from '../../lib/work/workWrite';
 import { summariseYear } from '../../lib/work/workYear';
+import { settleWrite } from '../work/settleWrite';
 
 // Home's Work tile (spec 6.4): today's status, the gaps to fill, the Home hours so
 // far this income year and a strip of the last five working days, with a way into
-// Work. It loads only the income year containing today, like the Today tab.
+// Work. It loads only the income year containing today, like the Today tab. While
+// today is unrecorded it also offers two shortcuts, Home at the default hours or
+// Office, so a normal day is one tap. Start and finish are left for Work.
 
 const LINE = 'flex items-baseline justify-between gap-3 border-t border-line py-2 text-[13px] text-ink-muted';
 
@@ -51,9 +58,27 @@ function todayText(status: TodayStatus): string {
 export default function WorkTile({ uid }: { uid: string }) {
   const clock = useWorkClock();
   const incomeYear = incomeYearOf(clock.today);
-  const { settings, loading: settingsLoading } = useWorkSettings(uid);
+  const { settings, loading: settingsLoading, loaded } = useWorkSettings(uid);
   const { days, loading: daysLoading, error } = useWorkDays(uid, incomeYear);
   const loading = settingsLoading || daysLoading;
+  const [saving, setSaving] = useState<'home' | 'office' | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  // Records today from the tile. Like DayEditor, the write is awaited only online
+  // (settleWrite), and the live day snapshot brings the new status back to the tile.
+  async function recordToday(type: 'home' | 'office') {
+    setSaving(type);
+    setFailed(false);
+    const action: WorkAction = type === 'home' ? { kind: 'save', type, minutes: settings.defaultMinutes } : { kind: 'save', type };
+    try {
+      const existing = days.find((day) => day.date === clock.today) ?? null;
+      await settleWrite(writeWorkDay(uid, clock.today, action, existing, loaded ? settings : null));
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(null);
+    }
+  }
 
   const figures = useMemo(() => {
     const rate = resolveRate(incomeYear, settings.ratesCentsPerHour);
@@ -85,6 +110,33 @@ export default function WorkTile({ uid }: { uid: string }) {
     const { today, missing, toConfirm, countedMinutes, recent } = figures;
     body = (
       <div>
+        {today.kind === 'unrecorded' && (
+          <div className="pb-2.5">
+            <div className="flex gap-2">
+              <LoadingButton
+                loading={saving === 'home'}
+                disabled={saving !== null}
+                onClick={() => void recordToday('home')}
+                className="btn-primary h-10 flex-1"
+              >
+                {`Home · ${formatHours(settings.defaultMinutes)} h`}
+              </LoadingButton>
+              <LoadingButton
+                loading={saving === 'office'}
+                disabled={saving !== null}
+                onClick={() => void recordToday('office')}
+                className="btn-outline h-10 flex-1"
+              >
+                Office
+              </LoadingButton>
+            </div>
+            {failed && (
+              <p role="alert" className="mt-2 text-[13px] text-negative">
+                Couldn't save today. Try again.
+              </p>
+            )}
+          </div>
+        )}
         <p className={LINE}>
           <span>Today</span>
           <span className={today.kind === 'unrecorded' ? 'font-semibold text-warning' : 'text-ink'}>{todayText(today)}</span>

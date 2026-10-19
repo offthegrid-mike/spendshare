@@ -42,6 +42,9 @@ export function reduceForm(state: DayFormState, event: FormEvent): DayFormState 
     case 'type':
       return { ...state, type: event.type };
     case 'start': {
+      // Start and finish are optional together. Clearing the start drops a finish
+      // that followed it, so the day is left with just its hours, unless the finish was typed.
+      if (event.value === '') return { ...state, startTime: '', finishTime: state.finishEdited ? state.finishTime : '' };
       const next = { ...state, startTime: event.value };
       if (parseHm(event.value) === null) return next;
       if (!state.finishEdited) {
@@ -64,22 +67,37 @@ export function reduceForm(state: DayFormState, event: FormEvent): DayFormState 
   }
 }
 
-/** Why the form cannot be saved, or null if it can. Only Home has times to get wrong. */
+function hoursError(minutes: number): string | null {
+  if (!Number.isInteger(minutes) || minutes <= 0) return 'Enter hours greater than 0';
+  if (minutes > MINUTES_IN_DAY) return "Hours can't be more than 24";
+  return null;
+}
+
+/**
+ * Why the form cannot be saved, or null if it can. Only Home has times to get wrong.
+ * A Home day may leave out its start and finish and record just its hours; once
+ * either is given, both must make sense.
+ */
 export function formError(state: DayFormState): string | null {
   if (state.type !== 'home') return null;
+  if (state.startTime === '' && state.finishTime === '') return hoursError(state.minutes);
   const start = parseHm(state.startTime);
   if (start === null) return 'Enter a start time';
-  if (!Number.isInteger(state.minutes) || state.minutes <= 0) return 'Enter hours greater than 0';
-  if (state.minutes > MINUTES_IN_DAY) return "Hours can't be more than 24";
+  const hours = hoursError(state.minutes);
+  if (hours !== null) return hours;
   const finish = parseHm(state.finishTime);
   if (finish === null) return 'Enter a finish time';
   if (finish <= start) return 'Finish must be after start';
   return null;
 }
 
-/** The save for a valid form. Office and Leave carry no times, so the keys are left out. */
+/**
+ * The save for a valid form. Office and Leave carry no times, so the keys are left out,
+ * and a Home day with no start or finish saves its hours alone.
+ */
 export function formToAction(state: DayFormState): Extract<WorkAction, { kind: 'save' }> {
   if (state.type !== 'home') return { kind: 'save', type: state.type };
+  if (state.startTime === '') return { kind: 'save', type: 'home', minutes: state.minutes };
   return {
     kind: 'save',
     type: 'home',
