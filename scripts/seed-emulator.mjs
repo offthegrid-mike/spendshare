@@ -75,6 +75,8 @@ async function seedFirestore(db, uids) {
   const ts = (d) => Timestamp.fromDate(d);
 
   for (const p of PEOPLE) {
+    // The rules let in only allowlisted emails.
+    await setDoc(doc(db, 'allowlist', p.email), {});
     await setDoc(doc(db, 'users', uids[p.key]), {
       uid: uids[p.key], email: p.email, displayName: p.displayName,
       memberOf: [GROUP_ID], createdAt: ts(created),

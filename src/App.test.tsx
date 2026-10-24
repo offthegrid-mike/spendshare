@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   user: null as { uid: string; email: string } | null,
   groups: [] as unknown[],
   expense: null as { id: string } | null,
+  access: 'allowed' as string,
+  groupsUid: undefined as string | undefined,
 }));
 const flags = vi.hoisted(() => ({ work: false }));
 
@@ -22,7 +24,13 @@ vi.mock('./lib/features', () => ({
 }));
 
 vi.mock('./hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: false }) }));
-vi.mock('./hooks/useGroups', () => ({ useGroups: () => ({ groups: state.groups, loading: false }) }));
+vi.mock('./hooks/useAllowlist', () => ({ useAllowlist: () => state.access }));
+vi.mock('./hooks/useGroups', () => ({
+  useGroups: (uid: string | undefined) => {
+    state.groupsUid = uid;
+    return { groups: state.groups, loading: false };
+  },
+}));
 vi.mock('./hooks/useGroup', () => ({ useGroup: () => ({ group: state.groups[0] ?? null }) }));
 vi.mock('./hooks/useExpense', () => ({
   useExpense: () => ({ expense: state.expense, items: [], loading: false }),
@@ -38,6 +46,9 @@ vi.mock('./components/Layout', async () => {
   return { default: () => <Outlet /> };
 });
 vi.mock('./features/auth/SignIn', () => ({ default: () => <div data-testid="sign-in" /> }));
+vi.mock('./features/auth/NotAllowed', () => ({
+  default: ({ status }: { status: string }) => <div data-testid="not-allowed" data-status={status} />,
+}));
 vi.mock('./features/groups/CreateGroup', () => ({ default: () => <div data-testid="create-group" /> }));
 vi.mock('./features/invites/PendingInvites', () => ({ default: () => <div data-testid="pending-invites" /> }));
 vi.mock('./features/groups/GroupSettings', () => ({ default: () => <div data-testid="group-settings" /> }));
@@ -87,6 +98,8 @@ beforeEach(() => {
   state.user = mike;
   state.groups = [home];
   state.expense = null;
+  state.access = 'allowed';
+  state.groupsUid = undefined;
   useUIStore.setState({ selectedGroupId: 'g1', pendingGroupId: null });
 });
 
@@ -166,6 +179,33 @@ describe('App route table', () => {
 });
 
 describe('App gates', () => {
+  it('turns away a signed-in user who is not on the allowlist, without loading their groups', () => {
+    state.access = 'denied';
+    renderApp('/spend');
+    expect(screen.getByTestId('not-allowed')).toHaveAttribute('data-status', 'denied');
+    expect(screen.queryByTestId('expense-list')).toBeNull();
+    expect(state.groupsUid).toBeUndefined();
+  });
+
+  it('asks a signed-in user with an unverified email to verify it', () => {
+    state.access = 'unverified';
+    renderApp('/spend');
+    expect(screen.getByTestId('not-allowed')).toHaveAttribute('data-status', 'unverified');
+  });
+
+  it('shows the splash while the allowlist check is loading', () => {
+    state.access = 'loading';
+    renderApp('/spend');
+    expect(screen.queryByTestId('not-allowed')).toBeNull();
+    expect(screen.queryByTestId('expense-list')).toBeNull();
+  });
+
+  it('loads the groups of an allowed user', () => {
+    renderApp('/spend');
+    expect(state.groupsUid).toBe('mike');
+    expect(screen.getByTestId('expense-list')).toBeInTheDocument();
+  });
+
   it('shows the sign-in screen at a /spend path when signed out, without redirecting', () => {
     state.user = null;
     renderApp('/spend/summary');

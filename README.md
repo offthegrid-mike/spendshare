@@ -63,7 +63,7 @@ The original roadmap (milestones M0–M8: authentication, groups, invites, categ
 ### Groups and members
 
 - Create several groups, each with its own name and currency (AUD, USD, EUR, or GBP), and switch between them. The selected group is remembered across reloads.
-- Invite members by email. Invitees see a pending-invite banner and can accept or decline, and a pending invite can be revoked.
+- Invite members by email. Invitees see a pending-invite banner and can accept or decline, and a pending invite can be revoked. An invitee must also be on the allowlist (see Accounts).
 - The group owner can add members who don't have an account (for example, a child or a housemate who won't sign in) and remove members.
 - Default categories are created with each group. Add, rename, or delete your own.
 - Firestore security rules keep each group's data visible only to its members.
@@ -72,6 +72,7 @@ The original roadmap (milestones M0–M8: authentication, groups, invites, categ
 
 - Sign in with email and password or with Google.
 - Email verification on sign-up, and password reset by email.
+- Only allowlisted people can use the app. Anyone else who signs in sees a "can't use SpendShare" screen, and the Firestore rules refuse all their reads and writes. An email-and-password account must verify its email first.
 
 ### Offline, install, and appearance
 
@@ -161,6 +162,8 @@ Copy `.env.example` to `.env.local`, fill in the values, then run `npm run dev`.
 | `VITE_FB_API_KEY`, `VITE_FB_AUTH_DOMAIN`, `VITE_FB_PROJECT_ID`, `VITE_FB_STORAGE_BUCKET`, `VITE_FB_SENDER_ID`, `VITE_FB_APP_ID` | Firebase web app config |
 | `VITE_OCR_PROXY_URL` | Optional. URL of the receipt OCR Worker. Leave blank to hide receipt scanning. |
 | `VITE_USE_EMULATOR` | Set by `npm run dev:emulator`. Leave blank. |
+
+Then add yourself to the allowlist, or the app will turn you away. In the Firebase console, open Firestore Database and create a collection named `allowlist` with one document per person. The document ID is the person's email in lower case, and the document needs no fields. Do the same for everyone you share a group with. The emulator seed script adds its sample users for you.
 
 ### Receipt scanning setup
 

@@ -1,6 +1,6 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  arrayUnion, deleteDoc, deleteField, doc, getDoc, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
+  arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch,
 } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 import { readFileSync } from 'fs';
@@ -9,14 +9,91 @@ import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 
 const rules = readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8');
 
+// Every rule requires a verified email on the allowlist. These are the emails
+// the suites sign in with; initRulesEnv seeds them and re-seeds after a clear.
+const ALLOWLISTED = ['usera@test.com', 'userb@test.com', 'userc@test.com', 'alicea@test.com', 'bob@test.com'];
+
+async function seedAllowlist(env: RulesTestEnvironment) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await Promise.all(ALLOWLISTED.map((email) => setDoc(doc(ctx.firestore(), 'allowlist', email), {})));
+  });
+}
+
+// A test environment whose contexts sign in as `<uid>@test.com`, verified,
+// unless the test passes its own email claims.
+async function initRulesEnv(): Promise<RulesTestEnvironment> {
+  const env = await initializeTestEnvironment({
+    projectId: 'demo-spendshare',
+    firestore: { rules, host: 'localhost', port: 8080 },
+  });
+  const clear = env.clearFirestore.bind(env);
+  env.clearFirestore = async () => {
+    await clear();
+    await seedAllowlist(env);
+  };
+  const authenticated = env.authenticatedContext.bind(env);
+  env.authenticatedContext = (uid, claims) =>
+    authenticated(uid, { email: `${uid.toLowerCase()}@test.com`, email_verified: true, ...claims });
+  await seedAllowlist(env);
+  return env;
+}
+
+describe('Firestore Rules - sign-in allowlist', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const stranger = () => testEnv.authenticatedContext('stranger');
+
+  it('denies a verified user who is not on the allowlist their own user document', async () => {
+    await assertFails(getDoc(doc(stranger().firestore(), 'users', 'stranger')));
+    await assertFails(setDoc(doc(stranger().firestore(), 'users', 'stranger'), { uid: 'stranger' }));
+  });
+
+  it('denies a user who is not on the allowlist creating a group', async () => {
+    await assertFails(setDoc(doc(stranger().firestore(), 'groups', 'strangerGroup'), {
+      ownerUid: 'stranger', name: 'Mine', currency: 'AUD',
+      members: { stranger: { role: 'owner' } }, memberUids: ['stranger'],
+    }));
+  });
+
+  it('denies an allowlisted email that is not verified', async () => {
+    const unverified = testEnv.authenticatedContext('userA', { email_verified: false });
+    await assertFails(getDoc(doc(unverified.firestore(), 'users', 'userA')));
+  });
+
+  it('allows an allowlisted, verified email whatever its case', async () => {
+    const userA = testEnv.authenticatedContext('userA', { email: 'UserA@Test.com' });
+    await assertSucceeds(getDoc(doc(userA.firestore(), 'users', 'userA')));
+  });
+
+  it('lets anyone signed in read their own allowlist entry, and only their own', async () => {
+    await assertSucceeds(getDoc(doc(stranger().firestore(), 'allowlist', 'stranger@test.com')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('userA').firestore(), 'allowlist', 'usera@test.com')));
+    await assertFails(getDoc(doc(stranger().firestore(), 'allowlist', 'usera@test.com')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'allowlist', 'usera@test.com')));
+  });
+
+  it('never lets the app list or write the allowlist', async () => {
+    const userA = testEnv.authenticatedContext('userA');
+    await assertFails(getDocs(collection(userA.firestore(), 'allowlist')));
+    await assertFails(setDoc(doc(stranger().firestore(), 'allowlist', 'stranger@test.com'), {}));
+    await assertFails(setDoc(doc(userA.firestore(), 'allowlist', 'friend@test.com'), {}));
+    await assertFails(deleteDoc(doc(userA.firestore(), 'allowlist', 'usera@test.com')));
+  });
+});
+
 describe('Firestore Rules - /users collection', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules, host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
   });
 
   afterAll(async () => {
@@ -43,10 +120,7 @@ describe('Firestore Rules - /groups privilege escalation', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     // Seed: group with ownerUid=userA, members={userA, userB}, memberUids=[userA, userB]
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
@@ -127,10 +201,7 @@ describe('/groups invite-accept takeover prevention', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     // Seed: group2 with ownerUid=userA, members={userA, userB}, memberUids=[userA, userB]
     // and a pending invite for userc@test.com
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -185,10 +256,7 @@ describe('/groups invite-accept arbitrary-UID injection (H-1)', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeEach(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'groups', 'group3'), {
@@ -305,10 +373,7 @@ describe('/groups/{id}/invites invitee write transitions (M-1)', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeEach(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'groups', 'group4'), {
@@ -358,10 +423,7 @@ describe('/groups invites email_verified gating (L-1)', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeEach(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'groups', 'group5'), {
@@ -406,10 +468,7 @@ describe('/groups financial sub-collection validation (M-2)', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeEach(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8'), host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'groups', 'group6'), {
@@ -526,10 +585,7 @@ describe('/groups create (a second group)', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules, host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'groups', 'home'), {
         ownerUid: 'userA',
@@ -575,10 +631,7 @@ describe('Firestore Rules - Work', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'demo-spendshare',
-      firestore: { rules, host: 'localhost', port: 8080 },
-    });
+    testEnv = await initRulesEnv();
   });
 
   afterAll(async () => {

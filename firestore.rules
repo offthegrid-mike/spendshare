@@ -12,7 +12,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() { return request.auth != null; }
+    // Only allowlisted people may use the app: a verified email with a document
+    // at allowlist/{email}. Entries are managed in the Firebase console, so no
+    // email lives in this public repo. Every rule below goes through signedIn().
+    function onAllowlist() {
+      return request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/allowlist/$(request.auth.token.email.lower()));
+    }
+    function signedIn() { return request.auth != null && onAllowlist(); }
     function myEmail() { return request.auth.token.email.lower(); }
     function emailVerified() { return signedIn() && request.auth.token.email_verified == true; }
     // The accepting/invitee principal: signed-in, verified, and matching the invite email.
@@ -24,6 +31,13 @@ service cloud.firestore {
     function isOwner(groupId) {
       return signedIn()
         && get(/databases/$(database)/documents/groups/$(groupId)).data.ownerUid == request.auth.uid;
+    }
+
+    // Anyone signed in may check their own entry, so the app can explain why
+    // it turned them away. Nobody can list or change the allowlist from the app.
+    match /allowlist/{email} {
+      allow get: if request.auth != null && request.auth.token.email.lower() == email;
+      allow list, write: if false;
     }
 
     match /users/{uid} {

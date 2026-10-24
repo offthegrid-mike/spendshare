@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { Navigate, Routes, Route, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+import { useAllowlist } from './hooks/useAllowlist';
 import { useGroups } from './hooks/useGroups';
 import { useUIStore } from './stores/uiStore';
 import { resolveSelection } from './lib/groupSelection';
 import SignIn from './features/auth/SignIn';
+import NotAllowed from './features/auth/NotAllowed';
 import GroupSettings from './features/groups/GroupSettings';
 import SendInvite from './features/invites/SendInvite';
 import CategoryManager from './features/categories/CategoryManager';
@@ -63,9 +65,12 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
 
 function App() {
   const { user, loading: authLoading } = useAuth();
-  const { groups, loading: groupsLoading } = useGroups(user?.uid);
+  const access = useAllowlist(user);
+  // Load nothing for someone the rules would refuse; every read would fail.
+  const allowedUser = access === 'allowed' ? user : null;
+  const { groups, loading: groupsLoading } = useGroups(allowedUser?.uid);
   const { selectedGroupId, setGroup, pendingGroupId, clearPendingGroup } = useUIStore();
-  const { group } = useGroup(selectedGroupId);
+  const { group } = useGroup(allowedUser ? selectedGroupId : null);
 
   // Keep the selection valid, and select a just-joined group once it arrives.
   useEffect(() => {
@@ -74,11 +79,12 @@ function App() {
     if (clearPending) clearPendingGroup();
   }, [groups, selectedGroupId, pendingGroupId, setGroup, clearPendingGroup]);
 
-  if (authLoading || (user && groupsLoading)) {
+  if (authLoading || access === 'loading' || (allowedUser && groupsLoading)) {
     return <AppSplash />;
   }
 
   if (!user) return <SignIn />;
+  if (access === 'denied' || access === 'unverified') return <NotAllowed user={user} status={access} />;
 
   return (
     <Routes>

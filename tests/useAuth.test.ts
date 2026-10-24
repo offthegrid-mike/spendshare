@@ -23,10 +23,11 @@ vi.mock('../src/lib/firebase', () => ({
 }));
 
 // Stub out Firestore so converters.ts and the upsert in useAuth don't blow up.
+const { getDoc } = vi.hoisted(() => ({ getDoc: vi.fn() }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   doc: vi.fn(() => ({})),
-  getDoc: vi.fn(() => Promise.resolve({ exists: () => true })),
+  getDoc: (...args: unknown[]) => getDoc(...args) as unknown,
   setDoc: vi.fn(() => Promise.resolve()),
   serverTimestamp: vi.fn(() => ({ _type: 'serverTimestamp' })),
 }));
@@ -37,6 +38,20 @@ describe('useAuth', () => {
   beforeEach(() => {
     authCallback = null;
     unsubscribe.mockClear();
+    getDoc.mockReset().mockResolvedValue({ exists: () => true });
+  });
+
+  it('still reports the user when the rules refuse the profile write', async () => {
+    getDoc.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const { result } = renderHook(() => useAuth());
+    const fakeUser = { uid: 'abc123', email: 'stranger@example.com' } as User;
+
+    await act(async () => {
+      authCallback?.(fakeUser);
+      await Promise.resolve();
+    });
+
+    expect(result.current.user).toEqual(fakeUser);
   });
 
   it('starts loading with no user', () => {
