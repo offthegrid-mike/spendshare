@@ -3,6 +3,9 @@
 # brainstorming session files
 .superpowers/
 
+# superpowers plans, specs and screenshots (kept local, not published)
+/docs/superpowers/
+
 # dependencies
 /node_modules
 /.pnp

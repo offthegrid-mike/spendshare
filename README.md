@@ -254,5 +254,4 @@ The app is served at https://spendshare-e5236.web.app and https://spendshare-e52
 
 - [docs/RECEIPT_OCR.md](docs/RECEIPT_OCR.md): receipt OCR design and free-tier research
 - [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md): security assessment
-- [docs/superpowers/specs/](docs/superpowers/specs/): feature design specs
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md): the original M0–M8 plan
