@@ -145,10 +145,9 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       const parsed = await scanReceipt(file, cats.map((c) => c.name));
       const patch = receiptToFormPatch(
         parsed,
-        { date: getValues('date'), shopName: getValues('shopName') },
+        { shopName: getValues('shopName') },
         cats,
       );
-      if (patch.date) setValue('date', patch.date, { shouldValidate: true, shouldDirty: true });
       if (patch.shopName)
         setValue('shopName', patch.shopName, { shouldValidate: true, shouldDirty: true });
       if (patch.items && patch.items.length > 0) replace(patch.items);

@@ -18,19 +18,24 @@ import { normalizeNameKey } from './textNormalize';
 // ---------------------------------------------------------------------------
 
 // Vision-language model on the NVIDIA API catalog. Kept as a single const so
-// swapping models (if catalog availability changes) is a one-line edit.
-const OCR_MODEL = 'meta/llama-3.2-11b-vision-instruct';
+// swapping models (if catalog availability changes) is a one-line edit. It is a
+// reasoning model; requests turn its reasoning off (see requestReceiptOcr).
+// Chosen by measured latency and accuracy on receipt images (docs/RECEIPT_OCR.md).
+const OCR_MODEL = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning';
+
+// NVIDIA's shared capacity answers 503 "ResourceExhausted" when every slot is in
+// use. That clears within seconds, so retry with a growing pause before giving up.
+const BUSY_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 function buildPrompt(categoryNames: string[]): string {
   const base =
     'You are a receipt parser. Extract the receipt in this image as strict JSON ' +
     'matching exactly this shape: ' +
-    '{"shopName": string, "date": "YYYY-MM-DD", "items": [{"name": string, "amount": number, "quantity": number, "category": string}], "total": number}. ' +
+    '{"shopName": string, "items": [{"name": string, "amount": number, "quantity": number, "category": string}], "total": number}. ' +
     'Numbers are in the receipt currency (no symbols). ' +
     '"amount" is the PER-ITEM (unit) price and "quantity" is how many units were bought. ' +
     'If a line shows a total for multiple units (e.g. "2 @ $2.75" = 5.50), set amount to the unit ' +
     'price (2.75) and quantity to 2. For a single unit, quantity is 1 and amount is that line price. ' +
-    'Use the purchase date in YYYY-MM-DD format. ' +
     'Include only real purchased line items (skip subtotals, tax, and totals as items). ';
   const categoryRule =
     categoryNames.length > 0
@@ -50,7 +55,6 @@ function buildPrompt(categoryNames: string[]): string {
 // ---------------------------------------------------------------------------
 export const receiptSchema = z.object({
   shopName: z.string().optional(),
-  date: z.string().optional(),
   items: z
     .array(
       z.object({
@@ -70,6 +74,7 @@ export type ReceiptOcrErrorCode =
   | 'not-configured'
   | 'network'
   | 'rate-limit'
+  | 'busy'
   | 'bad-response'
   | 'parse';
 
@@ -95,7 +100,6 @@ export interface FormItemPatch {
 }
 
 export interface ReceiptFormPatch {
-  date?: string;
   shopName?: string;
   items?: FormItemPatch[];
 }
@@ -123,8 +127,6 @@ export function extractJsonBlock(content: string): unknown {
   }
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 /**
  * Map a parsed receipt onto a partial expense-form patch. Every field is
  * defensive: a key is included only when the value is usable, so the caller
@@ -136,18 +138,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function receiptToFormPatch(
   parsed: ParsedReceipt,
-  current: { date: string; shopName: string },
+  current: { shopName: string },
   cats: { id: string; name: string }[] = [],
 ): ReceiptFormPatch {
   const patch: ReceiptFormPatch = {};
 
   // Build a name-key → id lookup for resolving AI-suggested categories.
   const catByKey = new Map(cats.map((c) => [normalizeNameKey(c.name), c.id]));
-
-  // Date — only accept a valid ISO YYYY-MM-DD; otherwise keep the current date.
-  if (parsed.date && ISO_DATE.test(parsed.date) && !Number.isNaN(new Date(parsed.date).getTime())) {
-    patch.date = parsed.date;
-  }
 
   // Shop name — only when non-empty; otherwise keep whatever is there.
   // Capitalize the first letter of each word for consistency (the model may
@@ -316,6 +313,34 @@ export async function pdfFirstPageToDataUrl(file: File): Promise<string> {
 }
 
 /**
+ * POST a request body to the OCR proxy, retrying while the model service is busy
+ * (HTTP 503). Other responses, including errors, are returned for the caller to map.
+ */
+async function postToProxy(proxyUrl: string, body: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      // The proxy adds the NVIDIA Authorization header; the browser never sees the key.
+      res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body,
+      });
+    } catch {
+      throw new ReceiptOcrError('network', 'Network error while scanning. Check your connection.');
+    }
+    if (res.status !== 503) return res;
+    if (attempt >= BUSY_RETRY_DELAYS_MS.length) {
+      throw new ReceiptOcrError('busy', 'The receipt service is busy right now. Try again in a moment.');
+    }
+    await new Promise((resolve) => setTimeout(resolve, BUSY_RETRY_DELAYS_MS[attempt]));
+  }
+}
+
+/**
  * Send a base64 image data URL to the OCR proxy (which forwards to the NVIDIA
  * vision model) and return the validated, parsed receipt. Takes a data URL (not
  * a File) so it is testable without a canvas.
@@ -329,33 +354,26 @@ export async function requestReceiptOcr(
     throw new ReceiptOcrError('not-configured', 'Receipt scanning is not configured.');
   }
 
-  let res: Response;
-  try {
-    // The proxy adds the NVIDIA Authorization header; the browser never sees the key.
-    res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        model: OCR_MODEL,
-        temperature: 0.1,
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: buildPrompt(categoryNames) },
-              { type: 'image_url', image_url: { url: dataUrl } },
-            ],
-          },
-        ],
-      }),
-    });
-  } catch {
-    throw new ReceiptOcrError('network', 'Network error while scanning. Check your connection.');
-  }
+  const res = await postToProxy(
+    proxyUrl,
+    JSON.stringify({
+      model: OCR_MODEL,
+      temperature: 0.1,
+      max_tokens: 1024,
+      // Reasoning off: with it on, a real photo could take over 100 seconds, past the
+      // proxy's timeout. Without it, a receipt answers in about 6 to 12 seconds.
+      chat_template_kwargs: { enable_thinking: false },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: buildPrompt(categoryNames) },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    }),
+  );
 
   if (res.status === 429) {
     throw new ReceiptOcrError('rate-limit', 'Too many scans right now — wait a moment and retry.');

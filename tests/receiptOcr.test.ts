@@ -11,7 +11,7 @@ import {
   isPdf,
 } from '../src/lib/receiptOcr';
 
-const CURRENT = { date: '2026-07-01', shopName: 'Existing Shop' };
+const CURRENT = { shopName: 'Existing Shop' };
 
 describe('extractJsonBlock', () => {
   it('parses a raw JSON object', () => {
@@ -125,11 +125,9 @@ describe('receiptToFormPatch', () => {
     expect(patch.items?.[1].amount).toBe('');
   });
 
-  it('passes a valid ISO date through and omits invalid ones', () => {
-    expect(receiptToFormPatch({ date: '2026-07-11' }, CURRENT).date).toBe('2026-07-11');
-    expect(receiptToFormPatch({ date: '2026-13-40' }, CURRENT)).not.toHaveProperty('date');
-    expect(receiptToFormPatch({ date: '07/11/2026' }, CURRENT)).not.toHaveProperty('date');
-    expect(receiptToFormPatch({}, CURRENT)).not.toHaveProperty('date');
+  it('never copies the receipt date into the form, even a valid one', () => {
+    const parsed = receiptSchema.parse({ date: '2026-07-11', shopName: 'Coles' });
+    expect(receiptToFormPatch(parsed, CURRENT)).not.toHaveProperty('date');
   });
 
   it('trims and capitalizes a present shopName, omits a blank one', () => {
@@ -266,6 +264,16 @@ describe('requestReceiptOcr', () => {
     expect((init as RequestInit).headers).not.toHaveProperty('Authorization');
   });
 
+  it('asks the Nemotron Nano Omni vision model, which answers receipt images within the proxy timeout', async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      jsonResponse('{"shopName":"X"}'),
+    );
+    await requestReceiptOcr(DATA_URL);
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.model).toBe('nvidia/nemotron-3-nano-omni-30b-a3b-reasoning');
+  });
+
   it('maps HTTP 429 to a rate-limit error', async () => {
     (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       jsonResponse('', false, 429),
@@ -288,5 +296,57 @@ describe('requestReceiptOcr', () => {
       jsonResponse('I could not read this receipt'),
     );
     await expect(requestReceiptOcr(DATA_URL)).rejects.toMatchObject({ code: 'parse' });
+  });
+
+  it('turns off model reasoning so a receipt answers in seconds, not minutes', async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      jsonResponse('{"shopName":"X"}'),
+    );
+    await requestReceiptOcr(DATA_URL);
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+  });
+
+  it('does not ask the model for the receipt date', async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      jsonResponse('{"shopName":"X"}'),
+    );
+    await requestReceiptOcr(DATA_URL);
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    const prompt = body.messages[0].content[0].text as string;
+    expect(prompt).not.toMatch(/date/i);
+  });
+
+  it('retries a busy (503) response and succeeds on a later attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      (fetch as unknown as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(jsonResponse('', false, 503))
+        .mockResolvedValueOnce(jsonResponse('{"shopName":"X"}'));
+      const pending = requestReceiptOcr(DATA_URL);
+      await vi.runAllTimersAsync();
+      const r = await pending;
+      expect(r.shopName).toBe('X');
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives up after repeated busy responses with a busy error', async () => {
+    vi.useFakeTimers();
+    try {
+      (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        jsonResponse('', false, 503),
+      );
+      const pending = requestReceiptOcr(DATA_URL).catch((e: unknown) => e);
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toMatchObject({ code: 'busy' });
+      expect(fetch).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

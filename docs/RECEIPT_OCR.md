@@ -21,16 +21,23 @@ _Researched July 2026._
 
 | Approach | Endpoint | Output | Fit for receipts |
 | --- | --- | --- | --- |
-| **Vision-Language Model (VLM)** ✅ _used here_ | `POST https://integrate.api.nvidia.com/v1/chat/completions` (OpenAI-compatible) | Whatever you prompt for — we ask for **structured JSON** | Best: one call → `{shopName, date, items[], total}`, no text parsing |
+| **Vision-Language Model (VLM)** ✅ _used here_ | `POST https://integrate.api.nvidia.com/v1/chat/completions` (OpenAI-compatible) | Whatever you prompt for — we ask for **structured JSON** | Best: one call → `{shopName, items[], total}`, no text parsing |
 | **Dedicated OCR NIM** (`nemoretriever-ocr` / `nemotron-ocr`) | `/v1/infer` | Raw text + bounding boxes + confidence | Lower-level: needs heuristic/regex parsing to reach fields |
 
 The VLM route is what SpendShare implements: the OpenAI-compatible body carries a `text` part (the
 extraction prompt) and an `image_url` part with a `data:image/jpeg;base64,…` data URL, and the model
 returns JSON we map straight onto the expense form. The model id lives in one constant (`OCR_MODEL`
-in `src/lib/receiptOcr.ts`, currently `meta/llama-3.2-11b-vision-instruct`) so it's a one-line swap
-if catalog availability changes. (Previously used the 90B variant, but its NVIDIA-hosted endpoint
-started hanging indefinitely on every request — even text-only, no image — while remaining listed in
-the `/v1/models` catalog; the 11B sibling responds normally.)
+in `src/lib/receiptOcr.ts`, currently `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`) so it's a
+one-line swap if catalog availability changes. Model history: the 90B variant's NVIDIA endpoint hung
+indefinitely on every request while still listed in `/v1/models`. The 11B variant answered text
+quickly but took over 100 seconds on receipt images, past Cloudflare's edge timeout (HTTP 524). In
+October 2026, Nemotron 3 Nano Omni (a reasoning model) was first used with reasoning on. A real phone
+photo then took up to 108 seconds and about 4,800 tokens, and sometimes failed (HTTP 500, or 524 at
+the proxy). Each request now turns reasoning off (`chat_template_kwargs.enable_thinking: false`), and
+the same photo answers in about 6 to 12 seconds with the same items and total. Busy responses (HTTP
+503 `ResourceExhausted`, NVIDIA's shared capacity) are retried up to three times before the app shows
+a "busy" message. The receipt date is not requested and never copied into the form: the model
+invented dates that the photo did not show, so the user sets the date.
 
 The browser does **not** call NVIDIA directly — see the CORS/key section below.
 
@@ -40,9 +47,10 @@ The browser does **not** call NVIDIA directly — see the CORS/key section below
 POST <VITE_OCR_PROXY_URL>              // browser → Worker (no key here)
 // Worker adds:  Authorization: Bearer nvapi-...  and forwards to NVIDIA
 {
-  "model": "meta/llama-3.2-11b-vision-instruct",
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
   "temperature": 0.1,
   "max_tokens": 1024,
+  "chat_template_kwargs": { "enable_thinking": false },
   "messages": [{
     "role": "user",
     "content": [
@@ -113,8 +121,8 @@ A **"Scan receipt"** button on the expense editor (`ExpenseEditor.tsx`), backed 
 - `requestReceiptOcr` — POST to the OCR proxy (`VITE_OCR_PROXY_URL`), with typed errors
   (`not-configured`, `network`, `rate-limit`, `bad-response`, `parse`) surfaced as friendly messages.
 - `extractJsonBlock` + `receiptSchema` (zod) — tolerate fenced/prose-wrapped output and validate.
-- `receiptToFormPatch` — defensively map the parsed receipt onto the form: valid ISO date only,
-  shop name title-cased, line items as `{name, categoryId, amount, quantity, shared}` where **amount
+- `receiptToFormPatch` — defensively map the parsed receipt onto the form: shop name title-cased
+  (the receipt date is never copied), line items as `{name, categoryId, amount, quantity, shared}` where **amount
   is the per-item (unit) price** and **quantity** is the count (a `2 @ $2.75` line → amount `2.75`,
   quantity `2`). Anything unusable is omitted so the user's current values are preserved.
 
