@@ -1,0 +1,5 @@
+.env.local:gcp-api-key:1
+.claude/worktrees/deploy-main/.env.local:gcp-api-key:1
+.claude/worktrees/funny-lumiere-6ba26b/.env.local:gcp-api-key:1
+.claude/worktrees/work-data-layer/.env.local:gcp-api-key:1
+.claude/worktrees/work-shell-home/.env.local:gcp-api-key:1
