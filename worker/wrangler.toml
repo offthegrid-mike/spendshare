@@ -17,5 +17,5 @@ preview_urls = false
 # Secrets (set with `npx wrangler secret put <NAME>` — do NOT commit values):
 #   NVIDIA_API_KEY   (required) your nvapi-... key from build.nvidia.com
 #   ALLOWED_ORIGINS  (recommended) comma-separated origins allowed to call the
-#                    proxy, e.g. "https://spendshare-e5236.web.app,http://localhost:5173"
+#                    proxy, e.g. "https://your-app.web.app,http://localhost:5173"
 #                    Leave unset to allow any origin (simpler, less locked-down).

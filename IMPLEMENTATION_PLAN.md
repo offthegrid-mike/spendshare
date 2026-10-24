@@ -24,7 +24,7 @@
 | **M7** — Summary & Settlement | ✅ **DONE** | `milestone/M7-summary` | PR #9 |
 | **M8** — Offline/PWA & Deploy | ✅ **DONE** | `milestone/M8-pwa-deploy` | PR #10 |
 
-**👉 All milestones complete. App live at https://spendshare-e5236.web.app**
+**👉 All milestones complete.**
 
 ---
 
