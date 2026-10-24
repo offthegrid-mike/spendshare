@@ -21,7 +21,7 @@ npx wrangler secret put NVIDIA_API_KEY
 
 # 3. (Recommended) restrict who can use the proxy — comma-separated origins
 npx wrangler secret put ALLOWED_ORIGINS
-#   e.g. https://spendshare-e5236.web.app,https://spendshare-e5236--pr34-... ,http://localhost:5173
+#   e.g. https://your-app.web.app,http://localhost:5173
 
 # 4. Deploy
 npx wrangler deploy

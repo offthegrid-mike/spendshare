@@ -6,8 +6,6 @@ Alongside it, a personal **Work tracker** records which days you worked from hom
 
 It works offline, installs as an app on desktop and mobile, and runs entirely on free tiers (Firebase Spark plan and Cloudflare Workers).
 
-**Live app:** https://spendshare-e5236.web.app
-
 ## Status
 
 **Stable, in daily use.** The current release is **v2.1.0**. Every merge to `main` deploys to production automatically.
@@ -238,8 +236,6 @@ firebase use spendshare-e5236
 npm run deploy          # app
 npm run deploy:rules    # Firestore rules and indexes
 ```
-
-The app is served at https://spendshare-e5236.web.app and https://spendshare-e5236.firebaseapp.com.
 
 ## Contributing
 
