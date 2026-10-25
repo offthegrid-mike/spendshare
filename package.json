@@ -18,7 +18,8 @@
     "icons": "node scripts/generate-icons.mjs",
     "deploy": "npm run build && firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
-    "test:rules": "FIRESTORE_EMULATOR_HOST=localhost:8080 vitest run tests/firestore.rules.test.ts --config vitest.rules.config.ts"
+    "test:rules": "FIRESTORE_EMULATOR_HOST=localhost:8080 vitest run tests/firestore.rules.test.ts --config vitest.rules.config.ts",
+    "test:rules:ci": "npx -y firebase-tools@15 emulators:exec --only firestore --project demo-spendshare \"npm run test:rules\""
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

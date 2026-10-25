@@ -164,6 +164,11 @@ describe('Firestore Rules - /groups privilege escalation', () => {
     );
   });
 
+  it('denies member deleting the group', async () => {
+    const userB = testEnv.authenticatedContext('userB');
+    await assertFails(deleteDoc(doc(userB.firestore(), 'groups', 'group1')));
+  });
+
   it('allows member to update group name', async () => {
     const userB = testEnv.authenticatedContext('userB');
     await assertSucceeds(
