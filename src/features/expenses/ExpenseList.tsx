@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import { useSettlements } from '../../hooks/useSettlements';
 import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
+import { useShortcut } from '../../hooks/useShortcut';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
 import BalanceHero from './BalanceHero';
@@ -46,12 +47,6 @@ function groupByDay(expenses: ExpenseDoc[], amountOf: (exp: ExpenseDoc) => numbe
     }
   }
   return groups;
-}
-
-/** Typing in a field must not move the list selection. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
 function ListSkeleton() {
@@ -125,33 +120,22 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const activeId = visible.some((e) => e.id === selectedId) ? selectedId : visible[0]?.id ?? null;
   const active = visible.find((e) => e.id === activeId) ?? null;
 
-  useEffect(() => {
-    if (!isDesktop) return;
-    function onKeyDown(e: KeyboardEvent) {
-      const edit = e.key === 'e' || e.key === 'E';
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && !edit) return;
-      // Another control (the gear menu, say) already used the key, or a
-      // dialog is open on top of the list.
-      if (e.defaultPrevented || pendingDelete || document.querySelector('[aria-modal="true"]')) return;
-      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (visible.length === 0) return;
-      e.preventDefault();
-      if (edit) {
-        if (activeId) navigate(paths.editExpense(activeId));
-        return;
-      }
-      const i = visible.findIndex((x) => x.id === activeId);
-      const next = visible[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)];
-      setSelectedId(next.id);
-      const row = document.querySelector<HTMLElement>(`[data-expense-id="${next.id}"]`);
-      // Keep keyboard focus on the selected option when the list has focus;
-      // otherwise just bring it into view without stealing focus.
-      if (document.activeElement?.closest('[role="listbox"]')) row?.focus();
-      else row?.scrollIntoView?.({ block: 'nearest' });
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isDesktop, visible, activeId, pendingDelete, navigate]);
+  // Desktop list keys. useShortcut skips keys another control (the gear menu,
+  // say) already used, keys typed in a field, and keys under an open dialog.
+  const listKeys = { enabled: isDesktop && !pendingDelete && visible.length > 0 };
+  useShortcut(['e', 'E'], () => {
+    if (activeId) navigate(paths.editExpense(activeId));
+  }, listKeys);
+  useShortcut(['ArrowDown', 'ArrowUp'], (e) => {
+    const i = visible.findIndex((x) => x.id === activeId);
+    const next = visible[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)];
+    setSelectedId(next.id);
+    const row = document.querySelector<HTMLElement>(`[data-expense-id="${next.id}"]`);
+    // Keep keyboard focus on the selected option when the list has focus;
+    // otherwise just bring it into view without stealing focus.
+    if (document.activeElement?.closest('[role="listbox"]')) row?.focus();
+    else row?.scrollIntoView?.({ block: 'nearest' });
+  }, listKeys);
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);

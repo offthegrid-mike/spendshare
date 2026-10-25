@@ -2,6 +2,7 @@ import type { User } from 'firebase/auth';
 import { Outlet, useLocation } from 'react-router-dom';
 import HouseholdHeader from './HouseholdHeader';
 import TopBar from './TopBar';
+import GlobalShortcuts from './GlobalShortcuts';
 import Dock from './Dock';
 import MonthRail from './MonthRail';
 import BottomSheet from './BottomSheet';
@@ -71,6 +72,8 @@ export default function Layout({ groups, user }: Props) {
       <Dock />
 
       <Notice />
+
+      <GlobalShortcuts />
 
       {/* Add expense bottom sheet (mobile only; BottomSheet is lg:hidden) */}
       <BottomSheet open={addSheetOpen} onClose={closeAddSheet} title="Add expense">

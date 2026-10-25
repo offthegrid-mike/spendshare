@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import { ChevronLeft, Plus, Search } from 'lucide-react';
@@ -6,6 +6,7 @@ import GroupSwitcher from './GroupSwitcher';
 import SectionPills from './SectionPills';
 import SettingsMenu from './SettingsMenu';
 import { paths } from '../lib/paths';
+import { useShortcut } from '../hooks/useShortcut';
 import type { GroupDoc } from '../types/models';
 
 interface Props {
@@ -40,17 +41,12 @@ export default function TopBar({ groups, user, showHome = false }: Props) {
     setDraft(urlQuery);
   }
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  function focusSearch() {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }
+  useShortcut(['k', 'K'], focusSearch, { mod: true, whileTyping: true });
+  useShortcut(['/'], focusSearch);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();

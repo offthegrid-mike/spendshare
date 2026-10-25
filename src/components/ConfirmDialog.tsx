@@ -1,3 +1,5 @@
+import { useEffect, useEffectEvent } from 'react';
+
 interface Props {
   open: boolean;
   title: string;
@@ -22,6 +24,16 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const onEscape = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onCancel();
+  });
+  useEffect(() => {
+    if (!open) return;
+    const listener = (e: KeyboardEvent) => onEscape(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, [open]);
+
   if (!open) return null;
 
   return (

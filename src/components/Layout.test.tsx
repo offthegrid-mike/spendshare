@@ -21,6 +21,7 @@ vi.mock('./TopBar', () => ({
   default: ({ showHome }: { showHome?: boolean }) => <div data-testid="top-bar" data-show-home={String(showHome)} />,
 }));
 vi.mock('./Dock', () => ({ default: () => <nav data-testid="dock" /> }));
+vi.mock('./GlobalShortcuts', () => ({ default: () => <span data-testid="global-shortcuts" /> }));
 vi.mock('./MonthRail', () => ({ default: () => <nav data-testid="month-rail" /> }));
 const { desktop } = vi.hoisted(() => ({ desktop: { value: false } }));
 vi.mock('../hooks/useMediaQuery', () => ({ useIsDesktop: () => desktop.value }));
@@ -60,6 +61,11 @@ beforeEach(() => {
 });
 
 describe('Layout', () => {
+  it('turns on the Spend keyboard shortcuts', () => {
+    renderLayout();
+    expect(screen.getByTestId('global-shortcuts')).toBeInTheDocument();
+  });
+
   it('renders both shells around the page', () => {
     renderLayout();
     expect(screen.getByTestId('household-header')).toBeInTheDocument();
