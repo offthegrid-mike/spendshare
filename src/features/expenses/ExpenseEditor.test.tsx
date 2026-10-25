@@ -375,3 +375,22 @@ describe('ExpenseEditor refund prefill', () => {
     );
   });
 });
+
+describe('ExpenseEditor refund cap', () => {
+  it("keeps the cap it opened with, so saving a refund doesn't count it against itself", () => {
+    const refundOf = (remaining: number) => ({ expense: editExpense, items: editItems, remaining });
+    const { rerender } = render(
+      <MemoryRouter>
+        <ExpenseEditor group={group} currentUserUid="u1" refundOf={refundOf(570)} />
+      </MemoryRouter>,
+    );
+    // The live refunds now include this one: what is left drops by its own total.
+    rerender(
+      <MemoryRouter>
+        <ExpenseEditor group={group} currentUserUid="u1" refundOf={refundOf(0)} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText(/can't be more than/)).toBeNull();
+    expect(screen.getByRole('button', { name: /save refund/i })).not.toBeDisabled();
+  });
+});

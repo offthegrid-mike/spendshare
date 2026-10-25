@@ -91,6 +91,9 @@ export default function ExpenseEditor({
 
   const isNew = !expense;
   const refundMode = !!refundOf;
+  // The cap as the editor opened: refunds are live, and saving this one would
+  // otherwise count it against itself before the save finishes.
+  const [refundCap] = useState(refundOf?.remaining ?? 0);
   // Only new expenses are drafted — editing one, or making a refund, is never cached.
   const drafting = isNew && !refundMode;
   // A new refund starts from its original's shop, payer and items.
@@ -392,7 +395,7 @@ export default function ExpenseEditor({
     }
     // Likewise a refund larger than what is left to refund, or a purchase
     // cut below what has already been refunded from it.
-    if (refundOf && total > refundOf.remaining) return;
+    if (refundMode && total > refundCap) return;
     if (total < refunded) return;
 
     const discountPercentNum =
@@ -497,7 +500,7 @@ export default function ExpenseEditor({
   const returnsToSearch = isSearchReturnState(locationState);
   // A new expense autosaves a draft once there is something worth keeping.
   const draftSaved = drafting && isDraftMeaningful(allValues as ExpenseDraftValues);
-  const overRefund = refundOf ? totalCents > refundOf.remaining : false;
+  const overRefund = refundMode && totalCents > refundCap;
   const belowRefunded = totalCents < refunded;
   const itemCount = (watchedItems ?? []).length;
   const sharedCents = (watchedItems ?? []).reduce((sum, it) => {
@@ -602,7 +605,7 @@ export default function ExpenseEditor({
           <p className="flex-1 text-sm text-ink">
             Refund of {refundOf.expense.shopName},{' '}
             {format(new Date(refundOf.expense.date.seconds * 1000), 'd MMM yyyy')}.{' '}
-            {formatMoney(refundOf.remaining, group.currency)} left to refund.
+            {formatMoney(refundCap, group.currency)} left to refund.
           </p>
         </div>
       )}
@@ -847,9 +850,9 @@ export default function ExpenseEditor({
               {formatMoney(refunded, group.currency)} of this expense has been refunded, so its total can't go below that.
             </p>
           )}
-          {overRefund && refundOf && (
+          {overRefund && (
             <p className="text-sm text-negative">
-              A refund can't be more than the {formatMoney(refundOf.remaining, group.currency)} left to refund.
+              A refund can't be more than the {formatMoney(refundCap, group.currency)} left to refund.
             </p>
           )}
           {gcCents > 0 && afterGiftCardCents < 0 && (

@@ -15,7 +15,7 @@ import ExpenseEditor from './features/expenses/ExpenseEditor';
 import RefundRoute from './features/expenses/RefundRoute';
 import { useExpense } from './hooks/useExpense';
 import { useRefunds } from './hooks/useRefunds';
-import { refundedTotal } from './lib/refund';
+import { isRefund, refundedTotal } from './lib/refund';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
@@ -61,7 +61,7 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { expense, items, loading } = useExpense(group.id, id);
   if (loading) return <RouteSkeleton />;
   if (!expense) return <div className="text-sm text-ink-muted">Expense not found.</div>;
-  if (expense.kind === 'refund' && expense.refundOf) {
+  if (isRefund(expense) && expense.refundOf) {
     return (
       <RefundRoute group={group} currentUserUid={user.uid} originalId={expense.refundOf} refund={expense} refundItems={items} />
     );
@@ -71,8 +71,10 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
 
 /** Editing a purchase, whose total can't drop below what has been refunded from it. */
 function PurchaseEditRoute({ group, user, expense, items }: { group: GroupDoc; user: User; expense: ExpenseDoc; items: ItemDoc[] }) {
-  const { refunds, loading } = useRefunds(group.id, expense.id);
+  const { refunds, loading, error } = useRefunds(group.id, expense.id);
   if (loading) return <RouteSkeleton />;
+  // Without its refunds the floor on its total is unknown, so don't guess it's zero.
+  if (error) return <p className="text-sm text-negative">Could not load this expense's refunds. Please try again.</p>;
   return (
     <ExpenseEditor
       key={expense.id}

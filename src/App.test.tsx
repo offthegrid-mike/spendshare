@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   groups: [] as unknown[],
   expense: null as { id: string; kind?: string; refundOf?: string } | null,
   refunds: [] as { id: string; total: number }[],
+  refundsError: false,
   access: 'allowed' as string,
   groupsUid: undefined as string | undefined,
 }));
@@ -61,7 +62,7 @@ vi.mock('./features/expenses/ExpenseEditor', () => ({
   ),
 }));
 vi.mock('./hooks/useRefunds', () => ({
-  useRefunds: () => ({ refunds: state.refunds, loading: false, error: false }),
+  useRefunds: () => ({ refunds: state.refunds, loading: false, error: state.refundsError }),
 }));
 vi.mock('./features/expenses/RefundRoute', () => ({
   default: ({ originalId, refund }: { originalId: string; refund?: { id: string } }) => (
@@ -189,6 +190,18 @@ describe('App route table', () => {
 });
 
 describe('App refunds', () => {
+  it("won't edit a purchase without knowing what has been refunded from it", () => {
+    state.expense = { id: 'e1' };
+    state.refundsError = true;
+    try {
+      renderApp(paths.editExpense('e1'));
+      expect(screen.getByText("Could not load this expense's refunds. Please try again.")).toBeInTheDocument();
+      expect(screen.queryByTestId('expense-editor')).toBeNull();
+    } finally {
+      state.refundsError = false;
+    }
+  });
+
   it("passes what has been refunded from a purchase to its editor", () => {
     state.expense = { id: 'e1' };
     state.refunds = [{ id: 'r1', total: 1500 }, { id: 'r2', total: 500 }];
