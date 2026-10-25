@@ -155,10 +155,10 @@ describe('computeShopsDelta', () => {
   });
 });
 
-import { countSuggestionChanges, rebuildSuggestions } from '../src/lib/suggestions';
+import { countSuggestionChanges, recountSuggestions } from '../src/lib/suggestions';
 import { makeExpense, makeItem } from '../src/test/fixtures';
 
-describe('rebuildSuggestions', () => {
+describe('recountSuggestions', () => {
   // Newest first, as useAllExpenses returns them.
   const newer = makeExpense('e2', { shopName: 'woolworths ', day: '2026-10-05' });
   const older = makeExpense('e1', { shopName: 'Woolworths', day: '2026-10-01' });
@@ -170,7 +170,7 @@ describe('rebuildSuggestions', () => {
   };
 
   it('counts every item and shop across the history', () => {
-    const { items, shops } = rebuildSuggestions([newer, blankShop, older], itemsByExpense);
+    const { items, shops } = recountSuggestions([newer, blankShop, older], itemsByExpense);
     expect(items).toEqual([
       { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 2 },
       { name: 'Bread', categoryId: 'cat1', category: 'Dairy', count: 1 },
@@ -180,7 +180,7 @@ describe('rebuildSuggestions', () => {
   });
 
   it('gives empty lists for an empty history', () => {
-    expect(rebuildSuggestions([], {})).toEqual({ items: [], shops: [] });
+    expect(recountSuggestions([], {})).toEqual({ items: [], shops: [] });
   });
 });
 
@@ -190,12 +190,20 @@ describe('countSuggestionChanges', () => {
     shops: [{ name: 'Coles', count: 2 }, { name: 'Aldi', count: 1 }],
   };
 
-  it('is zero when the lists hold the same counts, whatever the casing or order', () => {
+  it('is zero when the lists hold the same entries in another order', () => {
     const same = {
-      items: [{ ...bread }, { ...milk, name: 'MILK' }],
-      shops: [{ name: 'aldi', count: 1 }, { name: 'Coles', count: 2 }],
+      items: [{ ...bread }, { ...milk }],
+      shops: [{ name: 'Aldi', count: 1 }, { name: 'Coles', count: 2 }],
     };
     expect(countSuggestionChanges(current, same)).toEqual({ items: 0, shops: 0 });
+  });
+
+  it('counts a changed name casing or category name as a change', () => {
+    const renamed = {
+      items: [{ ...milk, name: 'MILK' }, { ...bread, category: 'Bakery' }],
+      shops: [{ name: 'aldi', count: 1 }, { name: 'Coles', count: 2 }],
+    };
+    expect(countSuggestionChanges(current, renamed)).toEqual({ items: 2, shops: 1 });
   });
 
   it('counts entries that were added, removed or changed', () => {

@@ -86,7 +86,7 @@ export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[] 
  * oldest first, so the newest casing and category name win, as they would have
  * if every expense had been added one at a time.
  */
-export function rebuildSuggestions(
+export function recountSuggestions(
   expenses: ExpenseDoc[],
   itemsByExpense: Record<string, ItemDoc[]>,
 ): SuggestionLists {
@@ -97,20 +97,20 @@ export function rebuildSuggestions(
   };
 }
 
-/** How many item and shop entries differ in count between two sets of suggestions. */
+/** How many item and shop entries were added, removed, or changed in count, name or category name. */
 export function countSuggestionChanges(
   current: SuggestionLists,
   next: SuggestionLists,
 ): { items: number; shops: number } {
   return {
-    items: countChanged(current.items, next.items, (e) => makeKey(e.name, e.categoryId)),
-    shops: countChanged(current.shops, next.shops, (e) => normalizeNameKey(e.name)),
+    items: countChanged(current.items, next.items, (e) => makeKey(e.name, e.categoryId), (e) => `${e.count}|${e.name}|${e.category}`),
+    shops: countChanged(current.shops, next.shops, (e) => normalizeNameKey(e.name), (e) => `${e.count}|${e.name}`),
   };
 }
 
-function countChanged<T extends { count: number }>(current: T[], next: T[], key: (entry: T) => string): number {
-  const before = new Map(current.map((e) => [key(e), e.count]));
-  const after = new Map(next.map((e) => [key(e), e.count]));
+function countChanged<T>(current: T[], next: T[], key: (entry: T) => string, value: (entry: T) => string): number {
+  const before = new Map(current.map((e) => [key(e), value(e)]));
+  const after = new Map(next.map((e) => [key(e), value(e)]));
   let changed = 0;
   for (const k of new Set([...before.keys(), ...after.keys()])) {
     if (before.get(k) !== after.get(k)) changed += 1;

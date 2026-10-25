@@ -47,7 +47,7 @@ describe('GroupSettings', () => {
     expect(screen.getByText('Bob')).toBeTruthy();
   });
 
-  it('offers to rebuild autocomplete to every member', () => {
+  it('shows Rebuild autocomplete to members who are not the owner', () => {
     render(<GroupSettings group={group} currentUserUid="u2" />);
     expect(screen.getByRole('button', { name: 'Rebuild autocomplete' })).toBeInTheDocument();
   });
