@@ -88,6 +88,17 @@ describe('SearchScreen', () => {
     expect(loadedFor).toContain('g1');
   });
 
+  it('loads the history straight away for a query restored from browser history', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: paths.search, state: { query: 'wool', scrollY: 0 } }]}>
+        <Routes>
+          <Route path={paths.search} element={<SearchScreen group={mockGroup} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(loadedFor[0]).toBe('g1');
+  });
+
   it('loads the history straight away for a ?q= query', () => {
     renderScreen(`${paths.search}?q=wool`);
     expect(loadedFor[0]).toBe('g1');

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { HISTORY_TTL_MS, invalidateGroupHistory, useAllExpenses } from './useAllExpenses';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { HISTORY_TTL_MS, clearGroupHistory, invalidateGroupHistory, useAllExpenses } from './useAllExpenses';
 
 const { getDocsMock } = vi.hoisted(() => ({ getDocsMock: vi.fn() }));
 
@@ -21,8 +21,7 @@ function fakeSnap(docs: Array<Record<string, unknown>>) {
 describe('useAllExpenses', () => {
   beforeEach(() => {
     getDocsMock.mockReset();
-    invalidateGroupHistory('g1');
-    invalidateGroupHistory('g2');
+    clearGroupHistory();
   });
 
   it('fetches every expense for the group with no month filter', async () => {
@@ -159,6 +158,84 @@ describe('useAllExpenses', () => {
       (await loadOnce('g1')).unmount();
       await loadOnce('g2');
       expect(getDocsMock).toHaveBeenCalledTimes(4);
+    });
+
+    // Each load's expense query waits until the test resolves it with expense ids.
+    function deferLoads() {
+      const loads: Array<{ resolve: (ids: string[]) => void }> = [];
+      getDocsMock.mockImplementation((q: string) =>
+        q === 'ITEMS_COL'
+          ? Promise.resolve(fakeSnap([]))
+          : new Promise((done) => loads.push({ resolve: (ids) => done(fakeSnap(ids.map((id) => ({ id })))) })),
+      );
+      return loads;
+    }
+
+    it('delivers a shared copy asynchronously, never inside the effect', async () => {
+      serveHistory();
+      (await loadOnce('g1')).unmount();
+      const { result } = renderHook(() => useAllExpenses('g1'));
+      expect(result.current.loading).toBe(true);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(getDocsMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not keep a load that finished after the copy was invalidated', async () => {
+      const loads = deferLoads();
+      const first = renderHook(() => useAllExpenses('g1'));
+      invalidateGroupHistory('g1'); // a save lands while the load is in flight
+      await act(async () => loads[0].resolve(['old']));
+      first.unmount();
+
+      const second = renderHook(() => useAllExpenses('g1'));
+      expect(loads).toHaveLength(2);
+      await act(async () => loads[1].resolve(['old', 'saved']));
+      expect(second.result.current.expenses.map((e) => e.id)).toEqual(['old', 'saved']);
+    });
+
+    it('shares a load already in flight instead of starting another', async () => {
+      const loads = deferLoads();
+      const a = renderHook(() => useAllExpenses('g1'));
+      const b = renderHook(() => useAllExpenses('g1'));
+      expect(loads).toHaveLength(1);
+      await act(async () => loads[0].resolve(['e1']));
+      expect(a.result.current.expenses.map((e) => e.id)).toEqual(['e1']);
+      expect(b.result.current.expenses.map((e) => e.id)).toEqual(['e1']);
+    });
+
+    it('keeps a fresh load over an older normal one that finishes later', async () => {
+      const loads = deferLoads();
+      const normal = renderHook(() => useAllExpenses('g1'));
+      const fresh = renderHook(() => useAllExpenses('g1', { fresh: true }));
+      expect(loads).toHaveLength(2);
+      await act(async () => loads[1].resolve(['fresh']));
+      await act(async () => loads[0].resolve(['stale']));
+      normal.unmount();
+      fresh.unmount();
+
+      const later = renderHook(() => useAllExpenses('g1'));
+      await waitFor(() => expect(later.result.current.loading).toBe(false));
+      expect(loads).toHaveLength(2);
+      expect(later.result.current.expenses.map((e) => e.id)).toEqual(['fresh']);
+    });
+
+    it('reports loading again when fresh is turned on for the same group', async () => {
+      serveHistory();
+      const { result, rerender } = renderHook(({ fresh }) => useAllExpenses('g1', { fresh }), { initialProps: { fresh: false } });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      rerender({ fresh: true });
+      expect(result.current.loading).toBe(true);
+      await waitFor(() => expect(result.current.loading).toBe(false));
+    });
+
+    it('clearGroupHistory forgets every group', async () => {
+      serveHistory();
+      (await loadOnce('g1')).unmount();
+      (await loadOnce('g2')).unmount();
+      clearGroupHistory();
+      (await loadOnce('g1')).unmount();
+      (await loadOnce('g2')).unmount();
+      expect(getDocsMock).toHaveBeenCalledTimes(8);
     });
 
     it('does not keep a failed load', async () => {

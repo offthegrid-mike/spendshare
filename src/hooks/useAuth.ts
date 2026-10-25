@@ -3,6 +3,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth } from '../lib/firebase';
 import { usersCol } from '../lib/converters';
+import { clearGroupHistory } from './useAllExpenses';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,6 +29,9 @@ export function useAuth() {
             // The rules refuse anyone off the allowlist or unverified; the app
             // shows them NotAllowed, so a failed profile write is expected.
             .catch(() => {});
+        } else {
+          // Signed out: the next person in this tab must not see this user's groups.
+          clearGroupHistory();
         }
         setUser(u);
         setLoading(false);

@@ -32,12 +32,16 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => ({ _type: 'serverTimestamp' })),
 }));
 
+const { clearGroupHistory } = vi.hoisted(() => ({ clearGroupHistory: vi.fn() }));
+vi.mock('../src/hooks/useAllExpenses', () => ({ clearGroupHistory }));
+
 import { useAuth } from '../src/hooks/useAuth';
 
 describe('useAuth', () => {
   beforeEach(() => {
     authCallback = null;
     unsubscribe.mockClear();
+    clearGroupHistory.mockClear();
     getDoc.mockReset().mockResolvedValue({ exists: () => true });
   });
 
@@ -81,5 +85,13 @@ describe('useAuth', () => {
 
     expect(result.current.loading).toBe(false);
     expect(result.current.user).toBeNull();
+  });
+
+  it("forgets every group's shared history when signed out", () => {
+    renderHook(() => useAuth());
+    act(() => {
+      authCallback?.(null);
+    });
+    expect(clearGroupHistory).toHaveBeenCalled();
   });
 });
