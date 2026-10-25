@@ -1,3 +1,5 @@
+import { useEscape } from '../hooks/useEscape';
+
 interface Props {
   open: boolean;
   title: string;
@@ -22,6 +24,8 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  useEscape(open, onCancel);
+
   if (!open) return null;
 
   return (

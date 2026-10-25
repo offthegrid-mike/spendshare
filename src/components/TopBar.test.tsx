@@ -9,6 +9,8 @@ import { paths } from '../lib/paths';
 
 const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
+const { desktop } = vi.hoisted(() => ({ desktop: { value: true } }));
+vi.mock('../hooks/useMediaQuery', () => ({ useIsDesktop: () => desktop.value }));
 vi.mock('./GroupSwitcher', () => ({ default: () => <div data-testid="group-switcher" /> }));
 vi.mock('./MonthControl', () => ({ default: () => <div data-testid="month-control" /> }));
 vi.mock('./SettingsMenu', () => ({ default: () => <button type="button">Settings menu</button> }));
@@ -82,6 +84,32 @@ describe('TopBar', () => {
     renderBar();
     await userEvent.keyboard('{Control>}k{/Control}');
     expect(search()).toHaveFocus();
+  });
+
+  it('focuses the search field with /', async () => {
+    renderBar();
+    await userEvent.keyboard('/');
+    expect(screen.getByRole('searchbox', { name: /search items/i })).toHaveFocus();
+    expect(screen.getByRole('searchbox', { name: /search items/i })).toHaveValue('');
+  });
+
+  it('leaves / alone on mobile', async () => {
+    desktop.value = false;
+    try {
+      renderBar();
+      await userEvent.keyboard('/');
+      expect(screen.getByRole('searchbox', { name: /search items/i })).not.toHaveFocus();
+    } finally {
+      desktop.value = true;
+    }
+  });
+
+  it('types / into a field that already has focus', async () => {
+    renderBar();
+    const field = screen.getByRole('searchbox', { name: /search items/i });
+    await userEvent.click(field);
+    await userEvent.keyboard('a/b');
+    expect(field).toHaveValue('a/b');
   });
 
   it('focuses the search field with Cmd+K', async () => {

@@ -59,7 +59,7 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
           Delete
         </button>
       </div>
-      <p className="text-center text-xs text-ink-muted">Use ↑ ↓ to move between expenses</p>
+      <p className="text-center text-xs text-ink-muted">Use ↑ ↓ to move between expenses · ? for all shortcuts</p>
     </div>
   );
 }

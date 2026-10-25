@@ -25,7 +25,7 @@ describe('ExpenseDetail', () => {
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();
-    expect(screen.getByText('Use ↑ ↓ to move between expenses')).toBeInTheDocument();
+    expect(screen.getByText('Use ↑ ↓ to move between expenses · ? for all shortcuts')).toBeInTheDocument();
   });
 
   it('shows a given category’s tile in place of the first item’s', () => {
