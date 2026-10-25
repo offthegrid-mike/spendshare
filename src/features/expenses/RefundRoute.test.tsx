@@ -77,6 +77,13 @@ describe('RefundRoute', () => {
     expect(screen.getByText('Expense not found.')).toBeInTheDocument();
   });
 
+  it("says a refund's original is gone, rather than that the refund isn't found", () => {
+    state.original = null;
+    const refund = makeExpense('r0', { total: 1500, kind: 'refund', refundOf: 'e1' });
+    render(<RefundRoute group={group} currentUserUid="mike" originalId="e1" refund={refund} refundItems={[]} />);
+    expect(screen.getByText('The expense this refunds has been deleted. You can still delete this refund.')).toBeInTheDocument();
+  });
+
   it('will not refund a refund', () => {
     state.original = earlier;
     render(<RefundRoute group={group} currentUserUid="mike" originalId="r0" />);

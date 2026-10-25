@@ -17,14 +17,20 @@ interface Props {
 
 /**
  * The expense editor as a refund of `originalId`, capped at what is left to
- * refund: what was paid for it, less its other refunds.
+ * refund: its receipt total, less its other refunds.
  */
 export default function RefundRoute({ group, currentUserUid, originalId, refund, refundItems }: Props) {
   const { expense: original, items, loading } = useExpense(group.id, originalId);
   const { refunds, loading: refundsLoading, error } = useRefunds(group.id, originalId);
 
   if (loading || refundsLoading) return <RouteSkeleton />;
-  if (!original) return <div className="text-sm text-ink-muted">Expense not found.</div>;
+  if (!original) {
+    return (
+      <div className="text-sm text-ink-muted">
+        {refund ? 'The expense this refunds has been deleted. You can still delete this refund.' : 'Expense not found.'}
+      </div>
+    );
+  }
   if (isRefund(original)) return <div className="text-sm text-ink-muted">A refund can't be refunded.</div>;
   if (error) {
     return <p className="text-sm text-negative">Could not load this expense's refunds. Please try again.</p>;

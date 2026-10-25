@@ -342,3 +342,36 @@ describe('ExpenseEditor refund mode', () => {
     expect(suggestionWrites()).toHaveLength(0);
   });
 });
+
+describe('ExpenseEditor for a purchase with refunds', () => {
+  beforeEach(() => {
+    batchSets.length = 0;
+    mockCommit.mockClear();
+  });
+
+  it("won't let its total drop below what has been refunded", async () => {
+    // Cherry 3.00 + Bread 2.70 = 5.70, with 6.00 already refunded.
+    renderEditor({ expense: editExpense, items: editItems, refunded: 600 });
+    expect(screen.getByText(/A\$6\.00 of this expense has been refunded/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockCommit).not.toHaveBeenCalled();
+  });
+
+  it('saves normally while the total covers the refunds', async () => {
+    renderEditor({ expense: editExpense, items: editItems, refunded: 500 });
+    expect(screen.queryByText(/has been refunded/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('ExpenseEditor refund prefill', () => {
+  it("dates a new refund today and keeps the original's payer", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    renderEditor({ refundOf: { expense: { ...editExpense, payerUid: 'u1' }, items: editItems, remaining: 570 } });
+    expect(screen.getByRole('button', { name: /date/i }).textContent).toContain(
+      new Date(`${today}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    );
+  });
+});

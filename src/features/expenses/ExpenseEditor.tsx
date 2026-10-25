@@ -72,6 +72,8 @@ interface Props {
    * `expense` set) an existing refund being edited. `remaining` caps its total.
    */
   refundOf?: { expense: ExpenseDoc; items: ItemDoc[]; remaining: number };
+  /** For a purchase being edited: what has been refunded from it, the floor for its total. */
+  refunded?: number;
   /** `sheet` inside the mobile Add expense sheet (which shows its own title). */
   variant?: 'page' | 'sheet';
 }
@@ -80,7 +82,7 @@ interface Props {
 // Component
 // ---------------------------------------------------------------------------
 export default function ExpenseEditor({
-  group, groups, user, currentUserUid, expense, items, onSuccess, refundOf, variant = 'page',
+  group, groups, user, currentUserUid, expense, items, onSuccess, refundOf, refunded = 0, variant = 'page',
 }: Props) {
   const navigate = useSafeNavigate();
   const locationState = useSafeLocationState();
@@ -388,8 +390,10 @@ export default function ExpenseEditor({
       // Caught by live UI warning, but guard at submit too
       return;
     }
-    // Likewise a refund larger than what is left to refund.
+    // Likewise a refund larger than what is left to refund, or a purchase
+    // cut below what has already been refunded from it.
     if (refundOf && total > refundOf.remaining) return;
+    if (total < refunded) return;
 
     const discountPercentNum =
       data.applyDiscount && data.discountPercent && data.discountPercent.trim() !== ''
@@ -494,6 +498,7 @@ export default function ExpenseEditor({
   // A new expense autosaves a draft once there is something worth keeping.
   const draftSaved = drafting && isDraftMeaningful(allValues as ExpenseDraftValues);
   const overRefund = refundOf ? totalCents > refundOf.remaining : false;
+  const belowRefunded = totalCents < refunded;
   const itemCount = (watchedItems ?? []).length;
   const sharedCents = (watchedItems ?? []).reduce((sum, it) => {
     if (!it?.shared) return sum;
@@ -837,6 +842,11 @@ export default function ExpenseEditor({
               {formatMoney(totalCents, group.currency)}
             </span>
           </div>
+          {belowRefunded && (
+            <p className="text-sm text-negative">
+              {formatMoney(refunded, group.currency)} of this expense has been refunded, so its total can't go below that.
+            </p>
+          )}
           {overRefund && refundOf && (
             <p className="text-sm text-negative">
               A refund can't be more than the {formatMoney(refundOf.remaining, group.currency)} left to refund.
@@ -882,7 +892,7 @@ export default function ExpenseEditor({
           type="submit"
           loading={saving}
           loadingText={expense ? 'Saving changes…' : 'Saving…'}
-          disabled={overRefund}
+          disabled={overRefund || belowRefunded}
           className="btn-primary h-11 w-full"
         >
           {expense ? 'Save changes' : refundMode ? 'Save refund' : 'Save expense'}

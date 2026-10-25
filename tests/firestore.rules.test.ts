@@ -580,6 +580,35 @@ describe('/groups financial sub-collection validation (M-2)', () => {
     it('denies an item refund flag that is not a boolean', async () => {
       await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({ refund: 'yes' })));
     });
+
+    it('denies a discount on a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', discountPercent: 2 })));
+    });
+
+    it("needs an item's refund flag to match its expense", async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      // a refund item under a purchase, a plain item under a refund
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i1'), item({ expenseId: 'e1', refund: true })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i1'), item({ expenseId: 'e1' })));
+    });
+
+    it('allows a refund and its items saved together in one batch', async () => {
+      const db = bob();
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r2'), expense({ kind: 'refund', refundOf: 'e1' }));
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r2', 'items', 'i1'), item({ expenseId: 'r2', refund: true }));
+      await assertSucceeds(batch.commit());
+    });
+
+    it('denies turning a purchase into a refund, or a refund into a purchase', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({ kind: 'refund', refundOf: 'e0' })));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', total: 400 })));
+    });
   });
 
   it('denies expense with negative total', async () => {

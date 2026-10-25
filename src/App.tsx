@@ -14,6 +14,8 @@ import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
 import RefundRoute from './features/expenses/RefundRoute';
 import { useExpense } from './hooks/useExpense';
+import { useRefunds } from './hooks/useRefunds';
+import { refundedTotal } from './lib/refund';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
@@ -32,7 +34,7 @@ import { paths } from './lib/paths';
 import { WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
 import type { User } from 'firebase/auth';
-import type { GroupDoc } from './types/models';
+import type { ExpenseDoc, GroupDoc, ItemDoc } from './types/models';
 
 function IncomeRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
   const { selectedMonth } = useUIStore();
@@ -64,8 +66,22 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
       <RefundRoute group={group} currentUserUid={user.uid} originalId={expense.refundOf} refund={expense} refundItems={items} />
     );
   }
+  return <PurchaseEditRoute group={group} user={user} expense={expense} items={items} />;
+}
+
+/** Editing a purchase, whose total can't drop below what has been refunded from it. */
+function PurchaseEditRoute({ group, user, expense, items }: { group: GroupDoc; user: User; expense: ExpenseDoc; items: ItemDoc[] }) {
+  const { refunds, loading } = useRefunds(group.id, expense.id);
+  if (loading) return <RouteSkeleton />;
   return (
-    <ExpenseEditor key={expense.id} group={group} currentUserUid={user.uid} expense={expense} items={items} />
+    <ExpenseEditor
+      key={expense.id}
+      group={group}
+      currentUserUid={user.uid}
+      expense={expense}
+      items={items}
+      refunded={refundedTotal(refunds)}
+    />
   );
 }
 

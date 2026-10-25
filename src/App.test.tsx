@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   user: null as { uid: string; email: string } | null,
   groups: [] as unknown[],
   expense: null as { id: string; kind?: string; refundOf?: string } | null,
+  refunds: [] as { id: string; total: number }[],
   access: 'allowed' as string,
   groupsUid: undefined as string | undefined,
 }));
@@ -55,9 +56,12 @@ vi.mock('./features/groups/GroupSettings', () => ({ default: () => <div data-tes
 vi.mock('./features/invites/SendInvite', () => ({ default: () => <div data-testid="send-invite" /> }));
 vi.mock('./features/categories/CategoryManager', () => ({ default: () => <div data-testid="category-manager" /> }));
 vi.mock('./features/expenses/ExpenseEditor', () => ({
-  default: ({ expense }: { expense?: { id: string } }) => (
-    <div data-testid="expense-editor" data-expense={expense?.id ?? ''} />
+  default: ({ expense, refunded }: { expense?: { id: string }; refunded?: number }) => (
+    <div data-testid="expense-editor" data-expense={expense?.id ?? ''} data-refunded={refunded ?? ''} />
   ),
+}));
+vi.mock('./hooks/useRefunds', () => ({
+  useRefunds: () => ({ refunds: state.refunds, loading: false, error: false }),
 }));
 vi.mock('./features/expenses/RefundRoute', () => ({
   default: ({ originalId, refund }: { originalId: string; refund?: { id: string } }) => (
@@ -185,6 +189,17 @@ describe('App route table', () => {
 });
 
 describe('App refunds', () => {
+  it("passes what has been refunded from a purchase to its editor", () => {
+    state.expense = { id: 'e1' };
+    state.refunds = [{ id: 'r1', total: 1500 }, { id: 'r2', total: 500 }];
+    try {
+      renderApp(paths.editExpense('e1'));
+      expect(screen.getByTestId('expense-editor')).toHaveAttribute('data-refunded', '2000');
+    } finally {
+      state.refunds = [];
+    }
+  });
+
   it('edits an existing refund as a refund of its original', () => {
     state.expense = { id: 'r1', kind: 'refund', refundOf: 'e1' };
     renderApp(paths.editExpense('r1'));
