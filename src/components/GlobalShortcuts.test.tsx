@@ -42,10 +42,10 @@ describe('GlobalShortcuts', () => {
     expect(location()).toBe(paths.newExpense);
   });
 
-  it('ignores N on the expense editor itself', () => {
-    renderAt(paths.newExpense);
+  it.each([paths.newExpense, paths.editExpense('e1')])('ignores N on the expense editor at %s', (path) => {
+    renderAt(path);
     press('n');
-    expect(location()).toBe(paths.newExpense);
+    expect(location()).toBe(path);
   });
 
   it.each([paths.spend, paths.summary, paths.income])('changes month with ← and → on %s', (path) => {
@@ -62,6 +62,40 @@ describe('GlobalShortcuts', () => {
     renderAt(paths.spend);
     press('ArrowRight');
     expect(useUIStore.getState().selectedMonth).toBe(todayMonthKey());
+  });
+
+  it('leaves ← and → to a control that has focus', () => {
+    renderAt(paths.summary);
+    const control = document.createElement('button');
+    document.body.appendChild(control);
+    control.focus();
+    press('ArrowLeft');
+    expect(useUIStore.getState().selectedMonth).toBe(lastMonth);
+    control.remove();
+  });
+
+  it('still changes month while the expense list has focus', () => {
+    renderAt(paths.spend);
+    const list = document.createElement('div');
+    list.setAttribute('role', 'listbox');
+    const row = document.createElement('div');
+    row.tabIndex = 0;
+    list.appendChild(row);
+    document.body.appendChild(list);
+    row.focus();
+    press('ArrowLeft');
+    expect(useUIStore.getState().selectedMonth).toBe(prevMonthKey(lastMonth));
+    list.remove();
+  });
+
+  it('leaves ← and → alone while a page opts out, like the Summary Year view', () => {
+    renderAt(paths.summary);
+    const yearView = document.createElement('div');
+    yearView.setAttribute('data-no-month-keys', '');
+    document.body.appendChild(yearView);
+    press('ArrowLeft');
+    expect(useUIStore.getState().selectedMonth).toBe(lastMonth);
+    yearView.remove();
   });
 
   it('leaves ← and → alone on pages without a month', () => {

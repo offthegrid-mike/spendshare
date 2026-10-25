@@ -122,10 +122,10 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
 
   // Desktop list keys. useShortcut skips keys another control (the gear menu,
   // say) already used, keys typed in a field, and keys under an open dialog.
-  const listKeys = { enabled: isDesktop && !pendingDelete && visible.length > 0 };
-  useShortcut(['e', 'E'], () => {
+  const listShortcutOptions = { enabled: isDesktop && !pendingDelete && visible.length > 0 };
+  useShortcut(['e'], () => {
     if (activeId) navigate(paths.editExpense(activeId));
-  }, listKeys);
+  }, listShortcutOptions);
   useShortcut(['ArrowDown', 'ArrowUp'], (e) => {
     const i = visible.findIndex((x) => x.id === activeId);
     const next = visible[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)];
@@ -135,7 +135,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     // otherwise just bring it into view without stealing focus.
     if (document.activeElement?.closest('[role="listbox"]')) row?.focus();
     else row?.scrollIntoView?.({ block: 'nearest' });
-  }, listKeys);
+  }, listShortcutOptions);
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);

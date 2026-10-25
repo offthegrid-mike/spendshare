@@ -23,6 +23,14 @@ describe('useShortcut', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it('matches letters whatever their case', () => {
+    const handler = vi.fn();
+    renderHook(() => useShortcut(['n'], handler));
+    press('n');
+    press('N', { shiftKey: true });
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
   it('leaves other keys alone', () => {
     const handler = vi.fn();
     renderHook(() => useShortcut(['n'], handler));

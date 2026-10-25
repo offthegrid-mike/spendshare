@@ -1,7 +1,8 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useShortcut } from '../hooks/useShortcut';
+import { useEscape } from '../hooks/useEscape';
 import { useIsDesktop } from '../hooks/useMediaQuery';
 import { useUIStore } from '../stores/uiStore';
 import { isExpenseEditorPath, routeInfo } from '../lib/routes';
@@ -24,13 +25,14 @@ export default function GlobalShortcuts() {
   const route = routeInfo(pathname);
   const monthScoped = route.kind === 'primary' && route.monthScoped;
 
-  useShortcut(['n', 'N'], () => { navigate(paths.newExpense); }, {
+  useShortcut(['n'], () => { navigate(paths.newExpense); }, {
     enabled: isDesktop && !isExpenseEditorPath(pathname),
   });
-  useShortcut(['ArrowLeft'], () => setMonth(prevMonthKey(selectedMonth)), { enabled: isDesktop && monthScoped });
   useShortcut(
-    ['ArrowRight'],
-    () => {
+    ['ArrowLeft', 'ArrowRight'],
+    (e) => {
+      if (!monthKeysFree()) return false;
+      if (e.key === 'ArrowLeft') return void setMonth(prevMonthKey(selectedMonth));
       // Like the month control's Next button, stop at the current month.
       if (selectedMonth >= todayMonthKey()) return false;
       setMonth(nextMonthKey(selectedMonth));
@@ -42,16 +44,20 @@ export default function GlobalShortcuts() {
   return <ShortcutsHelp open={isDesktop && helpOpen} onClose={() => setHelpOpen(false)} />;
 }
 
+/**
+ * ← and → belong to the month only when nothing else wants them: nothing has
+ * focus, or the expense list does (it uses ↑ ↓). A focused button, tab or
+ * scrollable table keeps its arrows, and a page in a view without a single
+ * month (Summary's Year view) opts out with data-no-month-keys.
+ */
+function monthKeysFree(): boolean {
+  if (document.querySelector('[data-no-month-keys]')) return false;
+  const focused = document.activeElement;
+  return !focused || focused === document.body || focused.closest('[role="listbox"]') !== null;
+}
+
 function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const onEscape = useEffectEvent((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  });
-  useEffect(() => {
-    if (!open) return;
-    const listener = (e: KeyboardEvent) => onEscape(e);
-    window.addEventListener('keydown', listener);
-    return () => window.removeEventListener('keydown', listener);
-  }, [open]);
+  useEscape(open, onClose);
 
   if (!open) return null;
 

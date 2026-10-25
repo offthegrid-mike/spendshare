@@ -57,6 +57,16 @@ describe('ignoreShortcut', () => {
     expect(ignoreShortcut(event)).toBe(true);
   });
 
+  it('ignores keys while a popover is open', () => {
+    element('button', { 'aria-haspopup': 'menu', 'aria-expanded': 'true' });
+    expect(ignoreShortcut(keydown('n'))).toBe(true);
+  });
+
+  it('lets keys through when a popover trigger is closed', () => {
+    element('button', { 'aria-haspopup': 'menu', 'aria-expanded': 'false' });
+    expect(ignoreShortcut(keydown('n'))).toBe(false);
+  });
+
   it('ignores keys while a dialog is open', () => {
     element('div', { 'aria-modal': 'true' });
     expect(ignoreShortcut(keydown('n'))).toBe(true);

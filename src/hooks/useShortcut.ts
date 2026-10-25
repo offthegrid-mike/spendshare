@@ -7,9 +7,10 @@ interface Options extends ShortcutOptions {
 }
 
 /**
- * Calls `handler` when one of `keys` is pressed anywhere on the page, unless
- * `ignoreShortcut` says to leave the key alone. The key is claimed with
- * preventDefault; a handler that returns false declines it, leaving it to others.
+ * Calls `handler` when one of `keys` is pressed anywhere on the page (letters
+ * match either case), unless `ignoreShortcut` says to leave the key alone. The
+ * key is claimed with preventDefault; a handler that returns false declines it,
+ * leaving it to others.
  */
 export function useShortcut(
   keys: string[],
@@ -17,7 +18,8 @@ export function useShortcut(
   { enabled = true, mod = false, whileTyping = false }: Options = {},
 ): void {
   const onKey = useEffectEvent((event: KeyboardEvent) => {
-    if (!keys.includes(event.key) || ignoreShortcut(event, { mod, whileTyping })) return;
+    const key = event.key.toLowerCase();
+    if (!keys.some((k) => k.toLowerCase() === key) || ignoreShortcut(event, { mod, whileTyping })) return;
     if (handler(event) !== false) event.preventDefault();
   });
 

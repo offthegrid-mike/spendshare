@@ -157,6 +157,14 @@ describe('Summary Month/Year toggle', () => {
     expect(screen.getByRole('button', { name: 'Year' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('turns off the ← → month keys in the Year view only', async () => {
+    renderSummary();
+    expect(document.querySelector('[data-no-month-keys]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    await screen.findByText('Year view 2026');
+    expect(document.querySelector('[data-no-month-keys]')).not.toBeNull();
+  });
+
   it('picking a month in the Year view selects it and returns to Month view', async () => {
     renderSummary();
     await userEvent.click(screen.getByRole('button', { name: 'Year' }));

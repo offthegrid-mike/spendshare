@@ -83,7 +83,8 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
 
   if (view === 'year') {
     return (
-      <div className="space-y-6">
+      // ← → would pick a single month and leave the Year view, so they're off here.
+      <div className="space-y-6" data-no-month-keys>
         {header}
         <Suspense fallback={<RouteSkeleton />}>
           <YearSummary group={group} year={year} onSelectMonth={selectMonth} />

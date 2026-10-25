@@ -4,16 +4,16 @@ export interface ShortcutHelp { keys: string[]; description: string; }
 /** Every keyboard shortcut, grouped by where it works. The help dialog lists these. */
 export const SHORTCUTS: { title: string; shortcuts: ShortcutHelp[] }[] = [
   {
-    title: 'Anywhere in SpendShare',
+    title: 'Expenses, Summary, Income and Search',
     shortcuts: [
-      { keys: ['N'], description: 'New expense' },
+      { keys: ['N'], description: 'New expense (not while editing one)' },
       { keys: ['/'], description: 'Search' },
       { keys: ['⌘', 'K'], description: 'Search (Ctrl K on Windows)' },
       { keys: ['?'], description: 'Show keyboard shortcuts' },
     ],
   },
   {
-    title: 'Expenses, Summary and Income',
+    title: 'Expenses, Summary (month view) and Income',
     shortcuts: [
       { keys: ['←'], description: 'Previous month' },
       { keys: ['→'], description: 'Next month' },
@@ -47,13 +47,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 /**
  * Whether a keydown should be left alone rather than treated as a shortcut:
- * another control already handled it, a dialog is open on top of the page,
- * the user is typing in a field, or modifier keys don't match. Shift is
- * allowed, since keys like ? need it.
+ * another control already handled it, a dialog or popover is open on top of
+ * the page, the user is typing in a field, or modifier keys don't match.
+ * Shift is allowed, since keys like ? need it.
  */
 export function ignoreShortcut(event: KeyboardEvent, { mod = false, whileTyping = false }: ShortcutOptions = {}): boolean {
   if (event.defaultPrevented) return true;
-  if (document.querySelector('[aria-modal="true"]')) return true;
+  if (document.querySelector('[aria-modal="true"], [aria-haspopup][aria-expanded="true"]')) return true;
   if (!whileTyping && isTypingTarget(event.target)) return true;
   if (event.altKey) return true;
   const modPressed = event.metaKey || event.ctrlKey;
