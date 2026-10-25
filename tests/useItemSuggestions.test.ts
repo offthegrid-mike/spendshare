@@ -102,6 +102,30 @@ describe('useItemSuggestions', () => {
     expect(result.current).toEqual([updated, shops, true]);
   });
 
+  it('loads once the server confirms a doc that the cache also had as missing', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap(null, true)));
+    act(() => latest().next(snap(null, false)));
+    expect(result.current).toEqual([[], [], true]);
+  });
+
+  it('drops to not loaded when the listener errors after a good snapshot', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap({ items: suggestions, shops })));
+    act(() => latest().error(new Error('permission-denied')));
+    expect(result.current).toEqual([[], [], false]);
+  });
+
+  it('does not show an older copy as loaded when switching back to a group', () => {
+    const { result, rerender } = renderHook(({ gid }) => useItemSuggestions(gid), { initialProps: { gid: 'g1' } });
+    act(() => latest().next(snap({ items: suggestions, shops })));
+
+    rerender({ gid: 'g2' });
+    rerender({ gid: 'g1' });
+
+    expect(result.current).toEqual([[], [], false]);
+  });
+
   it('stays not loaded on a listener error, so saves never write from an empty list', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().error(new Error('permission-denied')));

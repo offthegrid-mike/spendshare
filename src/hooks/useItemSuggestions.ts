@@ -14,14 +14,14 @@ type Loaded = { groupId: string; items: SuggestionEntry[]; shops: ShopEntry[] };
  *
  * `loaded` stays false until the counts can be trusted as a baseline for a save:
  * a snapshot from the server, or a cached copy of the doc when offline. A cached
- * "no doc" may only mean the cache hasn't seen it yet, and a listener error gives
- * no counts at all; saving from an empty list in either case would wipe them.
+ * "no doc" may only mean the cache hasn't seen it yet, and after a listener error
+ * the counts no longer update; saving from either would overwrite real counts.
  */
 export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEntry[], boolean] {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
-    return onSnapshot(
+    const unsubscribe = onSnapshot(
       suggestionsDocRef(groupId),
       { includeMetadataChanges: true },
       (snap) => {
@@ -29,10 +29,15 @@ export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEnt
         const data = snap.exists() ? snap.data() : null;
         setLoaded({ groupId, items: data?.items ?? EMPTY_ITEMS, shops: data?.shops ?? EMPTY_SHOPS });
       },
-      () => {
-        // Leave it not loaded: saves then skip the suggestions update.
-      },
+      // An error ends the listener, so earlier counts would never update again.
+      // Not loaded: saves then skip the suggestions update.
+      () => setLoaded(null),
     );
+    return () => {
+      unsubscribe();
+      // Switching back to this group must wait for a fresh snapshot.
+      setLoaded(null);
+    };
   }, [groupId]);
 
   // Derived from the stored key, so a group switch never shows the old group's lists.
