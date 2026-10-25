@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paths } from './paths';
-import { routeInfo, isExpenseEditorPath, isEditExpensePath } from './routes';
+import { routeInfo, isExpenseEditorPath, isEditExpensePath, isRefundExpensePath } from './routes';
 
 describe('routeInfo', () => {
   it.each([paths.spend, paths.summary, paths.income])('treats %s as a month-scoped main section', (path) => {
@@ -43,6 +43,14 @@ describe('isExpenseEditorPath', () => {
 
   it.each(['/spend', '/spend/more', '/expense/new'])('is false for %s', (path) => {
     expect(isExpenseEditorPath(path)).toBe(false);
+  });
+});
+
+describe('isRefundExpensePath', () => {
+  it('is true only for the refund page', () => {
+    expect(isRefundExpensePath('/spend/expense/x/refund')).toBe(true);
+    expect(isRefundExpensePath('/spend/expense/x/edit')).toBe(false);
+    expect(isRefundExpensePath('/spend/expense/x/refund/more')).toBe(false);
   });
 });
 

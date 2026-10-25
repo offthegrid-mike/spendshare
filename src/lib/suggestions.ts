@@ -1,4 +1,5 @@
 import type { ExpenseDoc, ItemDoc, SuggestionEntry, ShopEntry } from '../types/models';
+import { isRefund } from './refund';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 export type ItemInput = { name: string; categoryId: string; category: string };
@@ -92,7 +93,7 @@ export function recountSuggestions(
   itemsByExpense: Record<string, ItemDoc[]>,
 ): SuggestionLists {
   const oldestFirst = expenses
-    .filter((exp) => exp.kind !== 'refund')
+    .filter((exp) => !isRefund(exp))
     .sort((a, b) => a.date.toMillis() - b.date.toMillis());
   return {
     items: computeSuggestionsDelta([], [], oldestFirst.flatMap((exp) => itemsByExpense[exp.id] ?? [])),

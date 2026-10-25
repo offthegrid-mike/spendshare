@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Pencil, Trash2, Undo2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
 import ExpenseBreakdown from './ExpenseBreakdown';
+import RefundButton from './RefundButton';
 import RefundLinks from './RefundLinks';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
@@ -58,28 +59,23 @@ export default function ExpenseDetail({
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <RefundLinks group={group} expense={expense} />
       <div className="mt-auto space-y-2 pt-2">
-      {deleteError && <p role="alert" className="text-sm text-negative">{deleteError}</p>}
-      {!refund && (
-        <Link to={paths.refundExpense(expense.id)} className="btn-outline w-full">
-          <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
-          Refund…
-        </Link>
-      )}
-      <div className="flex gap-2">
-        <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
-          <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
-          Edit
-        </Link>
-        <button
-          type="button"
-          disabled={deleting}
-          onClick={onDelete}
-          className="btn-ghost flex-1 text-negative hover:bg-negative/10 hover:text-negative"
-        >
-          <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
-          Delete
-        </button>
-      </div>
+        {deleteError && <p role="alert" className="text-sm text-negative">{deleteError}</p>}
+        <RefundButton expense={expense} />
+        <div className="flex gap-2">
+          <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
+            <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
+            Edit
+          </Link>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onDelete}
+            className="btn-ghost flex-1 text-negative hover:bg-negative/10 hover:text-negative"
+          >
+            <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+            Delete
+          </button>
+        </div>
       </div>
       <p className="text-center text-xs text-ink-muted">Use ↑ ↓ to move between expenses · ? for all shortcuts</p>
     </div>

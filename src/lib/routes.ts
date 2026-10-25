@@ -30,13 +30,18 @@ export function routeInfo(pathname: string): RouteInfo {
   const secondary = SECONDARY[pathname];
   if (secondary) return { kind: 'secondary', ...secondary };
   if (isEditExpensePath(pathname)) return { kind: 'secondary', title: 'Edit expense', back: paths.spend };
-  if (REFUND_EXPENSE_PATH.test(pathname)) return { kind: 'secondary', title: 'Refund', back: paths.spend };
+  if (isRefundExpensePath(pathname)) return { kind: 'secondary', title: 'Refund', back: paths.spend };
   return { kind: 'primary', monthScoped: MONTH_SCOPED.has(pathname) };
 }
 
 /** An existing expense being edited. */
 export function isEditExpensePath(pathname: string): boolean {
   return EDIT_EXPENSE_PATH.test(pathname);
+}
+
+/** The page making a new refund of an expense. */
+export function isRefundExpensePath(pathname: string): boolean {
+  return REFUND_EXPENSE_PATH.test(pathname);
 }
 
 export function isExpenseEditorPath(pathname: string): boolean {

@@ -6,11 +6,11 @@ import { makeExpense, makeGroup } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 import type { ExpenseDoc } from '../../types/models';
 
-const { state } = vi.hoisted(() => ({ state: { refunds: [] as ExpenseDoc[], calledWith: [] as unknown[] } }));
+const { state } = vi.hoisted(() => ({ state: { refunds: [] as ExpenseDoc[], error: false, calledWith: [] as unknown[] } }));
 vi.mock('../../hooks/useRefunds', () => ({
   useRefunds: (_gid: string, id: string | undefined) => {
     state.calledWith.push(id);
-    return { refunds: state.refunds, loading: false, error: false };
+    return { refunds: state.refunds, loading: false, error: state.error };
   },
 }));
 
@@ -26,6 +26,7 @@ function renderLinks(expense: ExpenseDoc) {
 
 beforeEach(() => {
   state.refunds = [];
+  state.error = false;
   state.calledWith = [];
 });
 
@@ -50,5 +51,11 @@ describe('RefundLinks', () => {
     renderLinks(makeExpense('r1', { kind: 'refund', refundOf: 'e1' }));
     expect(screen.getByRole('link', { name: 'Refund of an earlier expense' })).toHaveAttribute('href', paths.editExpense('e1'));
     expect(state.calledWith.every((id) => id === undefined)).toBe(true);
+  });
+
+  it('says when its refunds could not be loaded, rather than looking unrefunded', () => {
+    state.error = true;
+    renderLinks(makeExpense('e1'));
+    expect(screen.getByText("Couldn't load this expense's refunds.")).toBeInTheDocument();
   });
 });

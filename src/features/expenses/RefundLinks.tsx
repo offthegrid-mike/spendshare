@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { useRefunds } from '../../hooks/useRefunds';
 import { formatMoney } from '../../lib/money';
 import { paths } from '../../lib/paths';
-import { isRefund } from '../../lib/refund';
+import { isRefund, refundedTotal } from '../../lib/refund';
 import type { ExpenseDoc, GroupDoc } from '../../types/models';
 
 /**
@@ -12,7 +12,7 @@ import type { ExpenseDoc, GroupDoc } from '../../types/models';
  */
 export default function RefundLinks({ group, expense }: { group: GroupDoc; expense: ExpenseDoc }) {
   const refund = isRefund(expense);
-  const { refunds } = useRefunds(group.id, refund ? undefined : expense.id);
+  const { refunds, error } = useRefunds(group.id, refund ? undefined : expense.id);
 
   if (refund) {
     return expense.refundOf ? (
@@ -21,9 +21,10 @@ export default function RefundLinks({ group, expense }: { group: GroupDoc; expen
       </Link>
     ) : null;
   }
+  if (error) return <p className="text-sm text-ink-muted">Couldn't load this expense's refunds.</p>;
   if (refunds.length === 0) return null;
 
-  const total = refunds.reduce((sum, r) => sum + r.total, 0);
+  const total = refundedTotal(refunds);
   const oldestFirst = [...refunds].sort((a, b) => a.date.toMillis() - b.date.toMillis());
   return (
     <div className="space-y-1 rounded-[10px] bg-recessed px-3.5 py-2.5 text-sm">

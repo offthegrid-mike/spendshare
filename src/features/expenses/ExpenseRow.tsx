@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { CreditCard, Gift, Pencil, Trash2, Undo2 } from 'lucide-react';
+import { CreditCard, Gift, Pencil, Trash2 } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
 import Chip from '../../components/ui/Chip';
 import CategoryTile from '../../components/ui/CategoryTile';
 import ExpenseBreakdown from './ExpenseBreakdown';
+import RefundButton from './RefundButton';
 import RefundLinks from './RefundLinks';
 import { computeAdjustment } from '../../lib/adjustment';
 import { isRefund, signedNet } from '../../lib/refund';
@@ -117,12 +118,7 @@ export default function ExpenseRow(props: Props) {
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
             <RefundLinks group={group} expense={expense} />
-            {!isRefund(expense) && (
-              <Link to={paths.refundExpense(expense.id)} className="btn-outline w-full">
-                <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
-                Refund…
-              </Link>
-            )}
+            <RefundButton expense={expense} />
             <div className="flex gap-2">
               <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
