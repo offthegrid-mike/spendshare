@@ -1,6 +1,7 @@
 import { distributeEvenly } from './money';
+import { signedAmount } from './refund';
 
-export interface SummaryItem { amount: number; shared: boolean; payerUid: string; }
+export interface SummaryItem { amount: number; shared: boolean; payerUid: string; refund?: boolean; }
 export interface PaidSettlement { fromUid: string; toUid: string; amount: number; paid: boolean; }
 export interface Txn { fromUid: string; toUid: string; amount: number; }
 export interface Summary {
@@ -16,8 +17,10 @@ export function computeSummary(members: string[], items: SummaryItem[], settleme
   let sharedTotal = 0;
   for (const it of items) {
     if (paidTotal[it.payerUid] === undefined) { paidTotal[it.payerUid] = 0; paidShared[it.payerUid] = 0; }
-    paidTotal[it.payerUid] += Math.round(it.amount);
-    if (it.shared) { sharedTotal += Math.round(it.amount); paidShared[it.payerUid] += Math.round(it.amount); }
+    // A refund is money back to its payer, so it comes off what they paid.
+    const amount = signedAmount(it);
+    paidTotal[it.payerUid] += amount;
+    if (it.shared) { sharedTotal += amount; paidShared[it.payerUid] += amount; }
   }
   const shareOf = distributeEvenly(sharedTotal, members);
   const balance: Record<string, number> = {};

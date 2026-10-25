@@ -85,3 +85,16 @@ describe('categoriesBySpend', () => {
     expect(categoriesBySpend([])).toEqual([]);
   });
 });
+
+describe('filterByCategory with refunds', () => {
+  it('counts a refund against the category, as a negative amount paid', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', total: 1000, kind: 'refund', refundOf: 'e1' });
+    const result = filterByCategory(
+      [woolies, refund],
+      { ...itemsByExpense, r1: [makeItem('i9', 'r1', { category: 'Groceries', amount: 1000, refund: true })] },
+      'Groceries',
+    );
+    expect(result.paidOf.r1).toBe(-1000);
+    expect(result.total).toBe(2000);
+  });
+});

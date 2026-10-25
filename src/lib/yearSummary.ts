@@ -1,9 +1,10 @@
 import { computeSummary } from './settlement';
+import { signedAmount } from './refund';
 import type { IncomeDoc, ItemDoc, Uid } from '../types/models';
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export type YearItem = Pick<ItemDoc, 'amount' | 'shared' | 'payerUid' | 'month' | 'category'>;
+export type YearItem = Pick<ItemDoc, 'amount' | 'shared' | 'payerUid' | 'month' | 'category' | 'refund'>;
 export type YearIncome = Pick<IncomeDoc, 'uid' | 'amount' | 'month'>;
 
 export interface PersonYear { paid: number; share: number; income: number; }
@@ -29,12 +30,12 @@ export function yearMonths(year: string): string[] {
 }
 
 /** Spending per category, biggest first, each with its share of the total. */
-export function categoryTotals(items: Pick<ItemDoc, 'amount' | 'category'>[]): CategoryTotal[] {
+export function categoryTotals(items: Pick<ItemDoc, 'amount' | 'category' | 'refund'>[]): CategoryTotal[] {
   const byCategory = new Map<string, number>();
   let total = 0;
   for (const it of items) {
     const name = it.category || 'Uncategorized';
-    const amount = Math.round(it.amount);
+    const amount = signedAmount(it);
     byCategory.set(name, (byCategory.get(name) ?? 0) + amount);
     total += amount;
   }
@@ -42,7 +43,8 @@ export function categoryTotals(items: Pick<ItemDoc, 'amount' | 'category'>[]): C
     .map(([category, amount]) => ({
       category,
       amount,
-      pct: total > 0 ? (amount / total) * 100 : 0,
+      // A category refunded below zero has no share of the spending.
+      pct: total > 0 && amount > 0 ? (amount / total) * 100 : 0,
     }))
     .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
 }
@@ -61,7 +63,7 @@ export function computeYearSummary(
   // Reuse the monthly settlement math so rounding / equal-split stay in one place.
   const { paidTotal, shareOf, sharedTotal } = computeSummary(members, yItems, []);
 
-  const grandTotal = yItems.reduce((sum, i) => sum + Math.round(i.amount), 0);
+  const grandTotal = yItems.reduce((sum, i) => sum + signedAmount(i), 0);
   const incomeTotal = yIncome.reduce((sum, i) => sum + i.amount, 0);
 
   const perPerson: Record<Uid, PersonYear> = {};
@@ -74,7 +76,7 @@ export function computeYearSummary(
     month, label: MONTH_SHORT[i], spending: 0, income: 0,
   }));
   const byMonth = new Map(months.map((m) => [m.month, m]));
-  for (const it of yItems) byMonth.get(it.month)!.spending += Math.round(it.amount);
+  for (const it of yItems) byMonth.get(it.month)!.spending += signedAmount(it);
   for (const inc of yIncome) byMonth.get(inc.month)!.income += inc.amount;
 
   const categories = categoryTotals(yItems);

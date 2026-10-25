@@ -22,8 +22,10 @@ export interface ExpenseDoc {
   id: string; groupId: string; date: Timestamp; month: string; shopName: string;
   payerUid: Uid; total: number; itemCount: number; createdByUid: Uid;
   createdAt: Timestamp; updatedAt: Timestamp;
-  giftCardAmount?: number; // cents — net-to-split = total - giftCardAmount
+  giftCardAmount?: number; // cents; display-only, settlement uses item amounts (see lib/adjustment.ts)
   discountPercent?: number; // percent (e.g. 2 or 2.5) — see computeDiscountCents in lib/discount.ts
+  kind?: 'refund';          // missing for a purchase; amounts stay positive (see lib/refund.ts)
+  refundOf?: string;        // a refund's original expense id
 }
 export interface ItemDoc {
   id: string; groupId: string; expenseId: string; month: string;
@@ -32,6 +34,7 @@ export interface ItemDoc {
   remark?: string;
   quantity?: number;   // count (default 1); amount is the line total = unitAmount * quantity
   unitAmount?: number; // per-item price in cents (default: same as amount when quantity is 1)
+  refund?: boolean;    // denormalized from the expense's kind, so item-only sums can subtract it
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
@@ -93,4 +96,5 @@ export const itemSchema = z.object({
   remark: z.string().optional(),
   quantity: z.number().int().positive().optional(),
   unitAmount: z.number().int().nonnegative().optional(),
+  refund: z.boolean().optional(),
 });

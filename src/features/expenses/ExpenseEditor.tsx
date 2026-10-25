@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom';
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from 'firebase/firestore';
-import { ArrowLeftRight, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine, Undo2 } from 'lucide-react';
+import { format } from 'date-fns';
 import type { User } from 'firebase/auth';
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol } from '../../lib/converters';
@@ -66,6 +67,13 @@ interface Props {
   expense?: ExpenseDoc;
   items?: ItemDoc[];
   onSuccess?: () => void;
+  /**
+   * Makes this a refund of `expense`: a new one prefilled from it, or (with
+   * `expense` set) an existing refund being edited. `remaining` caps its total.
+   */
+  refundOf?: { expense: ExpenseDoc; items: ItemDoc[]; remaining: number };
+  /** For a purchase being edited: what has been refunded from it, the floor for its total. */
+  refunded?: number;
   /** `sheet` inside the mobile Add expense sheet (which shows its own title). */
   variant?: 'page' | 'sheet';
 }
@@ -73,27 +81,37 @@ interface Props {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function ExpenseEditor({ group, groups, user, currentUserUid, expense, items, onSuccess, variant = 'page' }: Props) {
+export default function ExpenseEditor({
+  group, groups, user, currentUserUid, expense, items, onSuccess, refundOf, refunded = 0, variant = 'page',
+}: Props) {
   const navigate = useSafeNavigate();
   const locationState = useSafeLocationState();
   const { active: cats, all: allCats, loading: catsLoading } = useCategories(group.id);
   const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
 
-  // Only new expenses are drafted — editing an existing one is never cached.
   const isNew = !expense;
+  const refundMode = !!refundOf;
+  // The cap as the editor opened: refunds are live, and saving this one would
+  // otherwise count it against itself before the save finishes.
+  const [refundCap] = useState(refundOf?.remaining ?? 0);
+  // Only new expenses are drafted — editing one, or making a refund, is never cached.
+  const drafting = isNew && !refundMode;
+  // A new refund starts from its original's shop, payer and items.
+  const source = expense ?? refundOf?.expense;
+  const sourceItems = expense ? items : refundOf?.items;
 
   const blankDefaults: FormValues = {
     date: expense
       ? new Date(expense.date.seconds * 1000).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10),
-    shopName: expense?.shopName ?? '',
-    payerUid: expense?.payerUid ?? group.memberUids[0] ?? '',
+    shopName: source?.shopName ?? '',
+    payerUid: source?.payerUid ?? group.memberUids[0] ?? '',
     giftCardAmount: expense?.giftCardAmount ? (expense.giftCardAmount / 100).toFixed(2) : '',
     applyDiscount: !!expense?.discountPercent,
     discountPercent: expense?.discountPercent != null ? String(expense.discountPercent) : DEFAULT_DISCOUNT_PERCENT,
     items:
-      expense && items && items.length > 0
-        ? items.map((it) => ({
+      source && sourceItems && sourceItems.length > 0
+        ? sourceItems.map((it) => ({
             name: it.name,
             categoryId: it.categoryId,
             // amount is the unit price; fall back to the line total for items
@@ -108,7 +126,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
 
   // Load a resumable draft once, on mount, for new expenses. `movedFrom` is set
   // when the entry arrived here by a group change.
-  const [restored] = useState(() => (isNew ? readDraftRecord(group.id) : null));
+  const [restored] = useState(() => (drafting ? readDraftRecord(group.id) : null));
   const restoredDraft = restored?.values ?? null;
   const movedFrom = restored?.movedFrom;
   const [draftBannerOpen, setDraftBannerOpen] = useState(!!restoredDraft);
@@ -185,7 +203,15 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
 
   // Changing group (new expenses only).
   const chooseGroup = useUIStore((s) => s.chooseGroup);
-  const canChangeGroup = isNew && !!groups && !!user;
+  const setPageTitle = useUIStore((s) => s.setPageTitle);
+  // Refunds are edited at the same route as purchases, so name the page here.
+  const editingRefund = refundMode && !isNew;
+  useEffect(() => {
+    if (!editingRefund) return;
+    setPageTitle('Edit refund');
+    return () => setPageTitle(null);
+  }, [editingRefund, setPageTitle]);
+  const canChangeGroup = drafting && !!groups && !!user;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerView, setPickerView] = useState<GroupPickerView>('list');
   const [switching, setSwitching] = useState(false);
@@ -294,13 +320,13 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
   const allValues = useWatch({ control });
 
   useEffect(() => {
-    if (!isNew) return;
+    if (!drafting) return;
     const timer = setTimeout(() => {
       if (handedOffRef.current) return;
       writeDraft(group.id, getValues());
     }, 400);
     return () => clearTimeout(timer);
-  }, [allValues, isNew, group.id, getValues]);
+  }, [allValues, drafting, group.id, getValues]);
 
   // Discard the restored draft and start from a clean form.
   function handleStartFresh() {
@@ -375,6 +401,10 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       // Caught by live UI warning, but guard at submit too
       return;
     }
+    // Likewise a refund larger than what is left to refund, or a purchase
+    // cut below what has already been refunded from it.
+    if (refundMode && total > refundCap) return;
+    if (total < refunded) return;
 
     const discountPercentNum =
       data.applyDiscount && data.discountPercent && data.discountPercent.trim() !== ''
@@ -392,10 +422,14 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       createdByUid: currentUserUid,
       createdAt: expense ? (expense.createdAt ?? serverTimestamp()) : serverTimestamp(),
       updatedAt: serverTimestamp(),
-      ...(giftCardAmountCents !== undefined ? { giftCardAmount: giftCardAmountCents } : {}),
-      ...(discountPercentNum !== undefined && !isNaN(discountPercentNum)
-        ? { discountPercent: discountPercentNum }
-        : {}),
+      ...(refundOf
+        ? { kind: 'refund', refundOf: refundOf.expense.id }
+        : {
+            ...(giftCardAmountCents !== undefined ? { giftCardAmount: giftCardAmountCents } : {}),
+            ...(discountPercentNum !== undefined && !isNaN(discountPercentNum)
+              ? { discountPercent: discountPercentNum }
+              : {}),
+          }),
     } as WithFieldValue<ExpenseDoc>;
 
     batch.set(expRef, expenseData);
@@ -425,12 +459,14 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         shared: it.shared,
         payerUid: data.payerUid,
         ...(it.remark ? { remark: it.remark } : {}),
+        ...(refundOf ? { refund: true } : {}),
       } as WithFieldValue<ItemDoc>);
     }
 
     // Suggestions delta — only written when the hook has finished loading to avoid
-    // overwriting Firestore with a stale [] baseline on fast submits.
-    if (suggestionsLoaded) {
+    // overwriting Firestore with a stale [] baseline on fast submits. A refund
+    // returns things already counted, so it leaves the suggestions alone.
+    if (suggestionsLoaded && !refundMode) {
       const oldItemInputs = (items ?? []).map((it) => ({
         name: it.name,
         categoryId: it.categoryId,
@@ -471,7 +507,9 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
   const inRouter = useInRouterContext();
   const returnsToSearch = isSearchReturnState(locationState);
   // A new expense autosaves a draft once there is something worth keeping.
-  const draftSaved = isNew && isDraftMeaningful(allValues as ExpenseDraftValues);
+  const draftSaved = drafting && isDraftMeaningful(allValues as ExpenseDraftValues);
+  const overRefund = refundMode && totalCents > refundCap;
+  const belowRefunded = totalCents < refunded;
   const itemCount = (watchedItems ?? []).length;
   const sharedCents = (watchedItems ?? []).reduce((sum, it) => {
     if (!it?.shared) return sum;
@@ -556,7 +594,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
             </Link>
           )}
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">
-            {expense ? 'Edit expense' : 'New expense'}
+            {refundMode ? (expense ? 'Edit refund' : 'Refund') : expense ? 'Edit expense' : 'New expense'}
           </h1>
           {draftSaved && <span className="ml-auto text-xs text-ink-muted">Draft saved</span>}
         </div>
@@ -568,6 +606,17 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         changeRef={changeRef}
         onChange={canChangeGroup && !catsLoading ? () => setPickerOpen(true) : undefined}
       />
+
+      {refundOf && (
+        <div role="status" className="flex items-center gap-3 rounded-[10px] bg-recessed px-3.5 py-2.5">
+          <Undo2 size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
+          <p className="flex-1 text-sm text-ink">
+            Refund of {refundOf.expense.shopName},{' '}
+            {format(new Date(refundOf.expense.date.seconds * 1000), 'd MMM yyyy')}.{' '}
+            {formatMoney(refundCap, group.currency)} left to refund.
+          </p>
+        </div>
+      )}
 
       {/* Resumed draft notice */}
       {draftBannerOpen && (
@@ -594,7 +643,8 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
           is the same on every screen size. */}
       <div className="lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8">
       <div className="space-y-4">
-      {/* Scan receipt: OCR prefills the form; the image is not uploaded or stored. */}
+      {/* Scan receipt: OCR prefills the form; the image is not uploaded or stored. Not for refunds. */}
+      {!refundMode && (
       <div>
         {/* No `capture` attribute: mobile then offers both the camera and the
             photo library / files, instead of jumping straight to the camera. */}
@@ -616,6 +666,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         </LoadingButton>
         {scanError && <p className="mt-1.5 text-sm text-negative">{scanError}</p>}
       </div>
+      )}
 
       {/* Date */}
       <div>
@@ -666,7 +717,8 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         )}
       />
 
-      {/* Gift card & discount */}
+      {/* Gift card & discount; a refund has neither. */}
+      {!refundMode && (
       <div className="rounded-[10px] border border-line bg-surface">
         <button
           type="button"
@@ -735,6 +787,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
           </div>
         )}
       </div>
+      )}
       </div>
 
       <div className="mt-4 space-y-3 lg:mt-0">
@@ -795,11 +848,21 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       >
         <div className="space-y-1.5 border-t border-line pt-3 max-lg:border-t-0 max-lg:pt-0">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-ink-muted">Receipt total</span>
+            <span className="text-sm text-ink-muted">{refundMode ? 'Refund total' : 'Receipt total'}</span>
             <span className="money text-base font-semibold text-ink">
               {formatMoney(totalCents, group.currency)}
             </span>
           </div>
+          {belowRefunded && (
+            <p className="text-sm text-negative">
+              {formatMoney(refunded, group.currency)} of this expense has been refunded, so its total can't go below that.
+            </p>
+          )}
+          {overRefund && (
+            <p className="text-sm text-negative">
+              A refund can't be more than the {formatMoney(refundCap, group.currency)} left to refund.
+            </p>
+          )}
           {gcCents > 0 && afterGiftCardCents < 0 && (
             <p className="text-sm text-negative">Gift card amount exceeds receipt total</p>
           )}
@@ -840,9 +903,10 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
           type="submit"
           loading={saving}
           loadingText={expense ? 'Saving changes…' : 'Saving…'}
+          disabled={overRefund || belowRefunded}
           className="btn-primary h-11 w-full"
         >
-          {expense ? 'Save changes' : 'Save expense'}
+          {expense ? 'Save changes' : refundMode ? 'Save refund' : 'Save expense'}
         </LoadingButton>
       </div>
       </div>

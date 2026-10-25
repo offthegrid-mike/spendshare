@@ -10,7 +10,9 @@ import { makeGroup } from './test/fixtures';
 const state = vi.hoisted(() => ({
   user: null as { uid: string; email: string } | null,
   groups: [] as unknown[],
-  expense: null as { id: string } | null,
+  expense: null as { id: string; kind?: string; refundOf?: string } | null,
+  refunds: [] as { id: string; total: number }[],
+  refundsError: false,
   access: 'allowed' as string,
   groupsUid: undefined as string | undefined,
 }));
@@ -55,8 +57,16 @@ vi.mock('./features/groups/GroupSettings', () => ({ default: () => <div data-tes
 vi.mock('./features/invites/SendInvite', () => ({ default: () => <div data-testid="send-invite" /> }));
 vi.mock('./features/categories/CategoryManager', () => ({ default: () => <div data-testid="category-manager" /> }));
 vi.mock('./features/expenses/ExpenseEditor', () => ({
-  default: ({ expense }: { expense?: { id: string } }) => (
-    <div data-testid="expense-editor" data-expense={expense?.id ?? ''} />
+  default: ({ expense, refunded }: { expense?: { id: string }; refunded?: number }) => (
+    <div data-testid="expense-editor" data-expense={expense?.id ?? ''} data-refunded={refunded ?? ''} />
+  ),
+}));
+vi.mock('./hooks/useRefunds', () => ({
+  useRefunds: () => ({ refunds: state.refunds, loading: false, error: state.refundsError }),
+}));
+vi.mock('./features/expenses/RefundRoute', () => ({
+  default: ({ originalId, refund }: { originalId: string; refund?: { id: string } }) => (
+    <div data-testid="refund-route" data-original={originalId} data-expense={refund?.id ?? ''} />
   ),
 }));
 vi.mock('./features/expenses/ExpenseList', () => ({ default: () => <div data-testid="expense-list" /> }));
@@ -167,6 +177,7 @@ describe('App route table', () => {
     { name: 'group invites', path: paths.groupInvites, screen: 'send-invite' },
     { name: 'new expense', path: paths.newExpense, screen: 'expense-editor', editing: '' },
     { name: 'edit expense', path: paths.editExpense('x'), screen: 'expense-editor', editing: 'x' },
+    { name: 'refund', path: paths.refundExpense('x'), screen: 'refund-route', editing: '' },
   ];
 
   it.each(screens)('serves $name at $path without redirecting', ({ path, screen: testId, editing }) => {
@@ -175,6 +186,40 @@ describe('App route table', () => {
     expect(screen.getByTestId(testId)).toBeInTheDocument();
     expect(location()).toBe(path);
     if (editing !== undefined) expect(screen.getByTestId(testId)).toHaveAttribute('data-expense', editing);
+  });
+});
+
+describe('App refunds', () => {
+  it("won't edit a purchase without knowing what has been refunded from it", () => {
+    state.expense = { id: 'e1' };
+    state.refundsError = true;
+    try {
+      renderApp(paths.editExpense('e1'));
+      expect(screen.getByText("Could not load this expense's refunds. Please try again.")).toBeInTheDocument();
+      expect(screen.queryByTestId('expense-editor')).toBeNull();
+    } finally {
+      state.refundsError = false;
+    }
+  });
+
+  it("passes what has been refunded from a purchase to its editor", () => {
+    state.expense = { id: 'e1' };
+    state.refunds = [{ id: 'r1', total: 1500 }, { id: 'r2', total: 500 }];
+    try {
+      renderApp(paths.editExpense('e1'));
+      expect(screen.getByTestId('expense-editor')).toHaveAttribute('data-refunded', '2000');
+    } finally {
+      state.refunds = [];
+    }
+  });
+
+  it('edits an existing refund as a refund of its original', () => {
+    state.expense = { id: 'r1', kind: 'refund', refundOf: 'e1' };
+    renderApp(paths.editExpense('r1'));
+    const route = screen.getByTestId('refund-route');
+    expect(route).toHaveAttribute('data-original', 'e1');
+    expect(route).toHaveAttribute('data-expense', 'r1');
+    expect(screen.queryByTestId('expense-editor')).toBeNull();
   });
 });
 

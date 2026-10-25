@@ -12,7 +12,10 @@ import SendInvite from './features/invites/SendInvite';
 import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
+import RefundRoute from './features/expenses/RefundRoute';
 import { useExpense } from './hooks/useExpense';
+import { useRefunds } from './hooks/useRefunds';
+import { isRefund, refundedTotal } from './lib/refund';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
 import { useIncome } from './hooks/useIncome';
@@ -31,7 +34,7 @@ import { paths } from './lib/paths';
 import { WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
 import type { User } from 'firebase/auth';
-import type { GroupDoc } from './types/models';
+import type { ExpenseDoc, GroupDoc, ItemDoc } from './types/models';
 
 function IncomeRouteWrapper({ group, user }: { group: GroupDoc; user: User }) {
   const { selectedMonth } = useUIStore();
@@ -58,9 +61,36 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { expense, items, loading } = useExpense(group.id, id);
   if (loading) return <RouteSkeleton />;
   if (!expense) return <div className="text-sm text-ink-muted">Expense not found.</div>;
+  if (isRefund(expense) && expense.refundOf) {
+    return (
+      <RefundRoute group={group} currentUserUid={user.uid} originalId={expense.refundOf} refund={expense} refundItems={items} />
+    );
+  }
+  return <PurchaseEditRoute group={group} user={user} expense={expense} items={items} />;
+}
+
+/** Editing a purchase, whose total can't drop below what has been refunded from it. */
+function PurchaseEditRoute({ group, user, expense, items }: { group: GroupDoc; user: User; expense: ExpenseDoc; items: ItemDoc[] }) {
+  const { refunds, loading, error } = useRefunds(group.id, expense.id);
+  if (loading) return <RouteSkeleton />;
+  // Without its refunds the floor on its total is unknown, so don't guess it's zero.
+  if (error) return <p className="text-sm text-negative">Could not load this expense's refunds. Please try again.</p>;
   return (
-    <ExpenseEditor key={expense.id} group={group} currentUserUid={user.uid} expense={expense} items={items} />
+    <ExpenseEditor
+      key={expense.id}
+      group={group}
+      currentUserUid={user.uid}
+      expense={expense}
+      items={items}
+      refunded={refundedTotal(refunds)}
+    />
   );
+}
+
+function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <RefundRoute group={group} currentUserUid={user.uid} originalId={id} />;
 }
 
 function App() {
@@ -133,6 +163,10 @@ function App() {
         <Route
           path="expense/:id/edit"
           element={group ? <EditExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
+        />
+        <Route
+          path="expense/:id/refund"
+          element={group ? <RefundExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
         />
         <Route
           path="income"

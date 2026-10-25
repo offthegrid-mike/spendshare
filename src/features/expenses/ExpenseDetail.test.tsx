@@ -3,6 +3,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseDetail from './ExpenseDetail';
+
+vi.mock('./RefundLinks', () => ({ default: () => <p>Refund links</p> }));
+vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 
@@ -22,6 +25,7 @@ describe('ExpenseDetail', () => {
     expect(screen.getByText('Sat 3 Oct · paid by you')).toBeInTheDocument();
     expect(screen.getByText('A$42.50')).toBeInTheDocument();
     expect(screen.getByText('Milk')).toBeInTheDocument();
+    expect(screen.getByText('Refund links')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();
@@ -55,5 +59,64 @@ describe('ExpenseDetail', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText('Select an expense to see its items.')).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseDetail for a refund', () => {
+  it('marks it as a refund, refunded to its payer, with the amount coming back', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', total: 1200, day: '2026-10-05', kind: 'refund', refundOf: 'e1' });
+    render(
+      <MemoryRouter>
+        <ExpenseDetail
+          expense={refund}
+          items={[makeItem('i9', 'r1', { name: 'Milk', amount: 1200, refund: true })]}
+          group={pair}
+          viewerUid="mike"
+          onDelete={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Refund')).toBeInTheDocument();
+    expect(screen.getByText('Mon 5 Oct · refunded to you')).toBeInTheDocument();
+    expect(screen.getByText('−A$12.00')).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseDetail refund action', () => {
+  it('offers to refund a purchase', () => {
+    render(
+      <MemoryRouter>
+        <ExpenseDetail expense={exp} items={items} group={pair} viewerUid="mike" onDelete={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Refund…' })).toHaveAttribute('href', paths.refundExpense('e1'));
+  });
+
+  it('does not offer to refund a refund', () => {
+    const refund = makeExpense('r1', { total: 1200, kind: 'refund', refundOf: 'e1' });
+    render(
+      <MemoryRouter>
+        <ExpenseDetail expense={refund} items={[]} group={pair} viewerUid="mike" onDelete={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'Refund…' })).toBeNull();
+  });
+});
+
+describe('ExpenseDetail delete error', () => {
+  it('shows why a delete failed beside the buttons', () => {
+    render(
+      <MemoryRouter>
+        <ExpenseDetail
+          expense={exp}
+          items={items}
+          group={pair}
+          viewerUid="mike"
+          onDelete={() => {}}
+          deleteError="This expense has refunds. Delete them first."
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
   });
 });

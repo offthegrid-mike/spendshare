@@ -140,6 +140,11 @@ service cloud.firestore {
       match /expenses/{expenseId} {
         allow read, delete: if isMember(groupId);
         // Bind the author and require a non-negative numeric total on create/update.
+        // A refund (kind 'refund') names its original and has no gift card or
+        // discount; its amounts stay positive and the app counts them against
+        // spending. A saved expense never switches between purchase and refund,
+        // and a refund stays with the original it was made from.
+        function isRefundDoc(data) { return data.get('kind', null) == 'refund'; }
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.total is number
@@ -147,12 +152,26 @@ service cloud.firestore {
           && (!('giftCardAmount' in request.resource.data)
               || (request.resource.data.giftCardAmount is number
                   && request.resource.data.giftCardAmount >= 0
-                  && request.resource.data.giftCardAmount <= request.resource.data.total));
+                  && request.resource.data.giftCardAmount <= request.resource.data.total))
+          && (('kind' in request.resource.data)
+              ? (request.resource.data.kind == 'refund'
+                 && request.resource.data.refundOf is string
+                 && !('giftCardAmount' in request.resource.data)
+                 && !('discountPercent' in request.resource.data))
+              : !('refundOf' in request.resource.data))
+          && (resource == null
+              || (isRefundDoc(request.resource.data) == isRefundDoc(resource.data)
+                  && request.resource.data.get('refundOf', null) == resource.data.get('refundOf', null)));
         match /items/{itemId} {
           allow read, delete: if isMember(groupId);
+          // An item is a refund item exactly when its expense is a refund. getAfter
+          // sees the expense when both are saved in one batch, as the app does.
           allow create, update: if isMember(groupId)
             && request.resource.data.amount is number
-            && request.resource.data.amount >= 0;
+            && request.resource.data.amount >= 0
+            && (!('refund' in request.resource.data) || request.resource.data.refund is bool)
+            && request.resource.data.get('refund', false)
+               == isRefundDoc(getAfter(/databases/$(database)/documents/groups/$(groupId)/expenses/$(expenseId)).data);
         }
       }
       match /income/{incomeId} {

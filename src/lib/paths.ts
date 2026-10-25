@@ -8,6 +8,7 @@ export const paths = {
   more: '/spend/more',
   newExpense: '/spend/expense/new',
   editExpense: (id: string): string => `/spend/expense/${id}/edit`,
+  refundExpense: (id: string): string => `/spend/expense/${id}/refund`,
   categories: '/spend/categories',
   groupSettings: '/spend/group/settings',
   groupInvites: '/spend/group/invites',

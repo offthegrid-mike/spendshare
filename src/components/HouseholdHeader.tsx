@@ -6,6 +6,7 @@ import MonthControl from './MonthControl';
 import { isSearchReturnState, routeInfo } from '../lib/routes';
 import { paths } from '../lib/paths';
 import { useScrolled } from '../hooks/useScrolled';
+import { useUIStore } from '../stores/uiStore';
 import type { GroupDoc } from '../types/models';
 
 interface Props {
@@ -22,6 +23,7 @@ export default function HouseholdHeader({ groups, user, startMonth, showHome = f
   const { pathname } = location;
   const navigate = useNavigate();
   const route = routeInfo(pathname);
+  const pageTitle = useUIStore((s) => s.pageTitle);
   const scrolled = useScrolled();
   const returnsToSearch = isSearchReturnState(location.state);
 
@@ -45,7 +47,7 @@ export default function HouseholdHeader({ groups, user, startMonth, showHome = f
           >
             <ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </Link>
-          <h1 className="text-lg font-semibold tracking-tight text-ink">{route.title}</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-ink">{pageTitle ?? route.title}</h1>
         </div>
       ) : (
         <div className="space-y-2 px-4 pb-2.5 pt-2.5">

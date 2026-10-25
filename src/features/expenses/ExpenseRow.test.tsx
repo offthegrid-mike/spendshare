@@ -3,6 +3,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseRow from './ExpenseRow';
+
+vi.mock('./RefundLinks', () => ({ default: () => <p>Refund links</p> }));
+vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 
@@ -61,9 +64,15 @@ describe('ExpenseRow (disclosure)', () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it('shows refund links only when expanded', () => {
+    renderRow();
+    expect(screen.queryByText('Refund links')).toBeNull();
+  });
+
   it('reveals the items, Edit and Delete when expanded', async () => {
     const onDelete = vi.fn();
     renderRow({ expanded: true, onDelete });
+    expect(screen.getByText('Refund links')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Milk')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
@@ -97,5 +106,16 @@ describe('ExpenseRow (option)', () => {
     await userEvent.click(option);
     expect(onSelect).toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+  });
+});
+
+describe('ExpenseRow for a refund', () => {
+  const refund = makeExpense('r1', { shopName: 'Woolworths', total: 1200, itemCount: 1, payerUid: 'mike', kind: 'refund', refundOf: 'e1' });
+  const refundItems = [makeItem('i9', 'r1', { name: 'Milk', amount: 1200, refund: true })];
+
+  it('marks it as a refund and shows the amount coming back', () => {
+    renderRow({ expense: refund, items: refundItems });
+    expect(screen.getByText('Refund')).toBeInTheDocument();
+    expect(screen.getByText('−12.00')).toBeInTheDocument();
   });
 });

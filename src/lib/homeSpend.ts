@@ -1,6 +1,7 @@
 import { describeBalance, type BalanceTone } from './balance';
 import { monthName } from './month';
 import { computeSummary, type SummaryItem } from './settlement';
+import { signedAmount } from './refund';
 import type { GroupDoc, SettlementDoc } from '../types/models';
 
 export interface SpendTileFigures {
@@ -28,7 +29,7 @@ export function spendTileFigures(
   if (items.length === 0) {
     return { monthLabel, spent: 0, empty: true, balanceLabel: 'Nothing to settle', balanceAmount: 0, tone: 'settled' };
   }
-  const spent = items.reduce((sum, it) => sum + Math.round(it.amount), 0);
+  const spent = items.reduce((sum, it) => sum + signedAmount(it), 0);
   const summary = computeSummary(group.memberUids, items, settlements);
   const balance = describeBalance(summary, viewerUid, group, monthLabel);
   return { monthLabel, spent, empty: false, balanceLabel: balance.label, balanceAmount: balance.amount, tone: balance.tone };

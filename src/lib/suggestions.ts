@@ -1,4 +1,5 @@
 import type { ExpenseDoc, ItemDoc, SuggestionEntry, ShopEntry } from '../types/models';
+import { isRefund } from './refund';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 export type ItemInput = { name: string; categoryId: string; category: string };
@@ -84,13 +85,16 @@ export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[] 
 /**
  * Recounts the suggestions from a group's whole history. Expenses are replayed
  * oldest first, so the newest casing and category name win, as they would have
- * if every expense had been added one at a time.
+ * if every expense had been added one at a time. Refunds return things already
+ * counted, so they're left out, as they are when saved.
  */
 export function recountSuggestions(
   expenses: ExpenseDoc[],
   itemsByExpense: Record<string, ItemDoc[]>,
 ): SuggestionLists {
-  const oldestFirst = [...expenses].sort((a, b) => a.date.toMillis() - b.date.toMillis());
+  const oldestFirst = expenses
+    .filter((exp) => !isRefund(exp))
+    .sort((a, b) => a.date.toMillis() - b.date.toMillis());
   return {
     items: computeSuggestionsDelta([], [], oldestFirst.flatMap((exp) => itemsByExpense[exp.id] ?? [])),
     shops: computeShopsDelta([], [], oldestFirst.map((exp) => exp.shopName.trim()).filter(Boolean)),

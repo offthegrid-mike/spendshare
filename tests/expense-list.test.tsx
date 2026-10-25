@@ -40,6 +40,10 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   collection: vi.fn(),
   serverTimestamp: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  limit: vi.fn(),
+  getDocs: () => Promise.resolve({ empty: true, docs: [] }),
   Timestamp: {
     now: vi.fn(),
     fromDate: vi.fn(),
@@ -48,6 +52,7 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('../src/lib/firebase', () => ({ db: {} }));
 vi.mock('../src/lib/converters', () => ({ suggestionsDocRef: vi.fn() }));
+vi.mock('../src/hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 vi.mock('../src/lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 
 // --- Import component after mocks ---

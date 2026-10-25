@@ -214,3 +214,16 @@ describe('countSuggestionChanges', () => {
     expect(countSuggestionChanges(current, next)).toEqual({ items: 3, shops: 1 });
   });
 });
+
+describe('recountSuggestions with refunds', () => {
+  it('leaves refunds out: they return things already counted', () => {
+    const bought = makeExpense('e1', { shopName: 'Coles', day: '2026-10-01' });
+    const refund = makeExpense('r1', { shopName: 'Coles', day: '2026-10-02', kind: 'refund', refundOf: 'e1' });
+    const { items, shops } = recountSuggestions([refund, bought], {
+      e1: [makeItem('i1', 'e1', { name: 'Milk', categoryId: 'cat1', category: 'Dairy' })],
+      r1: [makeItem('i2', 'r1', { name: 'Milk', categoryId: 'cat1', category: 'Dairy', refund: true })],
+    });
+    expect(items).toEqual([{ name: 'Milk', categoryId: 'cat1', category: 'Dairy', count: 1 }]);
+    expect(shops).toEqual([{ name: 'Coles', count: 1 }]);
+  });
+});

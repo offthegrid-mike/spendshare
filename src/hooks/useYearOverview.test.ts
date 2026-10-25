@@ -85,3 +85,17 @@ describe('useYearOverview', () => {
     expect(result.current.loading).toBe(false);
   });
 });
+
+describe('useYearOverview with refunds', () => {
+  it('takes refunds off each month and the year', () => {
+    state.itemsLoading = false;
+    state.items = [
+      { month: '2026-10', amount: 2000, shared: true, payerUid: 'mike' },
+      { month: '2026-10', amount: 500, shared: true, payerUid: 'mike', refund: true },
+    ];
+    const { result } = renderHook(() => useYearOverview('g1', '2026', members));
+    act(() => state.onNext!(snap([])));
+    expect(result.current.months['2026-10'].spent).toBe(1500);
+    expect(result.current.total).toBe(1500);
+  });
+});

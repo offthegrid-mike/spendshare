@@ -544,6 +544,99 @@ describe('/groups financial sub-collection validation (M-2)', () => {
   });
 
   // --- Expense numeric checks ---
+  describe('refunds', () => {
+    const expense = (extra: Record<string, unknown>) => ({
+      groupId: 'group6', month: '2026-06', shopName: 'Shop', payerUid: 'userA',
+      total: 500, itemCount: 1, createdByUid: 'userB', ...extra,
+    });
+    const item = (extra: Record<string, unknown>) => ({
+      groupId: 'group6', expenseId: 'r1', month: '2026-06', name: 'Milk', categoryId: 'c', category: 'C',
+      amount: 500, shared: true, payerUid: 'userA', ...extra,
+    });
+    const bob = () => testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true }).firestore();
+
+    it('allows a refund linked to its original, with refund items', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({ refund: true })));
+    });
+
+    it('denies an unknown expense kind', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'gift', refundOf: 'e1' })));
+    });
+
+    it('denies a refund that does not name its original', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 7 })));
+    });
+
+    it('denies refundOf on an expense that is not a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ refundOf: 'e1' })));
+    });
+
+    it('denies a gift card on a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', giftCardAmount: 100 })));
+    });
+
+    it('denies an item refund flag that is not a boolean', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({ refund: 'yes' })));
+    });
+
+    it('denies a discount on a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', discountPercent: 2 })));
+    });
+
+    it("needs an item's refund flag to match its expense", async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      // a refund item under a purchase, a plain item under a refund
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i1'), item({ expenseId: 'e1', refund: true })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i1'), item({ expenseId: 'e1' })));
+    });
+
+    it('allows a refund and its items saved together in one batch', async () => {
+      const db = bob();
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r2'), expense({ kind: 'refund', refundOf: 'e1' }));
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r2', 'items', 'i1'), item({ expenseId: 'r2', refund: true }));
+      await assertSucceeds(batch.commit());
+    });
+
+    it('denies moving a refund onto a different original', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e2' })));
+    });
+
+    it("allows editing a refund's items the way the editor saves them, in one batch", async () => {
+      const db = bob();
+      await assertSucceeds(setDoc(doc(db, 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertSucceeds(setDoc(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'old'), item({ refund: true })));
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', total: 300 }));
+      batch.delete(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'old'));
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'new'), item({ amount: 300, refund: true }));
+      await assertSucceeds(batch.commit());
+    });
+
+    it('allows a refund with many items in one batch, within the rules read limit', async () => {
+      const db = bob();
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r3'), expense({ kind: 'refund', refundOf: 'e1', total: 2500, itemCount: 25 }));
+      for (let i = 0; i < 25; i++) {
+        batch.set(doc(db, 'groups', 'group6', 'expenses', 'r3', 'items', `i${i}`), item({ expenseId: 'r3', amount: 100, refund: true }));
+      }
+      await assertSucceeds(batch.commit());
+    });
+
+    it('denies turning a purchase into a refund, or a refund into a purchase', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({ kind: 'refund', refundOf: 'e0' })));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({})));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', total: 400 })));
+    });
+  });
+
   it('denies expense with negative total', async () => {
     const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
     await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'expenses', 'exp1'), {

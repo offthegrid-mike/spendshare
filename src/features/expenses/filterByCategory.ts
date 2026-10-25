@@ -1,4 +1,5 @@
 import { computeAdjustment } from '../../lib/adjustment';
+import { isRefund, signedAmount } from '../../lib/refund';
 import { categoryTotals } from '../../lib/yearSummary';
 import type { ExpenseDoc, ItemDoc } from '../../types/models';
 
@@ -11,7 +12,7 @@ export interface CategoryFilterResult {
    * its items, so an expense that is all one category keeps its full net.
    */
   paidOf: Record<string, number>;
-  /** The category's item amounts, in cents. */
+  /** The category's item amounts, in cents, with refunds taken off. */
   total: number;
 }
 
@@ -22,7 +23,7 @@ const sumAmounts = (items: Pick<ItemDoc, 'amount'>[]) =>
   items.reduce((sum, it) => sum + Math.round(it.amount), 0);
 
 /** The categories the items fall in, the biggest spend first and ties by name. */
-export function categoriesBySpend(items: Pick<ItemDoc, 'category' | 'amount'>[]): string[] {
+export function categoriesBySpend(items: Pick<ItemDoc, 'category' | 'amount' | 'refund'>[]): string[] {
   return categoryTotals(items).map((c) => c.category);
 }
 
@@ -42,11 +43,12 @@ export function filterByCategory(
     const amount = sumAmounts(matching);
     const itemsTotal = sumAmounts(items);
     // With nothing to share out (all items free), the item amounts stand.
-    paidOf[expense.id] = itemsTotal > 0
+    const paid = itemsTotal > 0
       ? Math.round((computeAdjustment(expense).net * amount) / itemsTotal)
       : amount;
+    paidOf[expense.id] = isRefund(expense) ? -paid : paid;
     kept.push(expense);
-    total += amount;
+    total += matching.reduce((sum, it) => sum + signedAmount(it), 0);
   }
   return { expenses: kept, paidOf, total };
 }

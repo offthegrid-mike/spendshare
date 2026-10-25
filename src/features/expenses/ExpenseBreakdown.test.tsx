@@ -63,3 +63,19 @@ describe('ExpenseBreakdown', () => {
     expect(screen.getByText('Paid').nextSibling).toHaveTextContent('17.44');
   });
 });
+
+describe('ExpenseBreakdown for a refund', () => {
+  it('shows the split coming back, with a minus sign', () => {
+    const refund = makeExpense('r1', { total: 1650, payerUid: 'priya', kind: 'refund', refundOf: 'e1' });
+    render(
+      <ExpenseBreakdown
+        expense={refund}
+        items={[makeItem('i9', 'r1', { name: 'Sunscreen', amount: 1650, refund: true })]}
+        group={pair}
+        viewerUid="mike"
+      />,
+    );
+    expect(screen.getByText('Shared').nextElementSibling).toHaveTextContent('−16.50');
+    expect(screen.getByText('Your half').nextElementSibling).toHaveTextContent('−8.25');
+  });
+});

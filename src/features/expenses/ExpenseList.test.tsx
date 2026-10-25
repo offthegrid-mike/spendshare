@@ -7,9 +7,10 @@ import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc, ShopEntry, SuggestionEntry } from '../../types/models';
 import { paths } from '../../lib/paths';
 
-const { commit, batchSet, invalidateGroupHistory, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
+const { commit, batchSet, refundDocs, invalidateGroupHistory, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
   batchSet: vi.fn(),
+  refundDocs: { value: [] as unknown[] },
   invalidateGroupHistory: vi.fn(),
   openAddSheet: vi.fn(),
   desktop: { value: false },
@@ -32,9 +33,14 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   collection: vi.fn(),
   serverTimestamp: () => 'now',
+  query: vi.fn(),
+  where: vi.fn(),
+  limit: vi.fn(),
+  getDocs: () => Promise.resolve({ empty: refundDocs.value.length === 0, docs: refundDocs.value }),
 }));
 vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }) }));
 vi.mock('../../hooks/useAllExpenses', () => ({ invalidateGroupHistory }));
+vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
 }));
@@ -121,6 +127,24 @@ describe('ExpenseList', () => {
     expect(fri).toHaveTextContent('40.00');
   });
 
+  it('takes a refund off its day total', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-02', total: 1000, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [woolies, bunnings, refund, thai];
+    data.itemsByExpense = { ...items, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 1000, refund: true })] };
+    renderList();
+    const fri = screen.getByText('Fri 2 Oct').parentElement!;
+    expect(fri).toHaveTextContent('30.00');
+  });
+
+  it('shows a day that is all refunds as a negative total', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-01', total: 1000, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [woolies, refund];
+    data.itemsByExpense = { e1: items.e1, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 1000, refund: true })] };
+    renderList();
+    const thu = screen.getByText('Thu 1 Oct').parentElement!;
+    expect(thu).toHaveTextContent('−10.00');
+  });
+
   it('shows the balance hero for the month', () => {
     renderList();
     // Mike paid 30.00 shared, Priya 68.83: Mike owes half the difference.
@@ -144,6 +168,23 @@ describe('ExpenseList', () => {
     await userEvent.click(screen.getByRole('button', { name: /Bunnings/ }));
     expect(screen.queryByText('Bananas')).toBeNull();
     expect(screen.getByText('Potting mix')).toBeInTheDocument();
+  });
+
+  it("shows a refused delete beside the expanded row's Delete button on mobile", async () => {
+    refundDocs.value = [{ id: 'r1' }];
+    try {
+      renderList();
+      await userEvent.click(screen.getByRole('button', { name: /Woolworths/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await act(async () => {
+        await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+      });
+      const region = document.getElementById('expense-e1-details')!;
+      expect(await within(region).findByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
+      expect(screen.getAllByText('This expense has refunds. Delete them first.')).toHaveLength(1);
+    } finally {
+      refundDocs.value = [];
+    }
   });
 });
 
@@ -239,6 +280,34 @@ describe('ExpenseList on desktop', () => {
     await deleteSelected();
     expect(invalidateGroupHistory).toHaveBeenCalledWith('g1');
     expect(invalidateGroupHistory.mock.invocationCallOrder[0]).toBeGreaterThan(commit.mock.invocationCallOrder[0]);
+  });
+
+  it('will not delete an expense that has refunds', async () => {
+    refundDocs.value = [{ id: 'r1' }];
+    try {
+      renderList();
+      await deleteSelected();
+      expect(commit).not.toHaveBeenCalled();
+      expect(await within(detail()).findByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
+
+      // The message belongs to that expense: selecting another one clears it.
+      await userEvent.click(screen.getByRole('option', { name: /Bunnings/ }));
+      expect(within(detail()).queryByRole('alert')).toBeNull();
+    } finally {
+      refundDocs.value = [];
+    }
+  });
+
+  it('leaves the suggestions alone when deleting a refund', async () => {
+    suggestions.items = [{ name: 'Bananas', categoryId: 'cat-groceries', category: 'Groceries', count: 3 }];
+    suggestions.shops = [{ name: 'Woolworths', count: 1 }];
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-04', total: 500, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [refund, woolies];
+    data.itemsByExpense = { ...items, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 500, refund: true })] };
+    renderList();
+    await deleteSelected();
+    expect(commit).toHaveBeenCalled();
+    expect(batchSet).not.toHaveBeenCalled();
   });
 
   it('leaves the suggestions alone when they have not loaded yet', async () => {

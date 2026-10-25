@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paths } from './paths';
-import { routeInfo, isExpenseEditorPath, isEditExpensePath } from './routes';
+import { routeInfo, isExpenseEditorPath, isEditExpensePath, isRefundExpensePath } from './routes';
 
 describe('routeInfo', () => {
   it.each([paths.spend, paths.summary, paths.income])('treats %s as a month-scoped main section', (path) => {
@@ -27,18 +27,30 @@ describe('routeInfo', () => {
     expect(routeInfo(paths.newExpense)).toEqual({ kind: 'secondary', title: 'New expense', back: '/spend' });
   });
 
+  it('gives the refund page a back link to the expenses list', () => {
+    expect(routeInfo(paths.refundExpense('abc'))).toEqual({ kind: 'secondary', title: 'Refund', back: '/spend' });
+  });
+
   it('gives the edit expense page a back link to the expenses list', () => {
     expect(routeInfo('/spend/expense/abc/edit')).toEqual({ kind: 'secondary', title: 'Edit expense', back: '/spend' });
   });
 });
 
 describe('isExpenseEditorPath', () => {
-  it.each(['/spend/expense/new', '/spend/expense/x/edit'])('is true for %s', (path) => {
+  it.each(['/spend/expense/new', '/spend/expense/x/edit', '/spend/expense/x/refund'])('is true for %s', (path) => {
     expect(isExpenseEditorPath(path)).toBe(true);
   });
 
   it.each(['/spend', '/spend/more', '/expense/new'])('is false for %s', (path) => {
     expect(isExpenseEditorPath(path)).toBe(false);
+  });
+});
+
+describe('isRefundExpensePath', () => {
+  it('is true only for the refund page', () => {
+    expect(isRefundExpensePath('/spend/expense/x/refund')).toBe(true);
+    expect(isRefundExpensePath('/spend/expense/x/edit')).toBe(false);
+    expect(isRefundExpensePath('/spend/expense/x/refund/more')).toBe(false);
   });
 });
 

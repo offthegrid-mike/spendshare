@@ -4,9 +4,9 @@ import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
-import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, plainSigned } from '../../lib/money';
+import { isRefund, signedNet } from '../../lib/refund';
 import { monthName } from '../../lib/month';
 import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
@@ -28,8 +28,6 @@ import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 interface Props { group: GroupDoc; currentUserUid: string; }
 
 interface DayGroup { key: string; label: string; total: number; exps: ExpenseDoc[]; }
-
-const plain = (cents: number) => (cents / 100).toFixed(2);
 
 /** Groups newest-first expenses by day; `amountOf` is what each adds to its day's total. */
 function groupByDay(expenses: ExpenseDoc[], amountOf: (exp: ExpenseDoc) => number): DayGroup[] {
@@ -88,7 +86,8 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Why a delete failed, kept with the expense it was for.
+  const [deleteError, setDeleteError] = useState<{ id: string; message: string } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ exp: ExpenseDoc; items: ItemDoc[] } | null>(null);
   const [filter, setFilter] = useState<{ groupId: string; month: string; category: string } | null>(null);
 
@@ -141,15 +140,26 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     setDeletingId(exp.id);
     setDeleteError(null);
     try {
-      const { writeBatch, doc, collection } = await import('firebase/firestore');
+      const { writeBatch, doc, collection, getDocs, query, where, limit } = await import('firebase/firestore');
+      const expenses = collection(db, `groups/${group.id}/expenses`);
+      // An expense with refunds stays until they're gone, so no refund is left
+      // pointing at a purchase that no longer exists.
+      if (!isRefund(exp)) {
+        const refunds = await getDocs(query(expenses, where('refundOf', '==', exp.id), limit(1)));
+        if (!refunds.empty) {
+          setDeleteError({ id: exp.id, message: 'This expense has refunds. Delete them first.' });
+          return;
+        }
+      }
       const batch = writeBatch(db);
-      batch.delete(doc(collection(db, `groups/${group.id}/expenses`), exp.id));
+      batch.delete(doc(expenses, exp.id));
       for (const item of items) {
         batch.delete(doc(collection(db, `groups/${group.id}/expenses/${exp.id}/items`), item.id));
       }
       // Take the deleted names out of the suggestions, as the editor does on save.
       // Skipped until they have loaded, so a stale [] baseline never overwrites them.
-      if (suggestionsLoaded) {
+      // A refund never added to them, so deleting one takes nothing away.
+      if (suggestionsLoaded && !isRefund(exp)) {
         const shop = exp.shopName?.trim() ?? '';
         stageSuggestionsUpdate(
           batch,
@@ -164,7 +174,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       invalidateGroupHistory(group.id);
       await committed;
     } catch {
-      setDeleteError('Failed to delete. Please try again.');
+      setDeleteError({ id: exp.id, message: 'Failed to delete. Please try again.' });
     } finally {
       setDeletingId(null);
     }
@@ -180,7 +190,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   if (loading || itemsLoading || settlementsLoading) return <ListSkeleton />;
 
   const paidSettlements = settlements.filter((s) => s.paid);
-  const days = groupByDay(visible, (exp) => (filtered ? filtered.paidOf[exp.id] : computeAdjustment(exp).net));
+  const days = groupByDay(visible, (exp) => (filtered ? filtered.paidOf[exp.id] : signedNet(exp)));
   const itemsOf = (exp: ExpenseDoc) => itemsByExpense[exp.id] ?? [];
 
   const list = (
@@ -241,7 +251,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
           <div key={day.key}>
             <div className="flex justify-between px-1.5 pb-[7px] pt-[18px] text-xs font-medium text-ink-muted">
               <span>{day.label}</span>
-              <span className="money">{plain(day.total)}</span>
+              <span className="money">{plainSigned(day.total)}</span>
             </div>
             <div
               className="card divide-y divide-line overflow-hidden"
@@ -273,6 +283,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
                     onToggle={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
                     onDelete={() => setPendingDelete({ exp, items: itemsOf(exp) })}
                     deleting={deletingId === exp.id}
+                    deleteError={deleteError?.id === exp.id ? deleteError.message : null}
                   />
                 ),
               )}
@@ -281,7 +292,6 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
         ))
       )}
 
-      {deleteError && <p className="pt-2 text-sm text-negative">{deleteError}</p>}
     </div>
   );
 
@@ -304,6 +314,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
               category={category ?? undefined}
               onDelete={() => active && setPendingDelete({ exp: active, items: itemsOf(active) })}
               deleting={active !== null && deletingId === active.id}
+              deleteError={deleteError && deleteError.id === active?.id ? deleteError.message : null}
             />
           </aside>
         </div>

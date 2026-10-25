@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
 import { CreditCard, Gift, Pencil, Trash2 } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
+import Chip from '../../components/ui/Chip';
 import CategoryTile from '../../components/ui/CategoryTile';
 import ExpenseBreakdown from './ExpenseBreakdown';
+import RefundButton from './RefundButton';
+import RefundLinks from './RefundLinks';
 import { computeAdjustment } from '../../lib/adjustment';
+import { isRefund, signedNet } from '../../lib/refund';
+import { plainSigned } from '../../lib/money';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
 import { paths } from '../../lib/paths';
@@ -20,7 +25,11 @@ interface Common {
 
 type Props = Common &
   (
-    | { mode: 'disclosure'; expanded: boolean; onToggle: () => void; onDelete: () => void; deleting?: boolean }
+    | {
+        mode: 'disclosure'; expanded: boolean; onToggle: () => void; onDelete: () => void; deleting?: boolean;
+        /** Why the last delete of this expense failed, shown beside its Delete button. */
+        deleteError?: string | null;
+      }
     | { mode: 'option'; selected: boolean; onSelect: () => void }
   );
 
@@ -30,6 +39,7 @@ function RowContent({ expense, items, group, viewerUid, category: given, selecte
   const category = given ?? items[0]?.category ?? '';
   const count = `${expense.itemCount} item${expense.itemCount === 1 ? '' : 's'}`;
   const adj = computeAdjustment(expense);
+  const refund = isRefund(expense);
   const payer = memberName(group, expense.payerUid);
   const AdjIcon = adj.giftCard > 0 ? Gift : CreditCard;
 
@@ -46,12 +56,17 @@ function RowContent({ expense, items, group, viewerUid, category: given, selecte
         }
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-ink">{expense.shopName}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-medium text-ink">{expense.shopName}</span>
+          {refund && <Chip>Refund</Chip>}
+        </span>
         <span className="block truncate text-xs text-ink-muted">{category ? `${category} · ${count}` : count}</span>
       </span>
       <span className="shrink-0 text-right">
-        <span className="money block font-semibold text-ink">{plain(adj.net)}</span>
-        {adj.hasAdjustment && (
+        <span className={`money block font-semibold ${refund ? 'text-accent' : 'text-ink'}`}>
+          {plainSigned(signedNet(expense))}
+        </span>
+        {adj.hasAdjustment && !refund && (
           <span className="money flex items-center justify-end gap-1 text-[11px] text-ink-faint">
             <AdjIcon size={12} strokeWidth={1.75} aria-hidden="true" />
             <s>{plain(adj.total)}</s>
@@ -106,6 +121,9 @@ export default function ExpenseRow(props: Props) {
         <div id={regionId} className="grid motion-safe:animate-expand">
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
+            <RefundLinks group={group} expense={expense} />
+            {props.deleteError && <p role="alert" className="text-sm text-negative">{props.deleteError}</p>}
+            <RefundButton group={group} expense={expense} />
             <div className="flex gap-2">
               <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />

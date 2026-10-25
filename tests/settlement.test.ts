@@ -63,3 +63,36 @@ describe('computeSummary paidShared', () => {
     expect(s.paidShared).toEqual({ alice: 0, gone: 500 });
   });
 });
+
+describe('computeSummary with refunds', () => {
+  it('takes a shared refund off the shared total and off the payer who got the money back', () => {
+    const s = computeSummary(['alice', 'bob'], [
+      { amount: 10000, shared: true, payerUid: 'alice' },
+      { amount: 4000, shared: true, payerUid: 'alice', refund: true },
+    ], []);
+    expect(s.sharedTotal).toBe(6000);
+    expect(s.paidTotal.alice).toBe(6000);
+    expect(s.balance).toEqual({ alice: 3000, bob: -3000 });
+    expect(s.transactions).toEqual([{ fromUid: 'bob', toUid: 'alice', amount: 3000 }]);
+  });
+
+  it('settles a month that only has a refund, with balances that still sum to zero', () => {
+    const s = computeSummary(['alice', 'bob'], [{ amount: 1001, shared: true, payerUid: 'alice', refund: true }], []);
+    expect(s.sharedTotal).toBe(-1001);
+    expect(s.balance.alice + s.balance.bob).toBe(0);
+    expect(s.transactions).toEqual([{ fromUid: 'alice', toUid: 'bob', amount: s.balance.bob }]);
+  });
+});
+
+describe('computeSummary with a personal refund', () => {
+  it('gives a personal refund back to its payer without touching the shared split', () => {
+    const s = computeSummary(['alice', 'bob'], [
+      { amount: 10000, shared: true, payerUid: 'alice' },
+      { amount: 3000, shared: false, payerUid: 'bob' },
+      { amount: 1000, shared: false, payerUid: 'bob', refund: true },
+    ], []);
+    expect(s.sharedTotal).toBe(10000);
+    expect(s.paidTotal.bob).toBe(2000);
+    expect(s.balance).toEqual({ alice: 5000, bob: -5000 });
+  });
+});
