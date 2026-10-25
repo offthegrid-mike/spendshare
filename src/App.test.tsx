@@ -10,7 +10,7 @@ import { makeGroup } from './test/fixtures';
 const state = vi.hoisted(() => ({
   user: null as { uid: string; email: string } | null,
   groups: [] as unknown[],
-  expense: null as { id: string } | null,
+  expense: null as { id: string; kind?: string; refundOf?: string } | null,
   access: 'allowed' as string,
   groupsUid: undefined as string | undefined,
 }));
@@ -57,6 +57,11 @@ vi.mock('./features/categories/CategoryManager', () => ({ default: () => <div da
 vi.mock('./features/expenses/ExpenseEditor', () => ({
   default: ({ expense }: { expense?: { id: string } }) => (
     <div data-testid="expense-editor" data-expense={expense?.id ?? ''} />
+  ),
+}));
+vi.mock('./features/expenses/RefundRoute', () => ({
+  default: ({ originalId, refund }: { originalId: string; refund?: { id: string } }) => (
+    <div data-testid="refund-route" data-original={originalId} data-expense={refund?.id ?? ''} />
   ),
 }));
 vi.mock('./features/expenses/ExpenseList', () => ({ default: () => <div data-testid="expense-list" /> }));
@@ -167,6 +172,7 @@ describe('App route table', () => {
     { name: 'group invites', path: paths.groupInvites, screen: 'send-invite' },
     { name: 'new expense', path: paths.newExpense, screen: 'expense-editor', editing: '' },
     { name: 'edit expense', path: paths.editExpense('x'), screen: 'expense-editor', editing: 'x' },
+    { name: 'refund', path: paths.refundExpense('x'), screen: 'refund-route', editing: '' },
   ];
 
   it.each(screens)('serves $name at $path without redirecting', ({ path, screen: testId, editing }) => {
@@ -175,6 +181,17 @@ describe('App route table', () => {
     expect(screen.getByTestId(testId)).toBeInTheDocument();
     expect(location()).toBe(path);
     if (editing !== undefined) expect(screen.getByTestId(testId)).toHaveAttribute('data-expense', editing);
+  });
+});
+
+describe('App refunds', () => {
+  it('edits an existing refund as a refund of its original', () => {
+    state.expense = { id: 'r1', kind: 'refund', refundOf: 'e1' };
+    renderApp(paths.editExpense('r1'));
+    const route = screen.getByTestId('refund-route');
+    expect(route).toHaveAttribute('data-original', 'e1');
+    expect(route).toHaveAttribute('data-expense', 'r1');
+    expect(screen.queryByTestId('expense-editor')).toBeNull();
   });
 });
 
