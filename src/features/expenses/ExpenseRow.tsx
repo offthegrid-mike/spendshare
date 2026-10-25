@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { CreditCard, Gift, Pencil, Trash2 } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
+import Chip from '../../components/ui/Chip';
 import CategoryTile from '../../components/ui/CategoryTile';
 import ExpenseBreakdown from './ExpenseBreakdown';
 import { computeAdjustment } from '../../lib/adjustment';
+import { isRefund, signedNet } from '../../lib/refund';
+import { plainSigned } from '../../lib/money';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
 import { paths } from '../../lib/paths';
@@ -30,6 +33,7 @@ function RowContent({ expense, items, group, viewerUid, category: given, selecte
   const category = given ?? items[0]?.category ?? '';
   const count = `${expense.itemCount} item${expense.itemCount === 1 ? '' : 's'}`;
   const adj = computeAdjustment(expense);
+  const refund = isRefund(expense);
   const payer = memberName(group, expense.payerUid);
   const AdjIcon = adj.giftCard > 0 ? Gift : CreditCard;
 
@@ -46,12 +50,17 @@ function RowContent({ expense, items, group, viewerUid, category: given, selecte
         }
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-ink">{expense.shopName}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-medium text-ink">{expense.shopName}</span>
+          {refund && <Chip>Refund</Chip>}
+        </span>
         <span className="block truncate text-xs text-ink-muted">{category ? `${category} · ${count}` : count}</span>
       </span>
       <span className="shrink-0 text-right">
-        <span className="money block font-semibold text-ink">{plain(adj.net)}</span>
-        {adj.hasAdjustment && (
+        <span className={`money block font-semibold ${refund ? 'text-accent' : 'text-ink'}`}>
+          {plainSigned(signedNet(expense))}
+        </span>
+        {adj.hasAdjustment && !refund && (
           <span className="money flex items-center justify-end gap-1 text-[11px] text-ink-faint">
             <AdjIcon size={12} strokeWidth={1.75} aria-hidden="true" />
             <s>{plain(adj.total)}</s>

@@ -57,3 +57,23 @@ describe('ExpenseDetail', () => {
     expect(screen.getByText('Select an expense to see its items.')).toBeInTheDocument();
   });
 });
+
+describe('ExpenseDetail for a refund', () => {
+  it('marks it as a refund, refunded to its payer, with the amount coming back', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', total: 1200, day: '2026-10-05', kind: 'refund', refundOf: 'e1' });
+    render(
+      <MemoryRouter>
+        <ExpenseDetail
+          expense={refund}
+          items={[makeItem('i9', 'r1', { name: 'Milk', amount: 1200, refund: true })]}
+          group={pair}
+          viewerUid="mike"
+          onDelete={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Refund')).toBeInTheDocument();
+    expect(screen.getByText('Mon 5 Oct · refunded to you')).toBeInTheDocument();
+    expect(screen.getByText('−A$12.00')).toBeInTheDocument();
+  });
+});

@@ -198,6 +198,37 @@ describe('SearchScreen', () => {
     expect(within(link).getByText(/A\$80\.00/).className).toContain('line-through');
   });
 
+  it('shows a refund result with a minus sign and a Refund mark', async () => {
+    mockUseAllExpenses.mockReturnValue({
+      expenses: [...expenses, {
+        ...expenses[0], id: 'r1', kind: 'refund', refundOf: 'e1', total: 400,
+        date: { toMillis: () => 3000, toDate: () => new Date('2026-06-20T00:00:00Z') },
+      }],
+      itemsByExpense: { ...itemsByExpense, r1: [{ id: 'i9', expenseId: 'r1', name: 'Full cream milk', amount: 400, refund: true }] },
+      loading: false,
+      error: null,
+    });
+    renderScreen();
+    await userEvent.type(screen.getByRole('searchbox'), 'milk');
+    const refundLink = screen.getAllByRole('link').find((l) => l.getAttribute('href') === paths.editExpense('r1'))!;
+    expect(refundLink.textContent).toContain('Refund');
+    expect(refundLink.textContent).toContain('−A$4.00');
+  });
+
+  it('shows the discount on a result, as the expense list does', async () => {
+    mockUseAllExpenses.mockReturnValue({
+      expenses: [{ ...expenses[0], total: 10000, discountPercent: 2 }],
+      itemsByExpense,
+      loading: false,
+      error: null,
+    });
+    renderScreen();
+    await userEvent.type(screen.getByRole('searchbox'), 'wool');
+    const link = screen.getByRole('link');
+    expect(link.textContent).toContain('A$98.00');
+    expect(within(link).getByText(/A\$100\.00/).className).toContain('line-through');
+  });
+
   // Cangjie/Pinyin IMEs emit intermediate keystrokes ("一口廿" for 街) as change
   // events before the character is chosen. Searching on those is noise, and
   // re-rendering the input from router state mid-composition destroys the IME

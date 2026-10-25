@@ -4,9 +4,9 @@ import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
-import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, plainSigned } from '../../lib/money';
+import { signedNet } from '../../lib/refund';
 import { monthName } from '../../lib/month';
 import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
@@ -28,8 +28,6 @@ import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 interface Props { group: GroupDoc; currentUserUid: string; }
 
 interface DayGroup { key: string; label: string; total: number; exps: ExpenseDoc[]; }
-
-const plain = (cents: number) => (cents / 100).toFixed(2);
 
 /** Groups newest-first expenses by day; `amountOf` is what each adds to its day's total. */
 function groupByDay(expenses: ExpenseDoc[], amountOf: (exp: ExpenseDoc) => number): DayGroup[] {
@@ -180,7 +178,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   if (loading || itemsLoading || settlementsLoading) return <ListSkeleton />;
 
   const paidSettlements = settlements.filter((s) => s.paid);
-  const days = groupByDay(visible, (exp) => (filtered ? filtered.paidOf[exp.id] : computeAdjustment(exp).net));
+  const days = groupByDay(visible, (exp) => (filtered ? filtered.paidOf[exp.id] : signedNet(exp)));
   const itemsOf = (exp: ExpenseDoc) => itemsByExpense[exp.id] ?? [];
 
   const list = (
@@ -241,7 +239,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
           <div key={day.key}>
             <div className="flex justify-between px-1.5 pb-[7px] pt-[18px] text-xs font-medium text-ink-muted">
               <span>{day.label}</span>
-              <span className="money">{plain(day.total)}</span>
+              <span className="money">{plainSigned(day.total)}</span>
             </div>
             <div
               className="card divide-y divide-line overflow-hidden"

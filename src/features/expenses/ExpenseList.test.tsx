@@ -121,6 +121,24 @@ describe('ExpenseList', () => {
     expect(fri).toHaveTextContent('40.00');
   });
 
+  it('takes a refund off its day total', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-02', total: 1000, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [woolies, bunnings, refund, thai];
+    data.itemsByExpense = { ...items, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 1000, refund: true })] };
+    renderList();
+    const fri = screen.getByText('Fri 2 Oct').parentElement!;
+    expect(fri).toHaveTextContent('30.00');
+  });
+
+  it('shows a day that is all refunds as a negative total', () => {
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-01', total: 1000, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [woolies, refund];
+    data.itemsByExpense = { e1: items.e1, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 1000, refund: true })] };
+    renderList();
+    const thu = screen.getByText('Thu 1 Oct').parentElement!;
+    expect(thu).toHaveTextContent('−10.00');
+  });
+
   it('shows the balance hero for the month', () => {
     renderList();
     // Mike paid 30.00 shared, Priya 68.83: Mike owes half the difference.

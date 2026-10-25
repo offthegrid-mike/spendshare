@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Gift, Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, formatSignedMoney } from '../../lib/money';
+import { computeAdjustment } from '../../lib/adjustment';
+import { isRefund, signedNet } from '../../lib/refund';
+import Chip from '../../components/ui/Chip';
 import { searchExpenses, highlightMatch } from '../../lib/search';
 import { paths } from '../../lib/paths';
 import { useAllExpenses } from '../../hooks/useAllExpenses';
-import type { GroupDoc } from '../../types/models';
+import type { ExpenseDoc, GroupDoc } from '../../types/models';
 
 interface Props { group: GroupDoc; }
 
@@ -166,8 +169,9 @@ export default function SearchScreen({ group }: Props) {
                     <ShoppingBag size={18} aria-hidden="true" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-ink">
-                      {highlightMatch(expense.shopName, query)}
+                    <p className="flex items-center gap-1.5 font-medium text-ink">
+                      <span>{highlightMatch(expense.shopName, query)}</span>
+                      {isRefund(expense) && <Chip>Refund</Chip>}
                     </p>
                     <p className="text-xs text-ink-muted">
                       {expense.date ? format(expense.date.toDate(), 'd MMM yyyy') : expense.month}
@@ -175,25 +179,7 @@ export default function SearchScreen({ group }: Props) {
                       {payerName(expense.payerUid)}
                     </p>
                   </div>
-                  <div className="text-right">
-                    {expense.giftCardAmount ? (
-                      <>
-                        <p className="money text-xs text-ink-faint line-through">
-                          {formatMoney(expense.total, group.currency)}
-                        </p>
-                        <p className="money text-base font-semibold text-ink">
-                          {formatMoney(expense.total - expense.giftCardAmount, group.currency)}
-                        </p>
-                        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-ink-faint">
-                          <Gift size={12} aria-hidden="true" /> Gift card {formatMoney(expense.giftCardAmount, group.currency)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="money text-base font-semibold text-ink">
-                        {formatMoney(expense.total, group.currency)}
-                      </span>
-                    )}
-                  </div>
+                  <ResultAmount expense={expense} currency={group.currency} />
                 </div>
                 {matchedItems.length > 0 && (
                   <ul className="space-y-1 border-t border-line px-4 py-2.5">
@@ -211,6 +197,31 @@ export default function SearchScreen({ group }: Props) {
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/** A result's amount as the expense list shows it: net after gift card and discount, negative for a refund. */
+function ResultAmount({ expense, currency }: { expense: ExpenseDoc; currency: string }) {
+  const adj = computeAdjustment(expense);
+  if (isRefund(expense) || !adj.hasAdjustment) {
+    return (
+      <div className="text-right">
+        <span className={`money text-base font-semibold ${isRefund(expense) ? 'text-accent' : 'text-ink'}`}>
+          {formatSignedMoney(signedNet(expense), currency)}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="text-right">
+      <p className="money text-xs text-ink-faint line-through">{formatMoney(adj.total, currency)}</p>
+      <p className="money text-base font-semibold text-ink">{formatMoney(adj.net, currency)}</p>
+      {adj.giftCard > 0 && (
+        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-ink-faint">
+          <Gift size={12} aria-hidden="true" /> Gift card {formatMoney(adj.giftCard, currency)}
+        </span>
       )}
     </div>
   );

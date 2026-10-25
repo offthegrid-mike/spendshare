@@ -99,3 +99,14 @@ describe('ExpenseRow (option)', () => {
     expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
   });
 });
+
+describe('ExpenseRow for a refund', () => {
+  const refund = makeExpense('r1', { shopName: 'Woolworths', total: 1200, itemCount: 1, payerUid: 'mike', kind: 'refund', refundOf: 'e1' });
+  const refundItems = [makeItem('i9', 'r1', { name: 'Milk', amount: 1200, refund: true })];
+
+  it('marks it as a refund and shows the amount coming back', () => {
+    renderRow({ expense: refund, items: refundItems });
+    expect(screen.getByText('Refund')).toBeInTheDocument();
+    expect(screen.getByText('−12.00')).toBeInTheDocument();
+  });
+});

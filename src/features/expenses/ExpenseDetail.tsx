@@ -2,11 +2,12 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Pencil, Trash2 } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
+import Chip from '../../components/ui/Chip';
 import ExpenseBreakdown from './ExpenseBreakdown';
-import { computeAdjustment } from '../../lib/adjustment';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
-import { formatMoney } from '../../lib/money';
+import { formatSignedMoney } from '../../lib/money';
+import { isRefund, signedNet } from '../../lib/refund';
 import { paths } from '../../lib/paths';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
@@ -29,19 +30,25 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
   const category = given ?? items[0]?.category ?? '';
   const date = expense.date?.toDate?.();
   const payer = expense.payerUid === viewerUid ? 'you' : memberName(group, expense.payerUid);
-  const meta = [date ? format(date, 'EEE d MMM') : null, `paid by ${payer}`].filter(Boolean).join(' · ');
+  const refund = isRefund(expense);
+  const meta = [date ? format(date, 'EEE d MMM') : null, refund ? `refunded to ${payer}` : `paid by ${payer}`]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className="flex min-h-full flex-col gap-4">
       <div className="flex items-center gap-3">
         <CategoryTile icon={iconForCategory(category)} label={category || expense.shopName} size="lg" selected />
         <div className="min-w-0">
-          <h2 className="truncate text-[17px] font-semibold text-ink">{expense.shopName}</h2>
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate text-[17px] font-semibold text-ink">{expense.shopName}</h2>
+            {refund && <Chip>Refund</Chip>}
+          </div>
           <p className="text-xs text-ink-muted">{meta}</p>
         </div>
       </div>
-      <p className="money text-[32px] font-semibold tracking-[-0.03em] text-ink">
-        {formatMoney(computeAdjustment(expense).net, group.currency)}
+      <p className={`money text-[32px] font-semibold tracking-[-0.03em] ${refund ? 'text-accent' : 'text-ink'}`}>
+        {formatSignedMoney(signedNet(expense), group.currency)}
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <div className="mt-auto flex gap-2 pt-2">

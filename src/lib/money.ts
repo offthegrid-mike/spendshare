@@ -15,6 +15,17 @@ export function distributeEvenly(totalCents: number, ids: string[]): Record<stri
   return out;
 }
 
+/** Like formatMoney, but a negative amount (a refund) gets a true minus sign: −$12.50. */
+export function formatSignedMoney(cents: number, currency: string, locale = 'en-US'): string {
+  return cents < 0 ? `−${formatMoney(-cents, currency, locale)}` : formatMoney(cents, currency, locale);
+}
+
+/** Cents as a plain figure for the expense list (12.50), with a true minus sign when negative. */
+export function plainSigned(cents: number): string {
+  const figure = (Math.abs(cents) / 100).toFixed(2);
+  return cents < 0 ? `−${figure}` : figure;
+}
+
 /** Short axis-label form, e.g. 123456 cents → "$1.2K". Not for exact figures. */
 export function formatCompactMoney(cents: number, currency: string, locale = 'en-US'): string {
   return new Intl.NumberFormat(locale, {
