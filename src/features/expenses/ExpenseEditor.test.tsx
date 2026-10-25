@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseEditor from './ExpenseEditor';
+import { useUIStore } from '../../stores/uiStore';
 import { formatMoney } from '../../lib/money';
 import { paths } from '../../lib/paths';
 
@@ -392,5 +393,24 @@ describe('ExpenseEditor refund cap', () => {
     );
     expect(screen.queryByText(/can't be more than/)).toBeNull();
     expect(screen.getByRole('button', { name: /save refund/i })).not.toBeDisabled();
+  });
+});
+
+describe('ExpenseEditor page title', () => {
+  it('titles the page Edit refund while editing a refund, and clears it after', () => {
+    const existingRefund = { ...editExpense, id: 'r1', kind: 'refund', refundOf: 'e1', total: 300, itemCount: 1 };
+    const { unmount } = renderEditor({
+      expense: existingRefund,
+      items: [{ ...editItems[0], id: 'i9', expenseId: 'r1', refund: true }],
+      refundOf: { expense: editExpense, items: editItems, remaining: 570 },
+    });
+    expect(useUIStore.getState().pageTitle).toBe('Edit refund');
+    unmount();
+    expect(useUIStore.getState().pageTitle).toBeNull();
+  });
+
+  it('leaves the route title alone otherwise', () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    expect(useUIStore.getState().pageTitle ?? null).toBeNull();
   });
 });

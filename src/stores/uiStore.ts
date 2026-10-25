@@ -22,6 +22,8 @@ interface UIState {
   notice: Notice | null;
   /** A just-joined group to select once it appears in the group list; session-only. */
   pendingGroupId: string | null;
+  /** A title the open page sets for itself, over its route's (Edit refund); session-only. */
+  pageTitle: string | null;
   setGroup: (id: string) => void;
   /** A group the user picked: selects it and drops any pending joined group. */
   chooseGroup: (id: string) => void;
@@ -32,6 +34,7 @@ interface UIState {
   openAddSheet: () => void;
   closeAddSheet: () => void;
   showNotice: (notice: Omit<Notice, 'id'>) => void;
+  setPageTitle: (title: string | null) => void;
   clearNotice: () => void;
 }
 
@@ -44,6 +47,7 @@ export const useUIStore = create<UIState>()(
       addSheetOpen: false,
       notice: null,
       pendingGroupId: null,
+      pageTitle: null,
       setGroup: (id) => set({ selectedGroupId: id }),
       chooseGroup: (id) => set({ selectedGroupId: id, pendingGroupId: null }),
       selectGroupWhenReady: (id) => set({ pendingGroupId: id }),
@@ -54,6 +58,7 @@ export const useUIStore = create<UIState>()(
       closeAddSheet: () => set({ addSheetOpen: false }),
       showNotice: (notice) => set({ notice: { ...notice, id: ++noticeSeq } }),
       clearNotice: () => set({ notice: null }),
+      setPageTitle: (pageTitle) => set({ pageTitle }),
     }),
     {
       name: 'spendshare-ui',

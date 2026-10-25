@@ -5,6 +5,7 @@ import HouseholdHeader from './HouseholdHeader';
 import type { User } from 'firebase/auth';
 import { makeGroup } from '../test/fixtures';
 import { paths } from '../lib/paths';
+import { useUIStore } from '../stores/uiStore';
 
 const mockUser = { uid: 'mike', displayName: 'Mike', email: 'mike@example.com' } as unknown as User;
 
@@ -116,5 +117,22 @@ describe('HouseholdHeader', () => {
       window.dispatchEvent(new Event('scroll'));
     });
     expect(header.className).not.toContain('border-line');
+  });
+});
+
+describe('HouseholdHeader page title', () => {
+  it("uses the page's own title when it sets one, such as Edit refund", () => {
+    useUIStore.setState({ pageTitle: 'Edit refund' });
+    try {
+      renderHeader(paths.editExpense('r1'));
+      expect(screen.getByRole('heading', { name: 'Edit refund' })).toBeInTheDocument();
+    } finally {
+      useUIStore.setState({ pageTitle: null });
+    }
+  });
+
+  it('falls back to the route title', () => {
+    renderHeader(paths.editExpense('e1'));
+    expect(screen.getByRole('heading', { name: 'Edit expense' })).toBeInTheDocument();
   });
 });

@@ -203,6 +203,14 @@ export default function ExpenseEditor({
 
   // Changing group (new expenses only).
   const chooseGroup = useUIStore((s) => s.chooseGroup);
+  const setPageTitle = useUIStore((s) => s.setPageTitle);
+  // Refunds are edited at the same route as purchases, so name the page here.
+  const editingRefund = refundMode && !isNew;
+  useEffect(() => {
+    if (!editingRefund) return;
+    setPageTitle('Edit refund');
+    return () => setPageTitle(null);
+  }, [editingRefund, setPageTitle]);
   const canChangeGroup = drafting && !!groups && !!user;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerView, setPickerView] = useState<GroupPickerView>('list');
