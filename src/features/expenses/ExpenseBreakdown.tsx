@@ -1,6 +1,8 @@
 import { CreditCard, Gift } from 'lucide-react';
 import Chip from '../../components/ui/Chip';
 import { computeAdjustment } from '../../lib/adjustment';
+import { plainSigned } from '../../lib/money';
+import { isRefund } from '../../lib/refund';
 import { memberName } from '../../lib/balance';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
@@ -37,6 +39,8 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
   const shared = items.filter((it) => it.shared).reduce((s, it) => s + it.amount, 0);
   const personal = items.filter((it) => !it.shared).reduce((s, it) => s + it.amount, 0);
   const n = group.memberUids.length;
+  // A refund's split is money coming back, so it reads negative.
+  const split = (cents: number) => plainSigned(isRefund(expense) ? -cents : cents);
   let shareLabel = "Each person's share";
   if (n === 2) {
     const other = group.memberUids.find((u) => u !== viewerUid);
@@ -89,9 +93,9 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
       )}
       <Section title="Split">
         <dl className="space-y-2">
-          <Line label="Shared" value={plain(shared)} />
-          {personal > 0 && <Line label="Personal" value={plain(personal)} />}
-          <Line label={shareLabel} value={plain(n > 0 ? Math.round(shared / n) : 0)} strong />
+          <Line label="Shared" value={split(shared)} />
+          {personal > 0 && <Line label="Personal" value={split(personal)} />}
+          <Line label={shareLabel} value={split(n > 0 ? Math.round(shared / n) : 0)} strong />
         </dl>
       </Section>
     </div>

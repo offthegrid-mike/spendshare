@@ -83,3 +83,16 @@ describe('computeSummary with refunds', () => {
     expect(s.transactions).toEqual([{ fromUid: 'alice', toUid: 'bob', amount: s.balance.bob }]);
   });
 });
+
+describe('computeSummary with a personal refund', () => {
+  it('gives a personal refund back to its payer without touching the shared split', () => {
+    const s = computeSummary(['alice', 'bob'], [
+      { amount: 10000, shared: true, payerUid: 'alice' },
+      { amount: 3000, shared: false, payerUid: 'bob' },
+      { amount: 1000, shared: false, payerUid: 'bob', refund: true },
+    ], []);
+    expect(s.sharedTotal).toBe(10000);
+    expect(s.paidTotal.bob).toBe(2000);
+    expect(s.balance).toEqual({ alice: 5000, bob: -5000 });
+  });
+});

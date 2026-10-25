@@ -30,18 +30,20 @@ describe('isRefund', () => {
 });
 
 describe('remainingToRefund', () => {
-  const original = makeExpense('e1', { total: 10000, giftCardAmount: 2000 });
+  // A gift card or discount doesn't change what can be refunded: like the
+  // split, refunds count item amounts, so the whole receipt total can come back.
+  const original = makeExpense('e1', { total: 10000, giftCardAmount: 2000, discountPercent: 2 });
   const refund = (id: string, total: number) => makeExpense(id, { total, kind: 'refund', refundOf: 'e1' });
 
-  it('is what was paid, less the refunds already made', () => {
-    expect(remainingToRefund(original, [refund('r1', 3000), refund('r2', 1000)])).toBe(4000);
+  it('is the receipt total, less the refunds already made', () => {
+    expect(remainingToRefund(original, [refund('r1', 3000), refund('r2', 1000)])).toBe(6000);
   });
 
   it('leaves out the refund being edited', () => {
-    expect(remainingToRefund(original, [refund('r1', 3000), refund('r2', 1000)], 'r1')).toBe(7000);
+    expect(remainingToRefund(original, [refund('r1', 3000), refund('r2', 1000)], 'r1')).toBe(9000);
   });
 
   it('never goes below zero', () => {
-    expect(remainingToRefund(original, [refund('r1', 9000)])).toBe(0);
+    expect(remainingToRefund(original, [refund('r1', 11000)])).toBe(0);
   });
 });

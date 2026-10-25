@@ -72,7 +72,8 @@ export function computeMonthBreakdown({
   const categories: MonthCategory[] = categoryTotals(items).map((c) => {
     const before = prevByCategory.get(c.category);
     let change: MonthCategory['change'] = null;
-    if (prevSpent > 0) change = before ? percentChange(c.amount, before) : 'new';
+    // A category with nothing (or only refunds) last month is new, not a percent change.
+    if (prevSpent > 0) change = before !== undefined && before > 0 ? percentChange(c.amount, before) : 'new';
     return { ...c, change };
   });
 
@@ -98,7 +99,9 @@ export function computeMonthBreakdown({
     if (!refund) shop.visits += 1;
     shops.set(key, shop);
   }
+  // A shop with only a refund this month wasn't shopped at, so it isn't a top shop.
   const topShops = [...shops.values()]
+    .filter((shop) => shop.visits > 0)
     .sort((a, b) => b.amount - a.amount || b.visits - a.visits || a.shopName.localeCompare(b.shopName))
     .slice(0, TOP_SHOPS);
   const biggest = visits[0];

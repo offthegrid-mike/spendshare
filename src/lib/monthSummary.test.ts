@@ -242,3 +242,23 @@ describe('computeMonthBreakdown with refunds', () => {
     expect(b.biggestExpense).toBeNull();
   });
 });
+
+describe('computeMonthBreakdown edge cases with refunds', () => {
+  it("leaves a shop that only had a refund this month out of the top shops", () => {
+    const b = breakdown({
+      expenses: [...expenses, { id: 'r1', shopName: 'Aldi', kind: 'refund' }],
+      items: [...items, { expenseId: 'r1', category: 'Groceries', amount: 500, refund: true }],
+    });
+    expect(b.topShops.map((s) => s.shopName)).not.toContain('Aldi');
+  });
+
+  it('treats a category that was refunded below zero last month as new, not as a percent change', () => {
+    const b = breakdown({
+      prevItems: [
+        { expenseId: 'p1', category: 'Dining', amount: 3000 },
+        { expenseId: 'p2', category: 'Groceries', amount: 500, refund: true },
+      ],
+    });
+    expect(b.categories.find((c) => c.category === 'Groceries')?.change).toBe('new');
+  });
+});

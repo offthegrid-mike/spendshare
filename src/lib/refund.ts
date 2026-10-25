@@ -24,15 +24,20 @@ export function signedNet(expense: Pick<ExpenseDoc, 'total' | 'giftCardAmount' |
 }
 
 /**
- * How much of an expense can still be refunded: what was paid for it, less
- * the refunds already made (a refund's total, as refunds have no gift card or
- * discount). `excludeId` leaves out the refund being edited.
+ * How much of an expense can still be refunded: its receipt total, less the
+ * refunds already made. Like the split, refunds count item amounts, so a gift
+ * card or discount on the original doesn't reduce it. `excludeId` leaves out
+ * the refund being edited.
  */
 export function remainingToRefund(
-  original: Pick<ExpenseDoc, 'total' | 'giftCardAmount' | 'discountPercent'>,
+  original: Pick<ExpenseDoc, 'total'>,
   refunds: Pick<ExpenseDoc, 'id' | 'total'>[],
   excludeId?: string,
 ): number {
-  const refunded = refunds.filter((r) => r.id !== excludeId).reduce((sum, r) => sum + r.total, 0);
-  return Math.max(computeAdjustment(original).net - refunded, 0);
+  return Math.max(original.total - refundedTotal(refunds, excludeId), 0);
+}
+
+/** What has been refunded from an expense, from its refunds' totals. */
+export function refundedTotal(refunds: Pick<ExpenseDoc, 'id' | 'total'>[], excludeId?: string): number {
+  return refunds.filter((r) => r.id !== excludeId).reduce((sum, r) => sum + r.total, 0);
 }
