@@ -13,6 +13,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useItemSuggestions } from '../../hooks/useItemSuggestions';
+import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
@@ -174,7 +175,10 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
           { items: [], shops: [] },
         );
       }
-      await batch.commit();
+      const committed = batch.commit();
+      // Before awaiting: offline, commit() only resolves once the server has it.
+      invalidateGroupHistory(group.id);
+      await committed;
     } catch {
       setDeleteError('Failed to delete. Please try again.');
     } finally {

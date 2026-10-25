@@ -59,7 +59,8 @@ interface RunProps {
 function RebuildRun({ groupId, active, stored, onStart }: RunProps) {
   const [outcome, setOutcome] = useState<'cancelled' | 'rebuilt' | 'failed' | null>(null);
   const [saving, setSaving] = useState(false);
-  const history = useAllExpenses(active ? groupId : null);
+  // Fresh, never the shared copy: the recount is written back.
+  const history = useAllExpenses(active ? groupId : null, { fresh: true });
 
   const recount = useMemo(
     () => (active && !history.loading && !history.error

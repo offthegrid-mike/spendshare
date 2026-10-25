@@ -14,6 +14,8 @@ vi.mock('../../lib/converters', () => ({
 
 const batchSets: Record<string, unknown>[] = [];
 const mockCommit = vi.fn().mockResolvedValue(undefined);
+const { mockInvalidate } = vi.hoisted(() => ({ mockInvalidate: vi.fn() }));
+vi.mock('../../hooks/useAllExpenses', () => ({ invalidateGroupHistory: mockInvalidate }));
 vi.mock('firebase/firestore', () => ({
   writeBatch: () => ({
     set: (_ref: unknown, data: Record<string, unknown>) => { batchSets.push(data); },
@@ -202,6 +204,19 @@ describe('ExpenseEditor (hybrid)', () => {
     await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
     const expenseSet = batchSets.find((d) => 'total' in d);
     expect(expenseSet?.discountPercent).toBe(2);
+  });
+
+  it("forgets the group's shared history when the save is committed", async () => {
+    mockInvalidate.mockClear();
+    renderEditor();
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
+    fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '10.00' } });
+    fireEvent.click(screen.getByRole('button', { name: /add item/i }));
+    fireEvent.change(screen.getByLabelText(/shop name/i), { target: { value: 'Woolworths' } });
+    fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
+
+    await waitFor(() => expect(mockInvalidate).toHaveBeenCalledWith(group.id));
+    expect(mockInvalidate.mock.invocationCallOrder[0]).toBeGreaterThan(mockCommit.mock.invocationCallOrder.at(-1)!);
   });
 
   it('keeps the totals/save footer sticky to the bottom below the desktop breakpoint', () => {

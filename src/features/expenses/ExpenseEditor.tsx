@@ -14,6 +14,7 @@ import { useCategories, fetchActiveCategories } from '../../hooks/useCategories'
 import { useUIStore } from '../../stores/uiStore';
 import { carryEntry } from '../../lib/carryEntry';
 import { useItemSuggestions } from '../../hooks/useItemSuggestions';
+import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
 import { computeDiscountCents } from '../../lib/discount';
@@ -453,7 +454,11 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       );
     }
 
-    await batch.commit();
+    const committed = batch.commit();
+    // Before awaiting: offline, commit() only resolves once the server has it,
+    // but the local write is already applied.
+    invalidateGroupHistory(group.id);
+    await committed;
     clearDraft(group.id);
     navigate(paths.spend);
     onSuccess?.();

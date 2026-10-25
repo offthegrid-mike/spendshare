@@ -7,9 +7,10 @@ import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc, ShopEntry, SuggestionEntry } from '../../types/models';
 import { paths } from '../../lib/paths';
 
-const { commit, batchSet, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
+const { commit, batchSet, invalidateGroupHistory, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
   batchSet: vi.fn(),
+  invalidateGroupHistory: vi.fn(),
   openAddSheet: vi.fn(),
   desktop: { value: false },
   ui: { month: '2026-10' },
@@ -33,6 +34,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: () => 'now',
 }));
 vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }) }));
+vi.mock('../../hooks/useAllExpenses', () => ({ invalidateGroupHistory }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
 }));
@@ -230,6 +232,13 @@ describe('ExpenseList on desktop', () => {
       { items, shops, updatedAt: 'now' },
     );
     expect(batchSet.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
+  });
+
+  it("forgets the group's shared history when the delete is committed", async () => {
+    renderList();
+    await deleteSelected();
+    expect(invalidateGroupHistory).toHaveBeenCalledWith('g1');
+    expect(invalidateGroupHistory.mock.invocationCallOrder[0]).toBeGreaterThan(commit.mock.invocationCallOrder[0]);
   });
 
   it('leaves the suggestions alone when they have not loaded yet', async () => {
