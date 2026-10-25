@@ -602,6 +602,32 @@ describe('/groups financial sub-collection validation (M-2)', () => {
       await assertSucceeds(batch.commit());
     });
 
+    it('denies moving a refund onto a different original', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e2' })));
+    });
+
+    it("allows editing a refund's items the way the editor saves them, in one batch", async () => {
+      const db = bob();
+      await assertSucceeds(setDoc(doc(db, 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertSucceeds(setDoc(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'old'), item({ refund: true })));
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', total: 300 }));
+      batch.delete(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'old'));
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r1', 'items', 'new'), item({ amount: 300, refund: true }));
+      await assertSucceeds(batch.commit());
+    });
+
+    it('allows a refund with many items in one batch, within the rules read limit', async () => {
+      const db = bob();
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'groups', 'group6', 'expenses', 'r3'), expense({ kind: 'refund', refundOf: 'e1', total: 2500, itemCount: 25 }));
+      for (let i = 0; i < 25; i++) {
+        batch.set(doc(db, 'groups', 'group6', 'expenses', 'r3', 'items', `i${i}`), item({ expenseId: 'r3', amount: 100, refund: true }));
+      }
+      await assertSucceeds(batch.commit());
+    });
+
     it('denies turning a purchase into a refund, or a refund into a purchase', async () => {
       await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
       await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({ kind: 'refund', refundOf: 'e0' })));

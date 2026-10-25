@@ -142,7 +142,8 @@ service cloud.firestore {
         // Bind the author and require a non-negative numeric total on create/update.
         // A refund (kind 'refund') names its original and has no gift card or
         // discount; its amounts stay positive and the app counts them against
-        // spending. A saved expense never switches between purchase and refund.
+        // spending. A saved expense never switches between purchase and refund,
+        // and a refund stays with the original it was made from.
         function isRefundDoc(data) { return data.get('kind', null) == 'refund'; }
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
@@ -158,7 +159,9 @@ service cloud.firestore {
                  && !('giftCardAmount' in request.resource.data)
                  && !('discountPercent' in request.resource.data))
               : !('refundOf' in request.resource.data))
-          && (resource == null || isRefundDoc(request.resource.data) == isRefundDoc(resource.data));
+          && (resource == null
+              || (isRefundDoc(request.resource.data) == isRefundDoc(resource.data)
+                  && request.resource.data.get('refundOf', null) == resource.data.get('refundOf', null)));
         match /items/{itemId} {
           allow read, delete: if isMember(groupId);
           // An item is a refund item exactly when its expense is a refund. getAfter
