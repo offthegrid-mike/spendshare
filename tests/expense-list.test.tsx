@@ -22,6 +22,7 @@ vi.mock('firebase/firestore', () => ({
   writeBatch: mockBatch,
   doc: vi.fn(),
   collection: vi.fn(),
+  serverTimestamp: vi.fn(),
   Timestamp: {
     now: vi.fn(),
     fromDate: vi.fn(),
@@ -29,6 +30,8 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('../src/lib/firebase', () => ({ db: {} }));
+vi.mock('../src/lib/converters', () => ({ suggestionsDocRef: vi.fn() }));
+vi.mock('../src/hooks/useItemSuggestions', () => ({ useItemSuggestions: () => [[], [], false], writeCache: vi.fn() }));
 vi.mock('../src/lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 
 // --- Import component after mocks ---

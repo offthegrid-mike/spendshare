@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
+import { suggestionsDocRef } from '../../lib/converters';
+import { computeShopsDelta, computeSuggestionsDelta } from '../../lib/suggestions';
 import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney } from '../../lib/money';
@@ -11,6 +13,7 @@ import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
+import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
@@ -19,7 +22,7 @@ import CategoryFilter from './CategoryFilter';
 import { categoriesBySpend, filterByCategory } from './filterByCategory';
 import ExpenseRow from './ExpenseRow';
 import ExpenseDetail from './ExpenseDetail';
-import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
+import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc } from '../../types/models';
 
 interface Props { group: GroupDoc; currentUserUid: string; }
 
@@ -86,6 +89,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const navigate = useNavigate();
   const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
+  const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -153,13 +157,25 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     setDeletingId(exp.id);
     setDeleteError(null);
     try {
-      const { writeBatch, doc, collection } = await import('firebase/firestore');
+      const { writeBatch, doc, collection, serverTimestamp } = await import('firebase/firestore');
       const batch = writeBatch(db);
       batch.delete(doc(collection(db, `groups/${group.id}/expenses`), exp.id));
       for (const item of items) {
         batch.delete(doc(collection(db, `groups/${group.id}/expenses/${exp.id}/items`), item.id));
       }
+      // Take the deleted names out of the suggestions, as the editor does on save.
+      // Skipped until they have loaded, so a stale [] baseline never overwrites them.
+      let next: Pick<SuggestionsDoc, 'items' | 'shops'> | null = null;
+      if (suggestionsLoaded) {
+        const shop = exp.shopName?.trim() ?? '';
+        next = {
+          items: computeSuggestionsDelta(suggestions, items, []),
+          shops: computeShopsDelta(shopSuggestions, shop ? [shop] : [], []),
+        };
+        batch.set(suggestionsDocRef(group.id), { ...next, updatedAt: serverTimestamp() });
+      }
       await batch.commit();
+      if (next) writeCache(group.id, next.items, next.shops);
     } catch {
       setDeleteError('Failed to delete. Please try again.');
     } finally {
