@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
@@ -83,6 +83,7 @@ function ListSkeleton() {
 export default function ExpenseList({ group, currentUserUid }: Props) {
   const { selectedMonth, openAddSheet } = useUIStore();
   const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
   const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -123,13 +124,18 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   useEffect(() => {
     if (!isDesktop) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const edit = e.key === 'e' || e.key === 'E';
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && !edit) return;
       // Another control (the gear menu, say) already used the key, or a
       // dialog is open on top of the list.
       if (e.defaultPrevented || pendingDelete || document.querySelector('[aria-modal="true"]')) return;
       if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (visible.length === 0) return;
       e.preventDefault();
+      if (edit) {
+        if (activeId) navigate(paths.editExpense(activeId));
+        return;
+      }
       const i = visible.findIndex((x) => x.id === activeId);
       const next = visible[Math.min(Math.max(i + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)];
       setSelectedId(next.id);
@@ -141,7 +147,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isDesktop, visible, activeId, pendingDelete]);
+  }, [isDesktop, visible, activeId, pendingDelete, navigate]);
 
   async function handleDelete(exp: ExpenseDoc, items: ItemDoc[]) {
     setDeletingId(exp.id);

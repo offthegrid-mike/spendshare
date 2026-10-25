@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc } from '../../types/models';
@@ -230,7 +230,66 @@ describe('ExpenseList on desktop', () => {
     await userEvent.keyboard(' ');
     expect(within(detail()).getByRole('heading', { name: 'Bunnings' })).toBeInTheDocument();
   });
+
+  function renderRoutedList() {
+    return render(
+      <MemoryRouter initialEntries={['/spend']}>
+        <Routes>
+          <Route
+            path="/spend"
+            element={
+              <>
+                <input aria-label="Search items" />
+                <ExpenseList group={pair} currentUserUid="mike" />
+              </>
+            }
+          />
+          <Route path={paths.editExpense(':id')} element={<EditorProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('opens the selected expense in the editor with E', async () => {
+    renderRoutedList();
+    await userEvent.keyboard('{ArrowDown}');
+    await userEvent.keyboard('e');
+    expect(screen.getByTestId('editing')).toHaveTextContent('e2');
+  });
+
+  it('accepts a capital E too', async () => {
+    renderRoutedList();
+    await userEvent.keyboard('E');
+    expect(screen.getByTestId('editing')).toHaveTextContent('e1');
+  });
+
+  it('ignores E while typing in a field', async () => {
+    renderRoutedList();
+    await userEvent.click(screen.getByRole('textbox', { name: 'Search items' }));
+    await userEvent.keyboard('e');
+    expect(screen.queryByTestId('editing')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Search items' })).toHaveValue('e');
+  });
+
+  it('ignores E with a modifier or while the delete dialog is open', async () => {
+    renderRoutedList();
+    await userEvent.keyboard('{Meta>}e{/Meta}');
+    expect(screen.queryByTestId('editing')).toBeNull();
+    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
+    await userEvent.keyboard('e');
+    expect(screen.queryByTestId('editing')).toBeNull();
+  });
+
+  it('advertises the E shortcut on the Edit link', () => {
+    renderList();
+    expect(within(detail()).getByRole('link', { name: 'Edit' })).toHaveAttribute('aria-keyshortcuts', 'E');
+  });
 });
+
+function EditorProbe() {
+  const { id } = useParams();
+  return <p data-testid="editing">{id}</p>;
+}
 
 describe('ExpenseList category filter', () => {
   const filterGroup = () => screen.getByRole('group', { name: 'Filter by category' });

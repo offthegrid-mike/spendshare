@@ -45,7 +45,7 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <div className="mt-auto flex gap-2 pt-2">
-        <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
+        <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
           <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
           Edit
         </Link>
