@@ -101,3 +101,21 @@ describe('ExpenseDetail refund action', () => {
     expect(screen.queryByRole('link', { name: 'Refund…' })).toBeNull();
   });
 });
+
+describe('ExpenseDetail delete error', () => {
+  it('shows why a delete failed beside the buttons', () => {
+    render(
+      <MemoryRouter>
+        <ExpenseDetail
+          expense={exp}
+          items={items}
+          group={pair}
+          viewerUid="mike"
+          onDelete={() => {}}
+          deleteError="This expense has refunds. Delete them first."
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
+  });
+});

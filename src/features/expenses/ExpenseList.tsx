@@ -86,7 +86,8 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Why a delete failed, kept with the expense it was for.
+  const [deleteError, setDeleteError] = useState<{ id: string; message: string } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ exp: ExpenseDoc; items: ItemDoc[] } | null>(null);
   const [filter, setFilter] = useState<{ groupId: string; month: string; category: string } | null>(null);
 
@@ -146,7 +147,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       if (!isRefund(exp)) {
         const refunds = await getDocs(query(expenses, where('refundOf', '==', exp.id), limit(1)));
         if (!refunds.empty) {
-          setDeleteError('This expense has refunds. Delete them first.');
+          setDeleteError({ id: exp.id, message: 'This expense has refunds. Delete them first.' });
           return;
         }
       }
@@ -173,7 +174,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       invalidateGroupHistory(group.id);
       await committed;
     } catch {
-      setDeleteError('Failed to delete. Please try again.');
+      setDeleteError({ id: exp.id, message: 'Failed to delete. Please try again.' });
     } finally {
       setDeletingId(null);
     }
@@ -290,7 +291,8 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
         ))
       )}
 
-      {deleteError && <p className="pt-2 text-sm text-negative">{deleteError}</p>}
+      {/* On desktop the detail pane shows it, beside the Delete button. */}
+      {deleteError && !isDesktop && <p className="pt-2 text-sm text-negative">{deleteError.message}</p>}
     </div>
   );
 
@@ -313,6 +315,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
               category={category ?? undefined}
               onDelete={() => active && setPendingDelete({ exp: active, items: itemsOf(active) })}
               deleting={active !== null && deletingId === active.id}
+              deleteError={deleteError && deleteError.id === active?.id ? deleteError.message : null}
             />
           </aside>
         </div>

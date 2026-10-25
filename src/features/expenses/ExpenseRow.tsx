@@ -117,17 +117,17 @@ export default function ExpenseRow(props: Props) {
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
             <RefundLinks group={group} expense={expense} />
+            {!isRefund(expense) && (
+              <Link to={paths.refundExpense(expense.id)} className="btn-outline w-full">
+                <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
+                Refund…
+              </Link>
+            )}
             <div className="flex gap-2">
               <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                 Edit
               </Link>
-              {!isRefund(expense) && (
-                <Link to={paths.refundExpense(expense.id)} className="btn-outline flex-1">
-                  <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
-                  Refund…
-                </Link>
-              )}
               <button
                 type="button"
                 disabled={props.deleting}

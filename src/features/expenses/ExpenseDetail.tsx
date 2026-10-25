@@ -21,10 +21,14 @@ interface Props {
   category?: string;
   onDelete: () => void;
   deleting?: boolean;
+  /** Why the last delete failed, shown beside the buttons. */
+  deleteError?: string | null;
 }
 
 /** Desktop detail pane for the selected expense. */
-export default function ExpenseDetail({ expense, items, group, viewerUid, category: given, onDelete, deleting = false }: Props) {
+export default function ExpenseDetail({
+  expense, items, group, viewerUid, category: given, onDelete, deleting = false, deleteError = null,
+}: Props) {
   if (!expense) {
     return <p className="m-auto text-center text-xs text-ink-muted">Select an expense to see its items.</p>;
   }
@@ -53,17 +57,19 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <RefundLinks group={group} expense={expense} />
-      <div className="mt-auto flex gap-2 pt-2">
+      <div className="mt-auto space-y-2 pt-2">
+      {deleteError && <p role="alert" className="text-sm text-negative">{deleteError}</p>}
+      {!refund && (
+        <Link to={paths.refundExpense(expense.id)} className="btn-outline w-full">
+          <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
+          Refund…
+        </Link>
+      )}
+      <div className="flex gap-2">
         <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
           <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
           Edit
         </Link>
-        {!refund && (
-          <Link to={paths.refundExpense(expense.id)} className="btn-outline flex-1">
-            <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
-            Refund…
-          </Link>
-        )}
         <button
           type="button"
           disabled={deleting}
@@ -73,6 +79,7 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
           <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
           Delete
         </button>
+      </div>
       </div>
       <p className="text-center text-xs text-ink-muted">Use ↑ ↓ to move between expenses · ? for all shortcuts</p>
     </div>

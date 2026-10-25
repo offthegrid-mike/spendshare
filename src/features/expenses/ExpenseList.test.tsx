@@ -271,7 +271,11 @@ describe('ExpenseList on desktop', () => {
       renderList();
       await deleteSelected();
       expect(commit).not.toHaveBeenCalled();
-      expect(await screen.findByText('This expense has refunds. Delete them first.')).toBeInTheDocument();
+      expect(await within(detail()).findByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
+
+      // The message belongs to that expense: selecting another one clears it.
+      await userEvent.click(screen.getByRole('option', { name: /Bunnings/ }));
+      expect(within(detail()).queryByRole('alert')).toBeNull();
     } finally {
       refundDocs.value = [];
     }
