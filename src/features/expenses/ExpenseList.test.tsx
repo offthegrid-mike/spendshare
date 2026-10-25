@@ -7,10 +7,9 @@ import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc, ShopEntry, SuggestionEntry } from '../../types/models';
 import { paths } from '../../lib/paths';
 
-const { commit, batchSet, writeCache, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
+const { commit, batchSet, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
   batchSet: vi.fn(),
-  writeCache: vi.fn(),
   openAddSheet: vi.fn(),
   desktop: { value: false },
   ui: { month: '2026-10' },
@@ -36,7 +35,6 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }) }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
-  writeCache,
 }));
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
@@ -232,7 +230,6 @@ describe('ExpenseList on desktop', () => {
       { items, shops, updatedAt: 'now' },
     );
     expect(batchSet.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
-    expect(writeCache).toHaveBeenCalledWith('g1', items, shops);
   });
 
   it('leaves the suggestions alone when they have not loaded yet', async () => {
@@ -241,7 +238,6 @@ describe('ExpenseList on desktop', () => {
     await deleteSelected();
     expect(commit).toHaveBeenCalled();
     expect(batchSet).not.toHaveBeenCalled();
-    expect(writeCache).not.toHaveBeenCalled();
   });
 
   it('ignores arrow keys another control already handled, such as the gear menu', async () => {

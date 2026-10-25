@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
-import { stageSuggestionsUpdate, type SuggestionLists } from '../../lib/suggestionsWrite';
+import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
 import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney } from '../../lib/money';
@@ -12,7 +12,7 @@ import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
-import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
+import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
@@ -164,10 +164,9 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       }
       // Take the deleted names out of the suggestions, as the editor does on save.
       // Skipped until they have loaded, so a stale [] baseline never overwrites them.
-      let nextSuggestions: SuggestionLists | null = null;
       if (suggestionsLoaded) {
         const shop = exp.shopName?.trim() ?? '';
-        nextSuggestions = stageSuggestionsUpdate(
+        stageSuggestionsUpdate(
           batch,
           group.id,
           { items: suggestions, shops: shopSuggestions },
@@ -176,7 +175,6 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
         );
       }
       await batch.commit();
-      if (nextSuggestions) writeCache(group.id, nextSuggestions.items, nextSuggestions.shops);
     } catch {
       setDeleteError('Failed to delete. Please try again.');
     } finally {

@@ -6,7 +6,6 @@ import { suggestionsDocRef } from '../../lib/converters';
 import { countSuggestionChanges, recountSuggestions, type SuggestionLists } from '../../lib/suggestions';
 import { stageSuggestions } from '../../lib/suggestionsWrite';
 import { useAllExpenses } from '../../hooks/useAllExpenses';
-import { writeCache } from '../../hooks/useItemSuggestions';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 interface Props { groupId: string; }
@@ -81,7 +80,6 @@ function RebuildRun({ groupId, active, stored, onStart }: RunProps) {
       const batch = writeBatch(db);
       stageSuggestions(batch, groupId, recount);
       await batch.commit();
-      writeCache(groupId, recount.items, recount.shops);
       setOutcome('rebuilt');
     } catch {
       setOutcome('failed');

@@ -1,25 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import type { SuggestionEntry, ShopEntry } from '../src/types/models';
 
 // ---------------------------------------------------------------------------
-// Hoisted mocks
+// Hoisted mocks: onSnapshot hands each listener to the test, which then plays
+// the snapshots Firestore would send.
 // ---------------------------------------------------------------------------
-const { getDoc } = vi.hoisted(() => ({ getDoc: vi.fn() }));
+type Snapshot = { exists: () => boolean; data: () => unknown; metadata: { fromCache: boolean } };
+type Listener = { path: string; next: (snap: Snapshot) => void; error: (err: Error) => void; unsubscribe: () => void };
 
-vi.mock('firebase/firestore', () => ({
-  getDoc: (...args: unknown[]) => getDoc(...args),
-  getFirestore: vi.fn(),
-  collection: vi.fn(),
-  doc: vi.fn((_db: unknown, path: string) => ({ path })),
-}));
+const { listeners, onSnapshot } = vi.hoisted(() => {
+  const listeners: Listener[] = [];
+  const onSnapshot = vi.fn(
+    (ref: { path: string }, _opts: unknown, next: Listener['next'], error: Listener['error']) => {
+      const listener = { path: ref.path, next, error, unsubscribe: vi.fn() };
+      listeners.push(listener);
+      return listener.unsubscribe;
+    },
+  );
+  return { listeners, onSnapshot };
+});
 
-vi.mock('../src/lib/firebase', () => ({ db: { _mock: true } }));
+vi.mock('firebase/firestore', () => ({ onSnapshot }));
 vi.mock('../src/lib/converters', () => ({
   suggestionsDocRef: vi.fn((gid: string) => ({ path: `groups/${gid}/suggestions/index` })),
 }));
 
-import { useItemSuggestions, writeCache } from '../src/hooks/useItemSuggestions';
+import { useItemSuggestions } from '../src/hooks/useItemSuggestions';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -29,115 +36,94 @@ const suggestions: SuggestionEntry[] = [
 ];
 const shops: ShopEntry[] = [{ name: 'Woolworths', count: 3 }];
 
-const CACHE_KEY = 'suggestions_g1';
+function snap(doc: { items?: SuggestionEntry[]; shops?: ShopEntry[] } | null, fromCache = false): Snapshot {
+  return { exists: () => doc !== null, data: () => doc, metadata: { fromCache } };
+}
+
+const latest = () => listeners[listeners.length - 1];
 
 describe('useItemSuggestions', () => {
   beforeEach(() => {
-    localStorage.clear();
+    listeners.length = 0;
     vi.clearAllMocks();
   });
 
-  it('returns [[], [], false] synchronously before async load completes', () => {
-    getDoc.mockReturnValue(new Promise(() => {}));
+  it('listens to the group suggestions, including metadata changes', () => {
+    renderHook(() => useItemSuggestions('g1'));
+    expect(latest().path).toBe('groups/g1/suggestions/index');
+    expect(onSnapshot.mock.calls[0][1]).toEqual({ includeMetadataChanges: true });
+  });
+
+  it('returns [[], [], false] before the first snapshot', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    expect(result.current[0]).toEqual([]);
-    expect(result.current[1]).toEqual([]);
+    expect(result.current).toEqual([[], [], false]);
+  });
+
+  it('loads items and shops from a server snapshot', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap({ items: suggestions, shops })));
+    expect(result.current).toEqual([suggestions, shops, true]);
+  });
+
+  it('treats a missing doc confirmed by the server as empty and loaded', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap(null)));
+    expect(result.current).toEqual([[], [], true]);
+  });
+
+  it('defaults a missing shops field to an empty list', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap({ items: suggestions })));
+    expect(result.current).toEqual([suggestions, [], true]);
+  });
+
+  it('does not trust a cached "no doc" snapshot until the server confirms it', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap(null, true)));
     expect(result.current[2]).toBe(false);
+
+    act(() => latest().next(snap({ items: suggestions, shops })));
+    expect(result.current).toEqual([suggestions, shops, true]);
   });
 
-  it('fetches from Firestore on cache miss and returns items+shops with loaded=true', async () => {
-    getDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ items: suggestions, shops }),
-    });
+  it('uses a cached copy of the doc, so it works offline', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual(suggestions);
-    expect(result.current[1]).toEqual(shops);
-    expect(getDoc).toHaveBeenCalledTimes(1);
+    act(() => latest().next(snap({ items: suggestions, shops }, true)));
+    expect(result.current).toEqual([suggestions, shops, true]);
   });
 
-  it('returns empty shops array when Firestore doc has no shops field', async () => {
-    getDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ items: suggestions }), // no shops field
-    });
+  it('follows later snapshots, such as another member saving', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[1]).toEqual([]);
+    act(() => latest().next(snap({ items: suggestions, shops })));
+
+    const updated: SuggestionEntry[] = [{ ...suggestions[0], count: 6 }];
+    act(() => latest().next(snap({ items: updated, shops })));
+
+    expect(result.current).toEqual([updated, shops, true]);
   });
 
-  it('reads from localStorage without calling Firestore when cache is fresh', async () => {
-    writeCache('g1', suggestions, shops);
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [], shops: [] }) });
+  it('stays not loaded on a listener error, so saves never write from an empty list', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual(suggestions);
-    expect(result.current[1]).toEqual(shops);
-    expect(getDoc).not.toHaveBeenCalled();
+    act(() => latest().error(new Error('permission-denied')));
+    expect(result.current).toEqual([[], [], false]);
   });
 
-  it('fetches from Firestore when cache is stale (>24 h)', async () => {
-    const stale = {
-      items: [{ name: 'Old', categoryId: 'x', category: 'X', count: 1 }],
-      shops: [],
-      cachedAt: Date.now() - 25 * 60 * 60 * 1000,
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(stale));
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual(suggestions);
-    expect(getDoc).toHaveBeenCalledTimes(1);
+  it("re-subscribes on a group switch and never shows the old group's lists as loaded", () => {
+    const { result, rerender } = renderHook(({ gid }) => useItemSuggestions(gid), { initialProps: { gid: 'g1' } });
+    const first = latest();
+    act(() => first.next(snap({ items: suggestions, shops })));
+
+    rerender({ gid: 'g2' });
+
+    expect(first.unsubscribe).toHaveBeenCalled();
+    expect(latest().path).toBe('groups/g2/suggestions/index');
+    expect(result.current).toEqual([[], [], false]);
   });
 
-  it('returns [[], [], true] and does not throw when Firestore errors', async () => {
-    getDoc.mockRejectedValue(new Error('offline'));
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual([]);
-    expect(result.current[1]).toEqual([]);
-  });
-
-  it('returns [[], [], true] when Firestore doc does not exist', async () => {
-    getDoc.mockResolvedValue({ exists: () => false });
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual([]);
-    expect(result.current[1]).toEqual([]);
-  });
-
-  it('writeCache stores items+shops and is readable by the hook', async () => {
-    writeCache('g1', suggestions, shops);
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: [], shops: [] }) });
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-    expect(result.current[0]).toEqual(suggestions);
-    expect(result.current[1]).toEqual(shops);
-    expect(getDoc).not.toHaveBeenCalled();
-  });
-
-  it('updates a mounted hook when writeCache is called for its group', async () => {
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-
-    const items: SuggestionEntry[] = [{ name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 }];
-    const nextShops: ShopEntry[] = [{ name: 'Coles', count: 1 }];
-    act(() => writeCache('g1', items, nextShops));
-
-    expect(result.current[0]).toEqual(items);
-    expect(result.current[1]).toEqual(nextShops);
-  });
-
-  it("ignores writeCache for another group", async () => {
-    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
-    const { result } = renderHook(() => useItemSuggestions('g1'));
-    await waitFor(() => expect(result.current[2]).toBe(true));
-
-    act(() => writeCache('g2', [], []));
-
-    expect(result.current[0]).toEqual(suggestions);
-    expect(result.current[1]).toEqual(shops);
+  it('unsubscribes on unmount', () => {
+    const { unmount } = renderHook(() => useItemSuggestions('g1'));
+    const listener = latest();
+    unmount();
+    expect(listener.unsubscribe).toHaveBeenCalled();
   });
 });

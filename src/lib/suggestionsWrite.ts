@@ -8,8 +8,8 @@ export interface SuggestionChange { items: ItemInput[]; shops: string[] }
 
 /**
  * Adds the group's updated suggestions to `batch`, so they commit with the
- * expense write that changed them, and returns the new lists. After the batch
- * commits, pass them to `writeCache` so mounted hooks and the cache follow.
+ * expense write that changed them, and returns the new lists. Mounted
+ * `useItemSuggestions` hooks pick the write up through their listener.
  */
 export function stageSuggestionsUpdate(
   batch: WriteBatch,

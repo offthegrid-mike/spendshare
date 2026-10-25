@@ -27,9 +27,8 @@ const { useCategories } = vi.hoisted(() => ({
   useCategories: vi.fn(),
 }));
 
-const { useItemSuggestions, writeCache } = vi.hoisted(() => ({
+const { useItemSuggestions } = vi.hoisted(() => ({
   useItemSuggestions: vi.fn(),
-  writeCache: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -54,7 +53,6 @@ vi.mock('../src/hooks/useCategories', () => ({
 
 vi.mock('../src/hooks/useItemSuggestions', () => ({
   useItemSuggestions: (...args: unknown[]) => useItemSuggestions(...args),
-  writeCache: (...args: unknown[]) => writeCache(...args),
 }));
 
 vi.mock('react-day-picker', () => ({

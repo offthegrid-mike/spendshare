@@ -14,17 +14,29 @@ vi.mock('../src/hooks/useSettlements', () => ({
 }));
 
 // --- Firestore mock ---
-const { mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit, mockGetDoc } = vi.hoisted(() => {
+// The suggestions doc lives in `stored`. Like Firestore, the listener gets it
+// when it subscribes and again whenever a committed batch writes it.
+type StoredSuggestions = { items: unknown[]; shops: unknown[] } | null;
+const { mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit, stored, listener } = vi.hoisted(() => {
   const mockBatchDelete = vi.fn();
   const mockBatchSet = vi.fn();
-  const mockBatchCommit = vi.fn().mockResolvedValue(undefined);
+  const mockBatchCommit = vi.fn();
   const mockBatch = vi.fn(() => ({ delete: mockBatchDelete, set: mockBatchSet, commit: mockBatchCommit }));
-  return { mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit, mockGetDoc: vi.fn() };
+  return {
+    mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit,
+    stored: { doc: null as StoredSuggestions, pending: null as StoredSuggestions },
+    listener: { next: null as ((snap: unknown) => void) | null },
+  };
 });
+const snapOf = (doc: StoredSuggestions) => ({ exists: () => doc !== null, data: () => doc, metadata: { fromCache: false } });
 
 vi.mock('firebase/firestore', () => ({
   writeBatch: mockBatch,
-  getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  onSnapshot: (_ref: unknown, _opts: unknown, next: (snap: unknown) => void) => {
+    listener.next = next;
+    queueMicrotask(() => next(snapOf(stored.doc)));
+    return () => { listener.next = null; };
+  },
   doc: vi.fn(),
   collection: vi.fn(),
   serverTimestamp: vi.fn(),
@@ -111,10 +123,16 @@ describe('ExpenseList', () => {
   beforeEach(() => {
     useMonthExpenses.mockReset();
     mockBatchDelete.mockReset();
-    mockBatchSet.mockReset();
-    localStorage.clear();
-    mockGetDoc.mockResolvedValue({ exists: () => false });
-    mockBatchCommit.mockReset().mockResolvedValue(undefined);
+    stored.doc = null;
+    stored.pending = null;
+    mockBatchSet.mockReset().mockImplementation((_ref: unknown, data: StoredSuggestions) => { stored.pending = data; });
+    mockBatchCommit.mockReset().mockImplementation(async () => {
+      if (stored.pending) {
+        stored.doc = stored.pending;
+        stored.pending = null;
+        listener.next?.(snapOf(stored.doc));
+      }
+    });
     mockBatch.mockClear();
   });
 
@@ -240,22 +258,19 @@ describe('ExpenseList', () => {
       itemsByExpense: { exp1: items1, exp2: items2 },
       loading: false,
     });
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({
-        items: [
-          { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 1 },
-          { name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 },
-          { name: 'Eggs', categoryId: 'cat1', category: 'Groceries', count: 1 },
-        ],
-        shops: [{ name: 'Woolworths', count: 1 }, { name: 'Coles', count: 1 }],
-      }),
-    });
+    stored.doc = {
+      items: [
+        { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 1 },
+        { name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 },
+        { name: 'Eggs', categoryId: 'cat1', category: 'Groceries', count: 1 },
+      ],
+      shops: [{ name: 'Woolworths', count: 1 }, { name: 'Coles', count: 1 }],
+    };
 
     const u = userEvent.setup();
     renderExpenseList();
     await screen.findByText(/Woolworths/i);
-    await waitFor(() => expect(mockGetDoc).toHaveBeenCalled());
+    await waitFor(() => expect(listener.next).not.toBeNull());
 
     for (const shop of [/Woolworths/i, /Coles/i]) {
       await u.click(screen.getByRole('button', { name: shop }));
