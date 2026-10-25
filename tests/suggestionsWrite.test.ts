@@ -14,11 +14,11 @@ const bread: SuggestionEntry = { name: 'Bread', categoryId: 'cat1', category: 'G
 const woolies: ShopEntry = { name: 'Woolworths', count: 1 };
 
 describe('stageSuggestionsUpdate', () => {
-  it('sets the new item and shop lists on the batch and returns them', () => {
+  it('sets the updated item and shop lists on the batch', () => {
     const set = vi.fn();
     const batch = { set } as unknown as WriteBatch;
 
-    const next = stageSuggestionsUpdate(
+    const result = stageSuggestionsUpdate(
       batch,
       'g1',
       { items: [milk, bread], shops: [woolies] },
@@ -26,13 +26,10 @@ describe('stageSuggestionsUpdate', () => {
       { items: [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries' }], shops: ['Coles'] },
     );
 
-    expect(next).toEqual({
-      items: [{ ...milk, count: 3 }],
-      shops: [{ name: 'Coles', count: 1 }],
-    });
+    expect(result).toBeUndefined();
     expect(set).toHaveBeenCalledWith(
       { path: 'groups/g1/suggestions/index' },
-      { ...next, updatedAt: 'SERVER_TIMESTAMP' },
+      { items: [{ ...milk, count: 3 }], shops: [{ name: 'Coles', count: 1 }], updatedAt: 'SERVER_TIMESTAMP' },
     );
   });
 

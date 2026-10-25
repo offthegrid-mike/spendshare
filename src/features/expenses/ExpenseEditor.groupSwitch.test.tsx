@@ -50,7 +50,6 @@ vi.mock('../../hooks/useCategories', () => ({
 }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [[], [], true],
-  writeCache: vi.fn(),
 }));
 
 const home = makeGroup('g1', 'Hartley House', ['Mike', 'Priya']);

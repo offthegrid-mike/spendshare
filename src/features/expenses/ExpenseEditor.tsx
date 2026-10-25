@@ -13,9 +13,9 @@ import { monthKey } from '../../lib/month';
 import { useCategories, fetchActiveCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
 import { carryEntry } from '../../lib/carryEntry';
-import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
+import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
-import { stageSuggestionsUpdate, type SuggestionLists } from '../../lib/suggestionsWrite';
+import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
@@ -429,7 +429,6 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
 
     // Suggestions delta — only written when the hook has finished loading to avoid
     // overwriting Firestore with a stale [] baseline on fast submits.
-    let nextSuggestions: SuggestionLists | null = null;
     if (suggestionsLoaded) {
       const oldItemInputs = (items ?? []).map((it) => ({
         name: it.name,
@@ -445,7 +444,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
       const newShop = data.shopName?.trim() ?? '';
       const removedShops = oldShop && oldShop !== newShop ? [oldShop] : [];
       const addedShops = newShop && newShop !== oldShop ? [newShop] : [];
-      nextSuggestions = stageSuggestionsUpdate(
+      stageSuggestionsUpdate(
         batch,
         group.id,
         { items: suggestions, shops: shopSuggestions },
@@ -455,7 +454,6 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
     }
 
     await batch.commit();
-    if (nextSuggestions) writeCache(group.id, nextSuggestions.items, nextSuggestions.shops);
     clearDraft(group.id);
     navigate(paths.spend);
     onSuccess?.();

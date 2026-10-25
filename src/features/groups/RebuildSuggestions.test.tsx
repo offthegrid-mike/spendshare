@@ -5,11 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { makeExpense, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SuggestionsDoc } from '../../types/models';
 
-const { getDocFromServer, set, commit, writeCache, history } = vi.hoisted(() => ({
+const { getDocFromServer, set, commit, history } = vi.hoisted(() => ({
   getDocFromServer: vi.fn(),
   set: vi.fn(),
   commit: vi.fn(),
-  writeCache: vi.fn(),
   history: {
     expenses: [] as ExpenseDoc[],
     itemsByExpense: {} as Record<string, ItemDoc[]>,
@@ -28,7 +27,6 @@ vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/converters', () => ({
   suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }),
 }));
-vi.mock('../../hooks/useItemSuggestions', () => ({ writeCache }));
 vi.mock('../../hooks/useAllExpenses', () => ({
   // Snapshots the history when it first loads, like the real one-shot fetch.
   useAllExpenses: (gid: string | null) => {
@@ -100,7 +98,6 @@ describe('RebuildSuggestions', () => {
       { ...recount, updatedAt: 'SERVER_TIMESTAMP' },
     );
     expect(commit).toHaveBeenCalled();
-    expect(writeCache).toHaveBeenCalledWith('g1', recount.items, recount.shops);
     expect(await screen.findByText('Autocomplete rebuilt.')).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
@@ -125,7 +122,6 @@ describe('RebuildSuggestions', () => {
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Rebuild' }));
 
     expect(await screen.findByText('Failed to rebuild. Please try again.')).toBeInTheDocument();
-    expect(writeCache).not.toHaveBeenCalled();
   });
 
   it('shows a load error and asks nothing when the suggestions cannot be read', async () => {
