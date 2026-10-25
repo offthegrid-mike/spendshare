@@ -4,6 +4,7 @@ import GroupSettings from './GroupSettings';
 import type { GroupDoc } from '../../types/models';
 
 vi.mock('../../lib/converters', () => ({ groupsCol: {} }));
+vi.mock('../../lib/firebase', () => ({ db: {} }));
 
 type MockFn<TArgs extends unknown[], TReturn> = ReturnType<typeof vi.fn> & ((...args: TArgs) => TReturn);
 const mockUpdateDoc = vi.fn() as MockFn<[unknown, unknown], Promise<void>>;
@@ -44,6 +45,11 @@ describe('GroupSettings', () => {
     render(<GroupSettings group={group} currentUserUid="u1" />);
     expect(screen.getByText('Alice')).toBeTruthy();
     expect(screen.getByText('Bob')).toBeTruthy();
+  });
+
+  it('offers to rebuild autocomplete to every member', () => {
+    render(<GroupSettings group={group} currentUserUid="u2" />);
+    expect(screen.getByRole('button', { name: 'Rebuild autocomplete' })).toBeInTheDocument();
   });
 
   it('shows Add member form for owner', () => {

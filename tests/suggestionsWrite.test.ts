@@ -7,7 +7,7 @@ vi.mock('../src/lib/converters', () => ({
   suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }),
 }));
 
-import { stageSuggestionsUpdate } from '../src/lib/suggestionsWrite';
+import { stageSuggestions, stageSuggestionsUpdate } from '../src/lib/suggestionsWrite';
 
 const milk: SuggestionEntry = { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 2 };
 const bread: SuggestionEntry = { name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 };
@@ -33,6 +33,16 @@ describe('stageSuggestionsUpdate', () => {
     expect(set).toHaveBeenCalledWith(
       { path: 'groups/g1/suggestions/index' },
       { ...next, updatedAt: 'SERVER_TIMESTAMP' },
+    );
+  });
+
+  it('stageSuggestions replaces the whole suggestions doc', () => {
+    const set = vi.fn();
+    const lists = { items: [milk], shops: [woolies] };
+    stageSuggestions({ set } as unknown as WriteBatch, 'g1', lists);
+    expect(set).toHaveBeenCalledWith(
+      { path: 'groups/g1/suggestions/index' },
+      { ...lists, updatedAt: 'SERVER_TIMESTAMP' },
     );
   });
 });

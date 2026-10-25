@@ -1,4 +1,4 @@
-import type { SuggestionEntry, ShopEntry } from '../types/models';
+import type { ExpenseDoc, ItemDoc, SuggestionEntry, ShopEntry } from '../types/models';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 export type ItemInput = { name: string; categoryId: string; category: string };
@@ -77,4 +77,43 @@ export function computeShopsDelta(
   }
 
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[] }
+
+/**
+ * Recounts the suggestions from a group's whole history. Expenses are replayed
+ * oldest first, so the newest casing and category name win, as they would have
+ * if every expense had been added one at a time.
+ */
+export function rebuildSuggestions(
+  expenses: ExpenseDoc[],
+  itemsByExpense: Record<string, ItemDoc[]>,
+): SuggestionLists {
+  const oldestFirst = [...expenses].sort((a, b) => a.date.toMillis() - b.date.toMillis());
+  return {
+    items: computeSuggestionsDelta([], [], oldestFirst.flatMap((exp) => itemsByExpense[exp.id] ?? [])),
+    shops: computeShopsDelta([], [], oldestFirst.map((exp) => exp.shopName.trim()).filter(Boolean)),
+  };
+}
+
+/** How many item and shop entries differ in count between two sets of suggestions. */
+export function countSuggestionChanges(
+  current: SuggestionLists,
+  next: SuggestionLists,
+): { items: number; shops: number } {
+  return {
+    items: countChanged(current.items, next.items, (e) => makeKey(e.name, e.categoryId)),
+    shops: countChanged(current.shops, next.shops, (e) => normalizeNameKey(e.name)),
+  };
+}
+
+function countChanged<T extends { count: number }>(current: T[], next: T[], key: (entry: T) => string): number {
+  const before = new Map(current.map((e) => [key(e), e.count]));
+  const after = new Map(next.map((e) => [key(e), e.count]));
+  let changed = 0;
+  for (const k of new Set([...before.keys(), ...after.keys()])) {
+    if (before.get(k) !== after.get(k)) changed += 1;
+  }
+  return changed;
 }
