@@ -154,3 +154,63 @@ describe('computeShopsDelta', () => {
     expect(result[1].name).toBe('Coles');
   });
 });
+
+import { countSuggestionChanges, recountSuggestions } from '../src/lib/suggestions';
+import { makeExpense, makeItem } from '../src/test/fixtures';
+
+describe('recountSuggestions', () => {
+  // Newest first, as useAllExpenses returns them.
+  const newer = makeExpense('e2', { shopName: 'woolworths ', day: '2026-10-05' });
+  const older = makeExpense('e1', { shopName: 'Woolworths', day: '2026-10-01' });
+  const blankShop = makeExpense('e3', { shopName: '  ', day: '2026-10-02' });
+  const itemsByExpense = {
+    e1: [makeItem('i1', 'e1', { name: 'milk', categoryId: 'cat1', category: 'Dairy' }), makeItem('i2', 'e1', { name: 'Bread', categoryId: 'cat1', category: 'Dairy' })],
+    e2: [makeItem('i3', 'e2', { name: 'Milk ', categoryId: 'cat1', category: 'Groceries' })],
+    e3: [makeItem('i4', 'e3', { name: 'Milk', categoryId: 'cat2', category: 'Other' })],
+  };
+
+  it('counts every item and shop across the history', () => {
+    const { items, shops } = recountSuggestions([newer, blankShop, older], itemsByExpense);
+    expect(items).toEqual([
+      { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 2 },
+      { name: 'Bread', categoryId: 'cat1', category: 'Dairy', count: 1 },
+      { name: 'Milk', categoryId: 'cat2', category: 'Other', count: 1 },
+    ]);
+    expect(shops).toEqual([{ name: 'woolworths', count: 2 }]);
+  });
+
+  it('gives empty lists for an empty history', () => {
+    expect(recountSuggestions([], {})).toEqual({ items: [], shops: [] });
+  });
+});
+
+describe('countSuggestionChanges', () => {
+  const current = {
+    items: [milk, bread],
+    shops: [{ name: 'Coles', count: 2 }, { name: 'Aldi', count: 1 }],
+  };
+
+  it('is zero when the lists hold the same entries in another order', () => {
+    const same = {
+      items: [{ ...bread }, { ...milk }],
+      shops: [{ name: 'Aldi', count: 1 }, { name: 'Coles', count: 2 }],
+    };
+    expect(countSuggestionChanges(current, same)).toEqual({ items: 0, shops: 0 });
+  });
+
+  it('counts a changed name casing or category name as a change', () => {
+    const renamed = {
+      items: [{ ...milk, name: 'MILK' }, { ...bread, category: 'Bakery' }],
+      shops: [{ name: 'aldi', count: 1 }, { name: 'Coles', count: 2 }],
+    };
+    expect(countSuggestionChanges(current, renamed)).toEqual({ items: 2, shops: 1 });
+  });
+
+  it('counts entries that were added, removed or changed', () => {
+    const next = {
+      items: [{ ...milk, count: 1 }, { name: 'Eggs', categoryId: 'cat1', category: 'Groceries', count: 1 }],
+      shops: [{ name: 'Coles', count: 2 }],
+    };
+    expect(countSuggestionChanges(current, next)).toEqual({ items: 3, shops: 1 });
+  });
+});

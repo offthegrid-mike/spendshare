@@ -1,9 +1,9 @@
 import { serverTimestamp, type WithFieldValue, type WriteBatch } from 'firebase/firestore';
 import { suggestionsDocRef } from './converters';
-import { computeShopsDelta, computeSuggestionsDelta, type ItemInput } from './suggestions';
-import type { ShopEntry, SuggestionEntry, SuggestionsDoc } from '../types/models';
+import { computeShopsDelta, computeSuggestionsDelta, type ItemInput, type SuggestionLists } from './suggestions';
+import type { SuggestionsDoc } from '../types/models';
 
-export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[] }
+export type { SuggestionLists };
 export interface SuggestionChange { items: ItemInput[]; shops: string[] }
 
 /**
@@ -22,6 +22,11 @@ export function stageSuggestionsUpdate(
     items: computeSuggestionsDelta(current.items, removed.items, added.items),
     shops: computeShopsDelta(current.shops, removed.shops, added.shops),
   };
-  batch.set(suggestionsDocRef(groupId), { ...next, updatedAt: serverTimestamp() } as WithFieldValue<SuggestionsDoc>);
+  stageSuggestions(batch, groupId, next);
   return next;
+}
+
+/** Adds a write to `batch` that replaces the group's suggestions with `lists`. */
+export function stageSuggestions(batch: WriteBatch, groupId: string, lists: SuggestionLists): void {
+  batch.set(suggestionsDocRef(groupId), { ...lists, updatedAt: serverTimestamp() } as WithFieldValue<SuggestionsDoc>);
 }
