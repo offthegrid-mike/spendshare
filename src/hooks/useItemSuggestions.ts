@@ -11,6 +11,10 @@ function cacheKey(groupId: string) {
 
 type CacheData = { items: SuggestionEntry[]; shops: ShopEntry[] };
 
+// Mounted hooks, by group, so a write reaches every component that already
+// loaded the suggestions, not just the next one to read the cache.
+const listeners = new Map<string, Set<(data: CacheData) => void>>();
+
 function readCache(groupId: string): CacheData | null {
   try {
     const raw = localStorage.getItem(cacheKey(groupId));
@@ -31,6 +35,7 @@ export function writeCache(groupId: string, items: SuggestionEntry[], shops: Sho
   } catch {
     // ignore storage quota errors
   }
+  listeners.get(groupId)?.forEach((notify) => notify({ items, shops }));
 }
 
 export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEntry[], boolean] {
@@ -40,6 +45,14 @@ export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEnt
 
   useEffect(() => {
     let cancelled = false;
+
+    const onWrite = (data: CacheData) => {
+      setSuggestions(data.items);
+      setShops(data.shops);
+      setLoaded(true);
+    };
+    const groupListeners = listeners.get(groupId) ?? new Set();
+    listeners.set(groupId, groupListeners.add(onWrite));
 
     const cached = readCache(groupId);
     const load: Promise<CacheData> = cached
@@ -65,6 +78,8 @@ export function useItemSuggestions(groupId: string): [SuggestionEntry[], ShopEnt
 
     return () => {
       cancelled = true;
+      groupListeners.delete(onWrite);
+      if (groupListeners.size === 0) listeners.delete(groupId);
     };
   }, [groupId]);
 

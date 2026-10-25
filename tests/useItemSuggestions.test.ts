@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { SuggestionEntry, ShopEntry } from '../src/types/models';
 
 // ---------------------------------------------------------------------------
@@ -115,5 +115,29 @@ describe('useItemSuggestions', () => {
     expect(result.current[0]).toEqual(suggestions);
     expect(result.current[1]).toEqual(shops);
     expect(getDoc).not.toHaveBeenCalled();
+  });
+
+  it('updates a mounted hook when writeCache is called for its group', async () => {
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    await waitFor(() => expect(result.current[2]).toBe(true));
+
+    const items: SuggestionEntry[] = [{ name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 }];
+    const nextShops: ShopEntry[] = [{ name: 'Coles', count: 1 }];
+    act(() => writeCache('g1', items, nextShops));
+
+    expect(result.current[0]).toEqual(items);
+    expect(result.current[1]).toEqual(nextShops);
+  });
+
+  it("ignores writeCache for another group", async () => {
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ items: suggestions, shops }) });
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    await waitFor(() => expect(result.current[2]).toBe(true));
+
+    act(() => writeCache('g2', [], []));
+
+    expect(result.current[0]).toEqual(suggestions);
+    expect(result.current[1]).toEqual(shops);
   });
 });

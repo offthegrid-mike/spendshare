@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { Timestamp } from 'firebase/firestore';
@@ -14,12 +14,17 @@ vi.mock('../src/hooks/useSettlements', () => ({
 }));
 
 // --- Firestore mock ---
-const mockBatchDelete = vi.fn();
-const mockBatchCommit = vi.fn().mockResolvedValue(undefined);
-const mockBatch = vi.fn(() => ({ delete: mockBatchDelete, commit: mockBatchCommit }));
+const { mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit, mockGetDoc } = vi.hoisted(() => {
+  const mockBatchDelete = vi.fn();
+  const mockBatchSet = vi.fn();
+  const mockBatchCommit = vi.fn().mockResolvedValue(undefined);
+  const mockBatch = vi.fn(() => ({ delete: mockBatchDelete, set: mockBatchSet, commit: mockBatchCommit }));
+  return { mockBatch, mockBatchDelete, mockBatchSet, mockBatchCommit, mockGetDoc: vi.fn() };
+});
 
 vi.mock('firebase/firestore', () => ({
   writeBatch: mockBatch,
+  getDoc: (...args: unknown[]) => mockGetDoc(...args),
   doc: vi.fn(),
   collection: vi.fn(),
   serverTimestamp: vi.fn(),
@@ -31,7 +36,6 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('../src/lib/firebase', () => ({ db: {} }));
 vi.mock('../src/lib/converters', () => ({ suggestionsDocRef: vi.fn() }));
-vi.mock('../src/hooks/useItemSuggestions', () => ({ useItemSuggestions: () => [[], [], false], writeCache: vi.fn() }));
 vi.mock('../src/lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
 
 // --- Import component after mocks ---
@@ -107,6 +111,9 @@ describe('ExpenseList', () => {
   beforeEach(() => {
     useMonthExpenses.mockReset();
     mockBatchDelete.mockReset();
+    mockBatchSet.mockReset();
+    localStorage.clear();
+    mockGetDoc.mockResolvedValue({ exists: () => false });
     mockBatchCommit.mockReset().mockResolvedValue(undefined);
     mockBatch.mockClear();
   });
@@ -223,6 +230,42 @@ describe('ExpenseList', () => {
     await u.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     expect(mockBatchCommit).toHaveBeenCalled();
+  });
+
+  it('keeps the first delete\'s suggestion counts when a second expense is deleted', async () => {
+    const expense2 = { ...expense1, id: 'exp2', shopName: 'Coles' };
+    const items2: ItemDoc[] = [{ ...items1[0], id: 'i3', expenseId: 'exp2', name: 'Eggs' }];
+    useMonthExpenses.mockReturnValue({
+      expenses: [expense1, expense2],
+      itemsByExpense: { exp1: items1, exp2: items2 },
+      loading: false,
+    });
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        items: [
+          { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 1 },
+          { name: 'Bread', categoryId: 'cat1', category: 'Groceries', count: 1 },
+          { name: 'Eggs', categoryId: 'cat1', category: 'Groceries', count: 1 },
+        ],
+        shops: [{ name: 'Woolworths', count: 1 }, { name: 'Coles', count: 1 }],
+      }),
+    });
+
+    const u = userEvent.setup();
+    renderExpenseList();
+    await screen.findByText(/Woolworths/i);
+    await waitFor(() => expect(mockGetDoc).toHaveBeenCalled());
+
+    for (const shop of [/Woolworths/i, /Coles/i]) {
+      await u.click(screen.getByRole('button', { name: shop }));
+      await u.click(screen.getByRole('button', { name: /delete/i }));
+      await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /^delete$/i }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    }
+
+    expect(mockBatchSet).toHaveBeenCalledTimes(2);
+    expect(mockBatchSet.mock.calls[1][1]).toMatchObject({ items: [], shops: [] });
   });
 
   it('renders an edit link pointing to /expense/:id/edit once the row is expanded', async () => {

@@ -1,7 +1,7 @@
 import type { SuggestionEntry, ShopEntry } from '../types/models';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
-type ItemInput = { name: string; categoryId: string; category: string };
+export type ItemInput = { name: string; categoryId: string; category: string };
 
 function makeKey(name: string, categoryId: string): string {
   return normalizeNameKey(name) + '|' + categoryId;

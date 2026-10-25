@@ -6,7 +6,7 @@ import { writeBatch, doc, serverTimestamp, Timestamp, type WithFieldValue } from
 import { ArrowLeftRight, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Gift, History, ScanLine } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { db } from '../../lib/firebase';
-import { expensesCol, itemsCol, suggestionsDocRef } from '../../lib/converters';
+import { expensesCol, itemsCol } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
 import { collapseWhitespace } from '../../lib/textNormalize';
 import { monthKey } from '../../lib/month';
@@ -15,10 +15,10 @@ import { useUIStore } from '../../stores/uiStore';
 import { carryEntry } from '../../lib/carryEntry';
 import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
-import { computeSuggestionsDelta, computeShopsDelta } from '../../lib/suggestions';
+import { stageSuggestionsUpdate, type SuggestionLists } from '../../lib/suggestionsWrite';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
-import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc, SuggestionEntry, ShopEntry } from '../../types/models';
+import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
@@ -429,8 +429,7 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
 
     // Suggestions delta — only written when the hook has finished loading to avoid
     // overwriting Firestore with a stale [] baseline on fast submits.
-    let newSuggestions: SuggestionEntry[] | null = null;
-    let newShops: ShopEntry[] | null = null;
+    let nextSuggestions: SuggestionLists | null = null;
     if (suggestionsLoaded) {
       const oldItemInputs = (items ?? []).map((it) => ({
         name: it.name,
@@ -442,23 +441,21 @@ export default function ExpenseEditor({ group, groups, user, currentUserUid, exp
         categoryId: it.categoryId,
         category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
       }));
-      newSuggestions = computeSuggestionsDelta(suggestions, oldItemInputs, newItemInputs);
-
       const oldShop = expense?.shopName?.trim() ?? '';
       const newShop = data.shopName?.trim() ?? '';
       const removedShops = oldShop && oldShop !== newShop ? [oldShop] : [];
       const addedShops = newShop && newShop !== oldShop ? [newShop] : [];
-      newShops = computeShopsDelta(shopSuggestions, removedShops, addedShops);
-
-      batch.set(suggestionsDocRef(group.id), {
-        items: newSuggestions,
-        shops: newShops,
-        updatedAt: serverTimestamp(),
-      } as WithFieldValue<SuggestionsDoc>);
+      nextSuggestions = stageSuggestionsUpdate(
+        batch,
+        group.id,
+        { items: suggestions, shops: shopSuggestions },
+        { items: oldItemInputs, shops: removedShops },
+        { items: newItemInputs, shops: addedShops },
+      );
     }
 
     await batch.commit();
-    if (newSuggestions !== null && newShops !== null) writeCache(group.id, newSuggestions, newShops);
+    if (nextSuggestions) writeCache(group.id, nextSuggestions.items, nextSuggestions.shops);
     clearDraft(group.id);
     navigate(paths.spend);
     onSuccess?.();

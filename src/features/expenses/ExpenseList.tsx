@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
-import { suggestionsDocRef } from '../../lib/converters';
-import { computeShopsDelta, computeSuggestionsDelta } from '../../lib/suggestions';
+import { stageSuggestionsUpdate, type SuggestionLists } from '../../lib/suggestionsWrite';
 import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney } from '../../lib/money';
@@ -22,7 +21,7 @@ import CategoryFilter from './CategoryFilter';
 import { categoriesBySpend, filterByCategory } from './filterByCategory';
 import ExpenseRow from './ExpenseRow';
 import ExpenseDetail from './ExpenseDetail';
-import type { GroupDoc, ExpenseDoc, ItemDoc, SuggestionsDoc } from '../../types/models';
+import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
 
 interface Props { group: GroupDoc; currentUserUid: string; }
 
@@ -157,7 +156,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     setDeletingId(exp.id);
     setDeleteError(null);
     try {
-      const { writeBatch, doc, collection, serverTimestamp } = await import('firebase/firestore');
+      const { writeBatch, doc, collection } = await import('firebase/firestore');
       const batch = writeBatch(db);
       batch.delete(doc(collection(db, `groups/${group.id}/expenses`), exp.id));
       for (const item of items) {
@@ -165,17 +164,19 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       }
       // Take the deleted names out of the suggestions, as the editor does on save.
       // Skipped until they have loaded, so a stale [] baseline never overwrites them.
-      let next: Pick<SuggestionsDoc, 'items' | 'shops'> | null = null;
+      let nextSuggestions: SuggestionLists | null = null;
       if (suggestionsLoaded) {
         const shop = exp.shopName?.trim() ?? '';
-        next = {
-          items: computeSuggestionsDelta(suggestions, items, []),
-          shops: computeShopsDelta(shopSuggestions, shop ? [shop] : [], []),
-        };
-        batch.set(suggestionsDocRef(group.id), { ...next, updatedAt: serverTimestamp() });
+        nextSuggestions = stageSuggestionsUpdate(
+          batch,
+          group.id,
+          { items: suggestions, shops: shopSuggestions },
+          { items, shops: shop ? [shop] : [] },
+          { items: [], shops: [] },
+        );
       }
       await batch.commit();
-      if (next) writeCache(group.id, next.items, next.shops);
+      if (nextSuggestions) writeCache(group.id, nextSuggestions.items, nextSuggestions.shops);
     } catch {
       setDeleteError('Failed to delete. Please try again.');
     } finally {

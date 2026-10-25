@@ -198,23 +198,22 @@ describe('ExpenseList on desktop', () => {
     expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
   });
 
-  it('deletes the selected expense from the detail pane after confirming', async () => {
-    renderList();
-    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Woolworths');
-    await act(async () => {
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    });
-    expect(commit).toHaveBeenCalled();
-  });
-
   async function deleteSelected() {
     await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
     await act(async () => {
       await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
     });
   }
+
+  it('deletes the selected expense from the detail pane after confirming', async () => {
+    renderList();
+    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Woolworths');
+    await act(async () => {
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    });
+    expect(commit).toHaveBeenCalled();
+  });
 
   it("lowers the deleted expense's item and shop suggestion counts in the same batch", async () => {
     suggestions.items = [
