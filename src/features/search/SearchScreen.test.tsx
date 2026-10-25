@@ -6,8 +6,15 @@ import SearchScreen from './SearchScreen';
 import { paths } from '../../lib/paths';
 
 const mockUseAllExpenses = vi.fn();
+const loadedFor: (string | null)[] = [];
 vi.mock('../../hooks/useAllExpenses', () => ({
-  useAllExpenses: () => mockUseAllExpenses(),
+  // No group means nothing is loaded, as in the real hook.
+  useAllExpenses: (gid: string | null) => {
+    loadedFor.push(gid);
+    return gid === null
+      ? { expenses: [], itemsByExpense: {}, loading: false, error: null }
+      : mockUseAllExpenses(gid);
+  },
 }));
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -69,7 +76,32 @@ function ExpenseRoute() {
 
 describe('SearchScreen', () => {
   beforeEach(() => {
+    loadedFor.length = 0;
     mockUseAllExpenses.mockReturnValue({ expenses, itemsByExpense, loading: false, error: null });
+  });
+
+  it('loads no history until something is typed', async () => {
+    renderScreen();
+    expect(loadedFor.every((gid) => gid === null)).toBe(true);
+
+    await userEvent.type(screen.getByRole('searchbox'), 'w');
+    expect(loadedFor).toContain('g1');
+  });
+
+  it('loads the history straight away for a query restored from browser history', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: paths.search, state: { query: 'wool', scrollY: 0 } }]}>
+        <Routes>
+          <Route path={paths.search} element={<SearchScreen group={mockGroup} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(loadedFor[0]).toBe('g1');
+  });
+
+  it('loads the history straight away for a ?q= query', () => {
+    renderScreen(`${paths.search}?q=wool`);
+    expect(loadedFor[0]).toBe('g1');
   });
 
   it('starts from the ?q= query handed over by the desktop search bar', () => {
@@ -150,7 +182,7 @@ describe('SearchScreen', () => {
 
   it('shows skeletons while loading', () => {
     mockUseAllExpenses.mockReturnValue({ expenses: [], itemsByExpense: {}, loading: true, error: null });
-    renderScreen();
+    renderScreen(`${paths.search}?q=wool`);
     expect(document.querySelectorAll('.animate-pulse').length).toBe(3);
   });
 
@@ -232,7 +264,7 @@ describe('SearchScreen', () => {
     mockUseAllExpenses.mockReturnValue({
       expenses: [], itemsByExpense: {}, loading: false, error: 'Could not load expenses. Please try again.',
     });
-    renderScreen();
+    renderScreen(`${paths.search}?q=wool`);
     expect(screen.getByText(/could not load expenses/i)).toBeTruthy();
   });
 });

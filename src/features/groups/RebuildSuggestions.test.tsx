@@ -15,6 +15,7 @@ const { getDocFromServer, set, commit, history } = vi.hoisted(() => ({
     loading: false,
     error: null as string | null,
     calledWith: [] as (string | null)[],
+    fresh: [] as (boolean | undefined)[],
   },
 }));
 
@@ -29,8 +30,9 @@ vi.mock('../../lib/converters', () => ({
 }));
 vi.mock('../../hooks/useAllExpenses', () => ({
   // Snapshots the history when it first loads, like the real one-shot fetch.
-  useAllExpenses: (gid: string | null) => {
+  useAllExpenses: (gid: string | null, opts?: { fresh?: boolean }) => {
     history.calledWith.push(gid);
+    history.fresh.push(opts?.fresh);
     const [fetched] = useState(() => (gid === null ? null : { ...history }));
     return gid === null || fetched === null
       ? { expenses: [], itemsByExpense: {}, loading: gid !== null, error: null }
@@ -61,9 +63,18 @@ beforeEach(() => {
   history.loading = false;
   history.error = null;
   history.calledWith = [];
+  history.fresh = [];
 });
 
 describe('RebuildSuggestions', () => {
+  it('always loads the history fresh, never from the shared copy', async () => {
+    getDocFromServer.mockResolvedValue(suggestionsSnap(recount));
+    render(<RebuildSuggestions groupId="g1" />);
+    await userEvent.click(rebuildButton());
+    await screen.findByText('Autocomplete is already up to date.');
+    expect(history.fresh.every((f) => f === true)).toBe(true);
+  });
+
   it('loads nothing until the button is pressed', () => {
     render(<RebuildSuggestions groupId="g1" />);
     expect(history.calledWith.every((gid) => gid === null)).toBe(true);

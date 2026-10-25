@@ -49,14 +49,17 @@ export default function SearchScreen({ group }: Props) {
   const [adoptedQuery, setAdoptedQuery] = useState(initialQuery);
   const [draft, setDraft] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
+  // The whole history is only loaded once there is something to search for.
+  const [wanted, setWanted] = useState(initialQuery.trim() !== '');
   const initialScrollY = useRef(historyState?.scrollY);
   if (initialQuery !== adoptedQuery) {
     setAdoptedQuery(initialQuery);
     setDraft(initialQuery);
     setQuery(initialQuery);
+    if (initialQuery.trim() !== '') setWanted(true);
   }
   const composing = useRef(false);
-  const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
+  const { expenses, itemsByExpense, loading, error } = useAllExpenses(wanted ? group.id : null);
 
   const saveHistoryState = useCallback((nextQuery: string) => {
     navigate(
@@ -67,6 +70,7 @@ export default function SearchScreen({ group }: Props) {
 
   const commit = useCallback((value: string) => {
     setQuery(value);
+    if (value.trim() !== '') setWanted(true);
     saveHistoryState(value);
   }, [saveHistoryState]);
 
