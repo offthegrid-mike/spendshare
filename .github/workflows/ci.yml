@@ -25,3 +25,27 @@ jobs:
           VITE_FB_STORAGE_BUCKET: ci-dummy
           VITE_FB_SENDER_ID: ci-dummy
           VITE_FB_APP_ID: ci-dummy
+  rules-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      # The Firestore emulator is a Java program.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      # Key the emulator cache on the exact firebase-tools release, so a new 15.x
+      # emulator gets cached too. Keep the major in step with test:rules:ci.
+      - id: firebase-tools
+        run: echo "version=$(npm view firebase-tools@15 version --json | jq -r 'if type == "array" then .[-1] else . end')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ steps.firebase-tools.outputs.version }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - run: npm ci
+      - run: npm run test:rules:ci
