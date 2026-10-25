@@ -283,6 +283,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
                     onToggle={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
                     onDelete={() => setPendingDelete({ exp, items: itemsOf(exp) })}
                     deleting={deletingId === exp.id}
+                    deleteError={deleteError?.id === exp.id ? deleteError.message : null}
                   />
                 ),
               )}
@@ -291,8 +292,6 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
         ))
       )}
 
-      {/* On desktop the detail pane shows it, beside the Delete button. */}
-      {deleteError && !isDesktop && <p className="pt-2 text-sm text-negative">{deleteError.message}</p>}
     </div>
   );
 

@@ -25,7 +25,11 @@ interface Common {
 
 type Props = Common &
   (
-    | { mode: 'disclosure'; expanded: boolean; onToggle: () => void; onDelete: () => void; deleting?: boolean }
+    | {
+        mode: 'disclosure'; expanded: boolean; onToggle: () => void; onDelete: () => void; deleting?: boolean;
+        /** Why the last delete of this expense failed, shown beside its Delete button. */
+        deleteError?: string | null;
+      }
     | { mode: 'option'; selected: boolean; onSelect: () => void }
   );
 
@@ -118,6 +122,7 @@ export default function ExpenseRow(props: Props) {
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
             <RefundLinks group={group} expense={expense} />
+            {props.deleteError && <p role="alert" className="text-sm text-negative">{props.deleteError}</p>}
             <RefundButton group={group} expense={expense} />
             <div className="flex gap-2">
               <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">

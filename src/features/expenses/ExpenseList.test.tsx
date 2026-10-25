@@ -169,6 +169,23 @@ describe('ExpenseList', () => {
     expect(screen.queryByText('Bananas')).toBeNull();
     expect(screen.getByText('Potting mix')).toBeInTheDocument();
   });
+
+  it("shows a refused delete beside the expanded row's Delete button on mobile", async () => {
+    refundDocs.value = [{ id: 'r1' }];
+    try {
+      renderList();
+      await userEvent.click(screen.getByRole('button', { name: /Woolworths/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await act(async () => {
+        await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+      });
+      const region = document.getElementById('expense-e1-details')!;
+      expect(await within(region).findByRole('alert')).toHaveTextContent('This expense has refunds. Delete them first.');
+      expect(screen.getAllByText('This expense has refunds. Delete them first.')).toHaveLength(1);
+    } finally {
+      refundDocs.value = [];
+    }
+  });
 });
 
 describe('ExpenseList on desktop', () => {
