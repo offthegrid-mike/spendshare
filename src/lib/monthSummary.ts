@@ -1,9 +1,10 @@
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 import { categoryTotals, type CategoryTotal } from './yearSummary';
+import { isRefund, signedAmount } from './refund';
 import type { ExpenseDoc, IncomeDoc, ItemDoc } from '../types/models';
 
-export type MonthItem = Pick<ItemDoc, 'expenseId' | 'category' | 'amount'>;
-export type MonthExpense = Pick<ExpenseDoc, 'id' | 'shopName'>;
+export type MonthItem = Pick<ItemDoc, 'expenseId' | 'category' | 'amount' | 'refund'>;
+export type MonthExpense = Pick<ExpenseDoc, 'id' | 'shopName' | 'kind'>;
 /** An expense of the previous month, whose date places its items within the month. */
 export type PrevExpense = Pick<ExpenseDoc, 'id' | 'date'>;
 
@@ -47,7 +48,7 @@ export interface MonthBreakdownInput {
 
 const TOP_SHOPS = 5;
 
-const total = (items: MonthItem[]) => items.reduce((sum, it) => sum + Math.round(it.amount), 0);
+const total = (items: MonthItem[]) => items.reduce((sum, it) => sum + signedAmount(it), 0);
 const percentChange = (now: number, before: number) => ((now - before) * 100) / before;
 
 /** The items of expenses dated on or before `day` of their month; all of them for null. Undated items are left out. */
@@ -77,21 +78,24 @@ export function computeMonthBreakdown({
 
   const spentByExpense = new Map<string, number>();
   for (const it of items) {
-    spentByExpense.set(it.expenseId, (spentByExpense.get(it.expenseId) ?? 0) + Math.round(it.amount));
+    spentByExpense.set(it.expenseId, (spentByExpense.get(it.expenseId) ?? 0) + signedAmount(it));
   }
   const expenseById = new Map(expenses.map((e) => [e.id, e]));
   // Biggest first, ties by name, so what is shown doesn't depend on snapshot order.
   const visits = [...spentByExpense].flatMap(([id, amount]) => {
     const expense = expenseById.get(id);
-    return expense ? [{ id, amount, shopName: collapseWhitespace(expense.shopName) || 'Unnamed shop' }] : [];
+    return expense
+      ? [{ id, amount, refund: isRefund(expense), shopName: collapseWhitespace(expense.shopName) || 'Unnamed shop' }]
+      : [];
   }).sort((a, b) => b.amount - a.amount || a.shopName.localeCompare(b.shopName) || a.id.localeCompare(b.id));
 
   const shops = new Map<string, ShopTotal>();
-  for (const { amount, shopName } of visits) {
+  for (const { amount, shopName, refund } of visits) {
     const key = normalizeNameKey(shopName);
     const shop = shops.get(key) ?? { shopName, amount: 0, visits: 0 };
     shop.amount += amount;
-    shop.visits += 1;
+    // A refund comes off the shop's total but isn't another visit.
+    if (!refund) shop.visits += 1;
     shops.set(key, shop);
   }
   const topShops = [...shops.values()]

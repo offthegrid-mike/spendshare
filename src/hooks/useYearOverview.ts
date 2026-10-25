@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { onSnapshot, query, where } from 'firebase/firestore';
 import { settlementsCol } from '../lib/converters';
 import { computeSummary, type Summary } from '../lib/settlement';
+import { signedAmount } from '../lib/refund';
 import { useYearItems } from './useYearItems';
 import type { SettlementDoc } from '../types/models';
 
@@ -58,7 +59,7 @@ export function useYearOverview(
     let sum = 0;
     for (const month of new Set([...itemsByMonth.keys(), ...settlementsByMonth.keys()])) {
       const monthItems = itemsByMonth.get(month) ?? [];
-      const spent = monthItems.reduce((s, it) => s + Math.round(it.amount), 0);
+      const spent = monthItems.reduce((s, it) => s + signedAmount(it), 0);
       out[month] = { spent, summary: computeSummary(memberUids, monthItems, settlementsByMonth.get(month) ?? []) };
       sum += spent;
     }

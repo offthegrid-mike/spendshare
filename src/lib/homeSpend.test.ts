@@ -58,3 +58,13 @@ describe('spendTileFigures', () => {
     });
   });
 });
+
+describe('spendTileFigures with refunds', () => {
+  it('takes refunds off what was spent', () => {
+    const items = [
+      { amount: 10000, shared: true, payerUid: 'mike' },
+      { amount: 2500, shared: true, payerUid: 'mike', refund: true },
+    ];
+    expect(spendTileFigures(group, 'mike', items, [], '2026-10').spent).toBe(7500);
+  });
+});

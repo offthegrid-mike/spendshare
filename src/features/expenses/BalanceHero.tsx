@@ -7,6 +7,7 @@ import { computeSummary, type SummaryItem, type Txn } from '../../lib/settlement
 import { describeBalance, memberName } from '../../lib/balance';
 import { formatMoney, splitMoney } from '../../lib/money';
 import { monthName } from '../../lib/month';
+import { signedAmount } from '../../lib/refund';
 import { markSettlementPaid, undoSettlement } from '../../lib/settle';
 import { paths } from '../../lib/paths';
 import type { GroupDoc, SettlementDoc } from '../../types/models';
@@ -45,7 +46,7 @@ export default function BalanceHero({ group, viewerUid, month, items, settlement
   // left over from deleted ones (that one can still be undone).
   const pending = empty ? undefined : summary.transactions[0];
   const undoable = pending ? undefined : latestPaid(settlements);
-  const spent = items.reduce((sum, it) => sum + Math.round(it.amount), 0);
+  const spent = items.reduce((sum, it) => sum + signedAmount(it), 0);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);

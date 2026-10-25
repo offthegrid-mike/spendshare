@@ -219,3 +219,26 @@ describe('computeMonthBreakdown is steady however the data arrives', () => {
       .toBe('Alpha');
   });
 });
+
+describe('computeMonthBreakdown with refunds', () => {
+  const withRefund = (over: Partial<MonthBreakdownInput> = {}) => breakdown({
+    expenses: [...expenses, { id: 'r1', shopName: 'Woolworths', kind: 'refund' }],
+    items: [...items, { expenseId: 'r1', category: 'Groceries', amount: 1500, refund: true }],
+    ...over,
+  });
+
+  it('takes refunds off spending, the category and the shop', () => {
+    const b = withRefund();
+    expect(b.spent).toBe(10500);
+    expect(b.categories.find((c) => c.category === 'Groceries')?.amount).toBe(7500);
+    expect(b.topShops[0]).toEqual({ shopName: 'Woolworths', amount: 8500, visits: 2 });
+  });
+
+  it('never names a refund as the biggest expense', () => {
+    const b = withRefund({
+      expenses: [{ id: 'r1', shopName: 'Woolworths', kind: 'refund' }],
+      items: [{ expenseId: 'r1', category: 'Groceries', amount: 1500, refund: true }],
+    });
+    expect(b.biggestExpense).toBeNull();
+  });
+});

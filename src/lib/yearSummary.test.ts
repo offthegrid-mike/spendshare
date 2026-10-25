@@ -152,3 +152,25 @@ describe('categoryTotals', () => {
     expect(categoryTotals([{ category: 'Dining', amount: 0 }])[0].pct).toBe(0);
   });
 });
+
+describe('refunds in the year', () => {
+  const withRefund = [
+    ...items,
+    { month: '2026-03', amount: 1000, shared: true, payerUid: 'u2', category: 'Groceries', refund: true },
+  ];
+
+  it('takes refunds off the totals, the month and the category', () => {
+    const y = computeYearSummary('2026', ['u1', 'u2'], withRefund, income);
+    expect(y.grandTotal).toBe(3500);
+    expect(y.months[2].spending).toBe(2000);
+    expect(y.categories.find((c) => c.category === 'Groceries')?.amount).toBe(3000);
+  });
+
+  it('can leave a category below zero without giving it a negative share of a positive total', () => {
+    const totals = categoryTotals([
+      { amount: 1000, category: 'Dining' },
+      { amount: 400, category: 'Groceries', refund: true },
+    ]);
+    expect(totals.find((c) => c.category === 'Groceries')).toEqual({ category: 'Groceries', amount: -400, pct: 0 });
+  });
+});
