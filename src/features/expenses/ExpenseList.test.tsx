@@ -7,9 +7,10 @@ import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc, SettlementDoc, ShopEntry, SuggestionEntry } from '../../types/models';
 import { paths } from '../../lib/paths';
 
-const { commit, batchSet, invalidateGroupHistory, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
+const { commit, batchSet, refundDocs, invalidateGroupHistory, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
   batchSet: vi.fn(),
+  refundDocs: { value: [] as unknown[] },
   invalidateGroupHistory: vi.fn(),
   openAddSheet: vi.fn(),
   desktop: { value: false },
@@ -32,9 +33,14 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   collection: vi.fn(),
   serverTimestamp: () => 'now',
+  query: vi.fn(),
+  where: vi.fn(),
+  limit: vi.fn(),
+  getDocs: () => Promise.resolve({ empty: refundDocs.value.length === 0, docs: refundDocs.value }),
 }));
 vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }) }));
 vi.mock('../../hooks/useAllExpenses', () => ({ invalidateGroupHistory }));
+vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
   useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
 }));
@@ -257,6 +263,18 @@ describe('ExpenseList on desktop', () => {
     await deleteSelected();
     expect(invalidateGroupHistory).toHaveBeenCalledWith('g1');
     expect(invalidateGroupHistory.mock.invocationCallOrder[0]).toBeGreaterThan(commit.mock.invocationCallOrder[0]);
+  });
+
+  it('will not delete an expense that has refunds', async () => {
+    refundDocs.value = [{ id: 'r1' }];
+    try {
+      renderList();
+      await deleteSelected();
+      expect(commit).not.toHaveBeenCalled();
+      expect(await screen.findByText('This expense has refunds. Delete them first.')).toBeInTheDocument();
+    } finally {
+      refundDocs.value = [];
+    }
   });
 
   it('leaves the suggestions alone when deleting a refund', async () => {

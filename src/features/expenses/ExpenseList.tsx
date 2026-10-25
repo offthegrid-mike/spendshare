@@ -139,9 +139,19 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
     setDeletingId(exp.id);
     setDeleteError(null);
     try {
-      const { writeBatch, doc, collection } = await import('firebase/firestore');
+      const { writeBatch, doc, collection, getDocs, query, where, limit } = await import('firebase/firestore');
+      const expenses = collection(db, `groups/${group.id}/expenses`);
+      // An expense with refunds stays until they're gone, so no refund is left
+      // pointing at a purchase that no longer exists.
+      if (!isRefund(exp)) {
+        const refunds = await getDocs(query(expenses, where('refundOf', '==', exp.id), limit(1)));
+        if (!refunds.empty) {
+          setDeleteError('This expense has refunds. Delete them first.');
+          return;
+        }
+      }
       const batch = writeBatch(db);
-      batch.delete(doc(collection(db, `groups/${group.id}/expenses`), exp.id));
+      batch.delete(doc(expenses, exp.id));
       for (const item of items) {
         batch.delete(doc(collection(db, `groups/${group.id}/expenses/${exp.id}/items`), item.id));
       }

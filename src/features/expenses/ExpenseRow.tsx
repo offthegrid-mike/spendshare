@@ -4,6 +4,7 @@ import Avatar from '../../components/ui/Avatar';
 import Chip from '../../components/ui/Chip';
 import CategoryTile from '../../components/ui/CategoryTile';
 import ExpenseBreakdown from './ExpenseBreakdown';
+import RefundLinks from './RefundLinks';
 import { computeAdjustment } from '../../lib/adjustment';
 import { isRefund, signedNet } from '../../lib/refund';
 import { plainSigned } from '../../lib/money';
@@ -115,6 +116,7 @@ export default function ExpenseRow(props: Props) {
         <div id={regionId} className="grid motion-safe:animate-expand">
           <div className="space-y-3 overflow-hidden px-3.5 pb-3.5">
             <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
+            <RefundLinks group={group} expense={expense} />
             <div className="flex gap-2">
               <Link to={paths.editExpense(expense.id)} className="btn-outline flex-1">
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />

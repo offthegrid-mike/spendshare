@@ -4,6 +4,7 @@ import { Pencil, Trash2, Undo2 } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
 import ExpenseBreakdown from './ExpenseBreakdown';
+import RefundLinks from './RefundLinks';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
 import { formatSignedMoney } from '../../lib/money';
@@ -51,6 +52,7 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
         {formatSignedMoney(signedNet(expense), group.currency)}
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
+      <RefundLinks group={group} expense={expense} />
       <div className="mt-auto flex gap-2 pt-2">
         <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
           <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />

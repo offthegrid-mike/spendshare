@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseDetail from './ExpenseDetail';
+
+vi.mock('./RefundLinks', () => ({ default: () => <p>Refund links</p> }));
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 
@@ -22,6 +24,7 @@ describe('ExpenseDetail', () => {
     expect(screen.getByText('Sat 3 Oct · paid by you')).toBeInTheDocument();
     expect(screen.getByText('A$42.50')).toBeInTheDocument();
     expect(screen.getByText('Milk')).toBeInTheDocument();
+    expect(screen.getByText('Refund links')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalled();

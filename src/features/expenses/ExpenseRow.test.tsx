@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseRow from './ExpenseRow';
+
+vi.mock('./RefundLinks', () => ({ default: () => <p>Refund links</p> }));
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 
@@ -61,9 +63,15 @@ describe('ExpenseRow (disclosure)', () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it('shows refund links only when expanded', () => {
+    renderRow();
+    expect(screen.queryByText('Refund links')).toBeNull();
+  });
+
   it('reveals the items, Edit and Delete when expanded', async () => {
     const onDelete = vi.fn();
     renderRow({ expanded: true, onDelete });
+    expect(screen.getByText('Refund links')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Woolworths/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Milk')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', paths.editExpense('e1'));
