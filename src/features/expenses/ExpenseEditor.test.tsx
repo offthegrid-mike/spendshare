@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ExpenseEditor from './ExpenseEditor';
@@ -284,5 +284,61 @@ describe('ExpenseEditor (hybrid)', () => {
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+  });
+});
+
+describe('ExpenseEditor refund mode', () => {
+  const refundOf = (remaining: number) => ({ expense: editExpense, items: editItems, remaining });
+  const suggestionWrites = () => batchSets.filter((d) => 'shops' in d);
+
+  beforeEach(() => {
+    batchSets.length = 0;
+    mockCommit.mockClear();
+  });
+
+  it("starts from the original's shop and items, without gift card, discount or receipt scan", () => {
+    renderEditor({ refundOf: refundOf(570) });
+    expect(screen.getByRole('heading', { name: 'Refund' })).toBeTruthy();
+    expect(screen.getByLabelText(/shop name/i)).toHaveValue('Flemington');
+    expect(screen.getByRole('button', { name: /cherry/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /bread/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /gift card & discount/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /scan receipt/i })).toBeNull();
+    expect(screen.getByText(/A\$5\.70 left to refund/)).toBeTruthy();
+  });
+
+  it('saves a refund linked to the original, with its items marked, and leaves autocomplete alone', async () => {
+    renderEditor({ refundOf: refundOf(570) });
+    fireEvent.click(screen.getByRole('button', { name: /save refund/i }));
+
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    const expenseSet = batchSets.find((d) => 'total' in d);
+    expect(expenseSet).toMatchObject({ kind: 'refund', refundOf: 'e1', total: 570, shopName: 'Flemington' });
+    expect(expenseSet).not.toHaveProperty('giftCardAmount');
+    const itemSets = batchSets.filter((d) => 'expenseId' in d);
+    expect(itemSets).toHaveLength(2);
+    expect(itemSets.every((d) => d.refund === true)).toBe(true);
+    expect(suggestionWrites()).toHaveLength(0);
+  });
+
+  it('will not save a refund larger than what is left to refund', async () => {
+    renderEditor({ refundOf: refundOf(400) });
+    expect(screen.getByText(/can't be more than the A\$4\.00 left to refund/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /save refund/i }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockCommit).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edited refund a refund', async () => {
+    const existingRefund = { ...editExpense, id: 'r1', kind: 'refund', refundOf: 'e1', total: 300, itemCount: 1 };
+    const refundItems = [{ ...editItems[0], id: 'i9', expenseId: 'r1', refund: true }];
+    renderEditor({ expense: existingRefund, items: refundItems, refundOf: refundOf(570) });
+    expect(screen.getByRole('heading', { name: 'Edit refund' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(batchSets.find((d) => 'total' in d)).toMatchObject({ kind: 'refund', refundOf: 'e1' });
+    expect(batchSets.filter((d) => 'expenseId' in d).every((d) => d.refund === true)).toBe(true);
+    expect(suggestionWrites()).toHaveLength(0);
   });
 });

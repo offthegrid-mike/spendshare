@@ -140,6 +140,8 @@ service cloud.firestore {
       match /expenses/{expenseId} {
         allow read, delete: if isMember(groupId);
         // Bind the author and require a non-negative numeric total on create/update.
+        // A refund (kind 'refund') names its original and has no gift card; its
+        // amounts stay positive and the app counts them against spending.
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.total is number
@@ -147,12 +149,18 @@ service cloud.firestore {
           && (!('giftCardAmount' in request.resource.data)
               || (request.resource.data.giftCardAmount is number
                   && request.resource.data.giftCardAmount >= 0
-                  && request.resource.data.giftCardAmount <= request.resource.data.total));
+                  && request.resource.data.giftCardAmount <= request.resource.data.total))
+          && (('kind' in request.resource.data)
+              ? (request.resource.data.kind == 'refund'
+                 && request.resource.data.refundOf is string
+                 && !('giftCardAmount' in request.resource.data))
+              : !('refundOf' in request.resource.data));
         match /items/{itemId} {
           allow read, delete: if isMember(groupId);
           allow create, update: if isMember(groupId)
             && request.resource.data.amount is number
-            && request.resource.data.amount >= 0;
+            && request.resource.data.amount >= 0
+            && (!('refund' in request.resource.data) || request.resource.data.refund is bool);
         }
       }
       match /income/{incomeId} {

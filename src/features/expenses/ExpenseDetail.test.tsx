@@ -77,3 +77,24 @@ describe('ExpenseDetail for a refund', () => {
     expect(screen.getByText('−A$12.00')).toBeInTheDocument();
   });
 });
+
+describe('ExpenseDetail refund action', () => {
+  it('offers to refund a purchase', () => {
+    render(
+      <MemoryRouter>
+        <ExpenseDetail expense={exp} items={items} group={pair} viewerUid="mike" onDelete={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Refund…' })).toHaveAttribute('href', paths.refundExpense('e1'));
+  });
+
+  it('does not offer to refund a refund', () => {
+    const refund = makeExpense('r1', { total: 1200, kind: 'refund', refundOf: 'e1' });
+    render(
+      <MemoryRouter>
+        <ExpenseDetail expense={refund} items={[]} group={pair} viewerUid="mike" onDelete={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'Refund…' })).toBeNull();
+  });
+});

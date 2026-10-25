@@ -544,6 +544,44 @@ describe('/groups financial sub-collection validation (M-2)', () => {
   });
 
   // --- Expense numeric checks ---
+  describe('refunds', () => {
+    const expense = (extra: Record<string, unknown>) => ({
+      groupId: 'group6', month: '2026-06', shopName: 'Shop', payerUid: 'userA',
+      total: 500, itemCount: 1, createdByUid: 'userB', ...extra,
+    });
+    const item = (extra: Record<string, unknown>) => ({
+      groupId: 'group6', expenseId: 'r1', month: '2026-06', name: 'Milk', categoryId: 'c', category: 'C',
+      amount: 500, shared: true, payerUid: 'userA', ...extra,
+    });
+    const bob = () => testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true }).firestore();
+
+    it('allows a refund linked to its original, with refund items', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({ refund: true })));
+    });
+
+    it('denies an unknown expense kind', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'gift', refundOf: 'e1' })));
+    });
+
+    it('denies a refund that does not name its original', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund' })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 7 })));
+    });
+
+    it('denies refundOf on an expense that is not a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ refundOf: 'e1' })));
+    });
+
+    it('denies a gift card on a refund', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1', giftCardAmount: 100 })));
+    });
+
+    it('denies an item refund flag that is not a boolean', async () => {
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1', 'items', 'i1'), item({ refund: 'yes' })));
+    });
+  });
+
   it('denies expense with negative total', async () => {
     const userB = testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true });
     await assertFails(setDoc(doc(userB.firestore(), 'groups', 'group6', 'expenses', 'exp1'), {

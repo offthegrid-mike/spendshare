@@ -27,13 +27,17 @@ describe('routeInfo', () => {
     expect(routeInfo(paths.newExpense)).toEqual({ kind: 'secondary', title: 'New expense', back: '/spend' });
   });
 
+  it('gives the refund page a back link to the expenses list', () => {
+    expect(routeInfo(paths.refundExpense('abc'))).toEqual({ kind: 'secondary', title: 'Refund', back: '/spend' });
+  });
+
   it('gives the edit expense page a back link to the expenses list', () => {
     expect(routeInfo('/spend/expense/abc/edit')).toEqual({ kind: 'secondary', title: 'Edit expense', back: '/spend' });
   });
 });
 
 describe('isExpenseEditorPath', () => {
-  it.each(['/spend/expense/new', '/spend/expense/x/edit'])('is true for %s', (path) => {
+  it.each(['/spend/expense/new', '/spend/expense/x/edit', '/spend/expense/x/refund'])('is true for %s', (path) => {
     expect(isExpenseEditorPath(path)).toBe(true);
   });
 

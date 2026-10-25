@@ -12,6 +12,7 @@ import SendInvite from './features/invites/SendInvite';
 import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
+import RefundRoute from './features/expenses/RefundRoute';
 import { useExpense } from './hooks/useExpense';
 import ExpenseList from './features/expenses/ExpenseList';
 import IncomeEditor from './features/income/IncomeEditor';
@@ -58,9 +59,20 @@ function EditExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { expense, items, loading } = useExpense(group.id, id);
   if (loading) return <RouteSkeleton />;
   if (!expense) return <div className="text-sm text-ink-muted">Expense not found.</div>;
+  if (expense.kind === 'refund' && expense.refundOf) {
+    return (
+      <RefundRoute group={group} currentUserUid={user.uid} originalId={expense.refundOf} refund={expense} refundItems={items} />
+    );
+  }
   return (
     <ExpenseEditor key={expense.id} group={group} currentUserUid={user.uid} expense={expense} items={items} />
   );
+}
+
+function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <RefundRoute group={group} currentUserUid={user.uid} originalId={id} />;
 }
 
 function App() {
@@ -133,6 +145,10 @@ function App() {
         <Route
           path="expense/:id/edit"
           element={group ? <EditExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
+        />
+        <Route
+          path="expense/:id/refund"
+          element={group ? <RefundExpenseRoute group={group} user={user} /> : <RouteSkeleton />}
         />
         <Route
           path="income"

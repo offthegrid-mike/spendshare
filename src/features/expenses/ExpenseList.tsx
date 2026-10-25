@@ -6,7 +6,7 @@ import { db } from '../../lib/firebase';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney, plainSigned } from '../../lib/money';
-import { signedNet } from '../../lib/refund';
+import { isRefund, signedNet } from '../../lib/refund';
 import { monthName } from '../../lib/month';
 import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
@@ -147,7 +147,8 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       }
       // Take the deleted names out of the suggestions, as the editor does on save.
       // Skipped until they have loaded, so a stale [] baseline never overwrites them.
-      if (suggestionsLoaded) {
+      // A refund never added to them, so deleting one takes nothing away.
+      if (suggestionsLoaded && !isRefund(exp)) {
         const shop = exp.shopName?.trim() ?? '';
         stageSuggestionsUpdate(
           batch,

@@ -259,6 +259,18 @@ describe('ExpenseList on desktop', () => {
     expect(invalidateGroupHistory.mock.invocationCallOrder[0]).toBeGreaterThan(commit.mock.invocationCallOrder[0]);
   });
 
+  it('leaves the suggestions alone when deleting a refund', async () => {
+    suggestions.items = [{ name: 'Bananas', categoryId: 'cat-groceries', category: 'Groceries', count: 3 }];
+    suggestions.shops = [{ name: 'Woolworths', count: 1 }];
+    const refund = makeExpense('r1', { shopName: 'Woolworths', day: '2026-10-04', total: 500, kind: 'refund', refundOf: 'e1' });
+    data.expenses = [refund, woolies];
+    data.itemsByExpense = { ...items, r1: [makeItem('i9', 'r1', { name: 'Bananas', amount: 500, refund: true })] };
+    renderList();
+    await deleteSelected();
+    expect(commit).toHaveBeenCalled();
+    expect(batchSet).not.toHaveBeenCalled();
+  });
+
   it('leaves the suggestions alone when they have not loaded yet', async () => {
     suggestions.loaded = false;
     renderList();

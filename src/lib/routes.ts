@@ -24,11 +24,13 @@ const SECONDARY: Record<string, { title: string; back: string }> = {
 const MONTH_SCOPED = new Set([paths.spend, paths.summary, paths.income]);
 
 const EDIT_EXPENSE_PATH = /^\/spend\/expense\/[^/]+\/edit$/;
+const REFUND_EXPENSE_PATH = /^\/spend\/expense\/[^/]+\/refund$/;
 
 export function routeInfo(pathname: string): RouteInfo {
   const secondary = SECONDARY[pathname];
   if (secondary) return { kind: 'secondary', ...secondary };
   if (isEditExpensePath(pathname)) return { kind: 'secondary', title: 'Edit expense', back: paths.spend };
+  if (REFUND_EXPENSE_PATH.test(pathname)) return { kind: 'secondary', title: 'Refund', back: paths.spend };
   return { kind: 'primary', monthScoped: MONTH_SCOPED.has(pathname) };
 }
 

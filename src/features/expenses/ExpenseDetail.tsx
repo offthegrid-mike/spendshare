@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Undo2 } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
 import ExpenseBreakdown from './ExpenseBreakdown';
@@ -56,6 +56,12 @@ export default function ExpenseDetail({ expense, items, group, viewerUid, catego
           <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
           Edit
         </Link>
+        {!refund && (
+          <Link to={paths.refundExpense(expense.id)} className="btn-outline flex-1">
+            <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
+            Refund…
+          </Link>
+        )}
         <button
           type="button"
           disabled={deleting}

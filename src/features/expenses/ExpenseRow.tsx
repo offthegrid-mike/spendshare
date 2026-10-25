@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CreditCard, Gift, Pencil, Trash2 } from 'lucide-react';
+import { CreditCard, Gift, Pencil, Trash2, Undo2 } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
 import Chip from '../../components/ui/Chip';
 import CategoryTile from '../../components/ui/CategoryTile';
@@ -120,6 +120,12 @@ export default function ExpenseRow(props: Props) {
                 <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                 Edit
               </Link>
+              {!isRefund(expense) && (
+                <Link to={paths.refundExpense(expense.id)} className="btn-outline flex-1">
+                  <Undo2 size={15} strokeWidth={1.75} aria-hidden="true" />
+                  Refund…
+                </Link>
+              )}
               <button
                 type="button"
                 disabled={props.deleting}
