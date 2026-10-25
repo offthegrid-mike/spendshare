@@ -36,6 +36,11 @@ export default function RefundRoute({ group, currentUserUid, originalId, refund,
     return <p className="text-sm text-negative">Could not load this expense's refunds. Please try again.</p>;
   }
 
+  const remaining = remainingToRefund(original, refunds, refund?.id);
+  if (!refund && remaining === 0) {
+    return <div className="text-sm text-ink-muted">Nothing left to refund on this expense.</div>;
+  }
+
   return (
     <ExpenseEditor
       key={refund?.id ?? `refund-of-${original.id}`}
@@ -43,7 +48,7 @@ export default function RefundRoute({ group, currentUserUid, originalId, refund,
       currentUserUid={currentUserUid}
       expense={refund}
       items={refundItems}
-      refundOf={{ expense: original, items, remaining: remainingToRefund(original, refunds, refund?.id) }}
+      refundOf={{ expense: original, items, remaining }}
     />
   );
 }

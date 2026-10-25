@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Gift, Search, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
-import { formatMoney, formatSignedMoney } from '../../lib/money';
+import { formatMoney } from '../../lib/money';
 import { computeAdjustment } from '../../lib/adjustment';
 import { isRefund, signedNet } from '../../lib/refund';
 import Chip from '../../components/ui/Chip';
@@ -209,7 +209,7 @@ function ResultAmount({ expense, currency }: { expense: ExpenseDoc; currency: st
     return (
       <div className="text-right">
         <span className={`money text-base font-semibold ${isRefund(expense) ? 'text-accent' : 'text-ink'}`}>
-          {formatSignedMoney(signedNet(expense), currency)}
+          {formatMoney(signedNet(expense), currency)}
         </span>
       </div>
     );

@@ -40,7 +40,7 @@ describe('MonthOverview', () => {
 
   it('shows a shortfall as a negative amount', () => {
     renderOverview({ income: 10000, saved: -2000, savingsRate: -20 });
-    expect(screen.getByTestId('month-saved')).toHaveTextContent('-A$20.00');
+    expect(screen.getByTestId('month-saved')).toHaveTextContent('−A$20.00');
     expect(screen.getByTestId('month-savings-rate')).toHaveTextContent('-20%');
   });
 

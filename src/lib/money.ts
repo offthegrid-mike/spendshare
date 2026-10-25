@@ -2,8 +2,10 @@ export function toCents(input: string | number): number {
   const n = typeof input === 'number' ? input : parseFloat(input);
   return Math.round(n * 100);
 }
+/** Cents as currency; a negative amount (a refund, say) gets a true minus sign: −A$12.50. */
 export function formatMoney(cents: number, currency: string, locale = 'en-US'): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
+  const formatted = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(Math.abs(cents) / 100);
+  return cents < 0 ? `−${formatted}` : formatted;
 }
 export function distributeEvenly(totalCents: number, ids: string[]): Record<string, number> {
   const n = ids.length;
@@ -15,11 +17,6 @@ export function distributeEvenly(totalCents: number, ids: string[]): Record<stri
   return out;
 }
 
-/** Like formatMoney, but a negative amount (a refund) gets a true minus sign: −$12.50. */
-export function formatSignedMoney(cents: number, currency: string, locale = 'en-US'): string {
-  return cents < 0 ? `−${formatMoney(-cents, currency, locale)}` : formatMoney(cents, currency, locale);
-}
-
 /** Cents as a plain figure for the expense list (12.50), with a true minus sign when negative. */
 export function plainSigned(cents: number): string {
   const figure = (Math.abs(cents) / 100).toFixed(2);
@@ -28,13 +25,14 @@ export function plainSigned(cents: number): string {
 
 /** Short axis-label form, e.g. 123456 cents → "$1.2K". Not for exact figures. */
 export function formatCompactMoney(cents: number, currency: string, locale = 'en-US'): string {
-  return new Intl.NumberFormat(locale, {
+  const formatted = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     notation: 'compact',
     maximumFractionDigits: 1,
     minimumFractionDigits: 0,
-  }).format(cents / 100);
+  }).format(Math.abs(cents) / 100);
+  return cents < 0 ? `−${formatted}` : formatted;
 }
 
 /** The currency symbol and the unsigned amount, for styling them separately ("A$" + "88.29"). */

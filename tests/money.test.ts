@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toCents, formatMoney, formatSignedMoney, distributeEvenly, plainSigned } from '../src/lib/money';
+import { toCents, formatMoney, formatCompactMoney, distributeEvenly, plainSigned } from '../src/lib/money';
 
 describe('money', () => {
   it('parses dollars to integer cents', () => {
@@ -35,9 +35,11 @@ describe('splitMoney', () => {
 
 describe('signed money', () => {
   it('writes a negative amount with a true minus sign', () => {
-    expect(formatSignedMoney(-1250, 'AUD', 'en-AU')).toBe('−$12.50');
-    expect(formatSignedMoney(1250, 'AUD', 'en-AU')).toBe('$12.50');
+    expect(formatMoney(-1250, 'AUD', 'en-AU')).toBe('−$12.50');
+    expect(formatMoney(-1250, 'AUD')).toBe('−A$12.50');
+    expect(formatMoney(1250, 'AUD', 'en-AU')).toBe('$12.50');
     expect(plainSigned(-1250)).toBe('−12.50');
+    expect(formatCompactMoney(-123456, 'USD')).toBe('−$1.2K');
     expect(plainSigned(1250)).toBe('12.50');
   });
 });

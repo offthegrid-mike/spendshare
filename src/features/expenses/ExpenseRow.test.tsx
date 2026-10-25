@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ExpenseRow from './ExpenseRow';
 
 vi.mock('./RefundLinks', () => ({ default: () => <p>Refund links</p> }));
+vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 import { paths } from '../../lib/paths';
 

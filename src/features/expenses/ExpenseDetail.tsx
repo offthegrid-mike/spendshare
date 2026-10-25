@@ -8,7 +8,7 @@ import RefundButton from './RefundButton';
 import RefundLinks from './RefundLinks';
 import { memberName } from '../../lib/balance';
 import { iconForCategory } from '../../lib/categoryIcons';
-import { formatSignedMoney } from '../../lib/money';
+import { formatMoney } from '../../lib/money';
 import { isRefund, signedNet } from '../../lib/refund';
 import { paths } from '../../lib/paths';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
@@ -54,13 +54,13 @@ export default function ExpenseDetail({
         </div>
       </div>
       <p className={`money text-[32px] font-semibold tracking-[-0.03em] ${refund ? 'text-accent' : 'text-ink'}`}>
-        {formatSignedMoney(signedNet(expense), group.currency)}
+        {formatMoney(signedNet(expense), group.currency)}
       </p>
       <ExpenseBreakdown expense={expense} items={items} group={group} viewerUid={viewerUid} />
       <RefundLinks group={group} expense={expense} />
       <div className="mt-auto space-y-2 pt-2">
         {deleteError && <p role="alert" className="text-sm text-negative">{deleteError}</p>}
-        <RefundButton expense={expense} />
+        <RefundButton group={group} expense={expense} />
         <div className="flex gap-2">
           <Link to={paths.editExpense(expense.id)} aria-keyshortcuts="E" title="Edit (E)" className="btn-outline flex-1">
             <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />

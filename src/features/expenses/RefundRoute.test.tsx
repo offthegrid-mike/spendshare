@@ -84,6 +84,13 @@ describe('RefundRoute', () => {
     expect(screen.getByText('The expense this refunds has been deleted. You can still delete this refund.')).toBeInTheDocument();
   });
 
+  it('says there is nothing left to refund instead of opening a capped editor', () => {
+    state.refunds = [makeExpense('r0', { total: 5000, kind: 'refund', refundOf: 'e1' })];
+    render(<RefundRoute group={group} currentUserUid="mike" originalId="e1" />);
+    expect(screen.getByText('Nothing left to refund on this expense.')).toBeInTheDocument();
+    expect(editorProps).toHaveLength(0);
+  });
+
   it('will not refund a refund', () => {
     state.original = earlier;
     render(<RefundRoute group={group} currentUserUid="mike" originalId="r0" />);
