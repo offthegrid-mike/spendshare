@@ -38,9 +38,14 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+      # Key the emulator cache on the exact firebase-tools release, so a new 15.x
+      # emulator gets cached too. Keep the major in step with test:rules:ci.
+      - id: firebase-tools
+        run: echo "version=$(npm view firebase-tools@15 version --json | jq -r 'if type == "array" then .[-1] else . end')" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ runner.os }}-15
+          key: firebase-emulators-${{ runner.os }}-${{ steps.firebase-tools.outputs.version }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
       - run: npm ci
       - run: npm run test:rules:ci
