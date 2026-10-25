@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
+import { stageSuggestionsUpdate, type SuggestionLists } from '../../lib/suggestionsWrite';
 import { computeAdjustment } from '../../lib/adjustment';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney } from '../../lib/money';
@@ -11,6 +12,7 @@ import { paths } from '../../lib/paths';
 import { useUIStore } from '../../stores/uiStore';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
+import { useItemSuggestions, writeCache } from '../../hooks/useItemSuggestions';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
@@ -86,6 +88,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const navigate = useNavigate();
   const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
+  const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -159,7 +162,21 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
       for (const item of items) {
         batch.delete(doc(collection(db, `groups/${group.id}/expenses/${exp.id}/items`), item.id));
       }
+      // Take the deleted names out of the suggestions, as the editor does on save.
+      // Skipped until they have loaded, so a stale [] baseline never overwrites them.
+      let nextSuggestions: SuggestionLists | null = null;
+      if (suggestionsLoaded) {
+        const shop = exp.shopName?.trim() ?? '';
+        nextSuggestions = stageSuggestionsUpdate(
+          batch,
+          group.id,
+          { items: suggestions, shops: shopSuggestions },
+          { items, shops: shop ? [shop] : [] },
+          { items: [], shops: [] },
+        );
+      }
       await batch.commit();
+      if (nextSuggestions) writeCache(group.id, nextSuggestions.items, nextSuggestions.shops);
     } catch {
       setDeleteError('Failed to delete. Please try again.');
     } finally {

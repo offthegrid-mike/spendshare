@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import ExpenseList from './ExpenseList';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
-import type { ExpenseDoc, ItemDoc, SettlementDoc } from '../../types/models';
+import type { ExpenseDoc, ItemDoc, SettlementDoc, ShopEntry, SuggestionEntry } from '../../types/models';
 import { paths } from '../../lib/paths';
 
-const { commit, openAddSheet, desktop, ui, data } = vi.hoisted(() => ({
+const { commit, batchSet, writeCache, openAddSheet, desktop, ui, data, suggestions } = vi.hoisted(() => ({
   commit: vi.fn().mockResolvedValue(undefined),
+  batchSet: vi.fn(),
+  writeCache: vi.fn(),
   openAddSheet: vi.fn(),
   desktop: { value: false },
   ui: { month: '2026-10' },
@@ -18,12 +20,23 @@ const { commit, openAddSheet, desktop, ui, data } = vi.hoisted(() => ({
     settlements: [] as SettlementDoc[],
     loading: false,
   },
+  suggestions: {
+    items: [] as SuggestionEntry[],
+    shops: [] as ShopEntry[],
+    loaded: true,
+  },
 }));
 
 vi.mock('firebase/firestore', () => ({
-  writeBatch: () => ({ delete: vi.fn(), commit }),
+  writeBatch: () => ({ delete: vi.fn(), set: batchSet, commit }),
   doc: vi.fn(),
   collection: vi.fn(),
+  serverTimestamp: () => 'now',
+}));
+vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ path: `groups/${gid}/suggestions/index` }) }));
+vi.mock('../../hooks/useItemSuggestions', () => ({
+  useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
+  writeCache,
 }));
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
@@ -69,6 +82,9 @@ beforeEach(() => {
   data.itemsByExpense = items;
   data.settlements = [];
   data.loading = false;
+  suggestions.items = [];
+  suggestions.shops = [];
+  suggestions.loaded = true;
 });
 
 describe('ExpenseList', () => {
@@ -182,15 +198,50 @@ describe('ExpenseList on desktop', () => {
     expect(within(detail()).getByRole('heading', { name: 'Woolworths' })).toBeInTheDocument();
   });
 
+  async function deleteSelected() {
+    await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
+    await act(async () => {
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    });
+  }
+
   it('deletes the selected expense from the detail pane after confirming', async () => {
     renderList();
     await userEvent.click(within(detail()).getByRole('button', { name: 'Delete' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Woolworths');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Woolworths');
     await act(async () => {
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
     });
     expect(commit).toHaveBeenCalled();
+  });
+
+  it("lowers the deleted expense's item and shop suggestion counts in the same batch", async () => {
+    suggestions.items = [
+      { name: 'Bananas', categoryId: 'cat-groceries', category: 'Groceries', count: 3 },
+      { name: 'Milk', categoryId: 'cat-groceries', category: 'Groceries', count: 1 },
+    ];
+    suggestions.shops = [{ name: 'Woolworths', count: 1 }, { name: 'Coles', count: 2 }];
+    renderList();
+    await deleteSelected();
+
+    const items = [{ name: 'Bananas', categoryId: 'cat-groceries', category: 'Groceries', count: 2 },
+      { name: 'Milk', categoryId: 'cat-groceries', category: 'Groceries', count: 1 }];
+    const shops = [{ name: 'Coles', count: 2 }];
+    expect(batchSet).toHaveBeenCalledWith(
+      { path: 'groups/g1/suggestions/index' },
+      { items, shops, updatedAt: 'now' },
+    );
+    expect(batchSet.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
+    expect(writeCache).toHaveBeenCalledWith('g1', items, shops);
+  });
+
+  it('leaves the suggestions alone when they have not loaded yet', async () => {
+    suggestions.loaded = false;
+    renderList();
+    await deleteSelected();
+    expect(commit).toHaveBeenCalled();
+    expect(batchSet).not.toHaveBeenCalled();
+    expect(writeCache).not.toHaveBeenCalled();
   });
 
   it('ignores arrow keys another control already handled, such as the gear menu', async () => {
