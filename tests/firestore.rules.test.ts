@@ -602,6 +602,14 @@ describe('/groups financial sub-collection validation (M-2)', () => {
       await assertSucceeds(batch.commit());
     });
 
+    it('allows up to 10 tags on an item, and no more', async () => {
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1'), expense({})));
+      const tags = (n: number) => Array.from({ length: n }, (_, i) => `tag ${i}`);
+      await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i1'), item({ expenseId: 'e1', tags: tags(10) })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i2'), item({ expenseId: 'e1', tags: tags(11) })));
+      await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'e1', 'items', 'i3'), item({ expenseId: 'e1', tags: 'Holiday' })));
+    });
+
     it('denies moving a refund onto a different original', async () => {
       await assertSucceeds(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e1' })));
       await assertFails(setDoc(doc(bob(), 'groups', 'group6', 'expenses', 'r1'), expense({ kind: 'refund', refundOf: 'e2' })));

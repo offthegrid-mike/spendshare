@@ -170,6 +170,9 @@ service cloud.firestore {
             && request.resource.data.amount is number
             && request.resource.data.amount >= 0
             && (!('refund' in request.resource.data) || request.resource.data.refund is bool)
+            // Tags: a list of at most 10 (the app also caps each at 40 characters).
+            && (!('tags' in request.resource.data)
+                || (request.resource.data.tags is list && request.resource.data.tags.size() <= 10))
             && request.resource.data.get('refund', false)
                == isRefundDoc(getAfter(/databases/$(database)/documents/groups/$(groupId)/expenses/$(expenseId)).data);
         }
