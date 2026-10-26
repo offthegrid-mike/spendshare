@@ -19,6 +19,7 @@ import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
 import { expenseTags } from '../../lib/suggestions';
+import { addTag, cleanTag, removeTag, sharedTags, tagKey } from '../../lib/tags';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
@@ -27,6 +28,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import DatePicker from './DatePicker';
 import ShopNameCombobox from './ShopNameCombobox';
 import QuickAddBar from './QuickAddBar';
+import TagInput from './TagInput';
 import ItemRow from './ItemRow';
 import PayerPicker from './PayerPicker';
 import GroupChip from './GroupChip';
@@ -121,8 +123,10 @@ export default function ExpenseEditor({
             quantity: String(it.quantity ?? 1),
             shared: it.shared,
             remark: it.remark ?? '',
+            tags: it.tags ?? [],
           }))
         : [],
+    tags: sharedTags(sourceItems ?? []),
   };
 
   // Load a resumable draft once, on mount, for new expenses. `movedFrom` is set
@@ -339,6 +343,22 @@ export default function ExpenseEditor({
 
   // Live totals
   const watchedItems = useWatch({ control, name: 'items' });
+  const watchedTags = useWatch({ control, name: 'tags' });
+  const tagNames = tagSuggestions.map((t) => t.name);
+
+  /** Sets the expense-wide tags, adding the new ones to every item and taking removed ones off. */
+  function applyExpenseTags(next: string[]) {
+    const before = getValues('tags') ?? [];
+    const added = next.filter((t) => !before.some((b) => tagKey(b) === tagKey(t)));
+    const removed = before.filter((b) => !next.some((t) => tagKey(t) === tagKey(b)));
+    setValue('tags', next);
+    (getValues('items') ?? []).forEach((item, i) => {
+      let tags = item.tags ?? [];
+      for (const tag of removed) tags = removeTag(tags, tag);
+      for (const tag of added) tags = addTag(tags, tag);
+      setValue(`items.${i}.tags`, tags);
+    });
+  }
   const watchedGiftCard = useWatch({ control, name: 'giftCardAmount' });
   const watchedApplyDiscount = useWatch({ control, name: 'applyDiscount' });
   const watchedDiscountPercent = useWatch({ control, name: 'discountPercent' });
@@ -460,6 +480,7 @@ export default function ExpenseEditor({
         shared: it.shared,
         payerUid: data.payerUid,
         ...(it.remark ? { remark: it.remark } : {}),
+        ...(it.tags && it.tags.length > 0 ? { tags: it.tags.map(cleanTag) } : {}),
         ...(refundOf ? { refund: true } : {}),
       } as WithFieldValue<ItemDoc>);
     }
@@ -718,6 +739,16 @@ export default function ExpenseEditor({
         )}
       />
 
+      {/* Tags for every item: added to each item now and to items added later. */}
+      <TagInput
+        id="expense-tags"
+        label="Tags for every item"
+        tags={watchedTags ?? []}
+        onChange={applyExpenseTags}
+        suggestions={tagNames}
+        hint="Tag single items from their own row."
+      />
+
       {/* Gift card & discount; a refund has neither. */}
       {!refundMode && (
       <div className="rounded-[10px] border border-line bg-surface">
@@ -798,7 +829,7 @@ export default function ExpenseEditor({
           cats={cats}
           suggestions={suggestions}
           onAdd={({ name, categoryId, amount, quantity, shared }) =>
-            append({ name, categoryId, amount, quantity, shared, remark: '' })
+            append({ name, categoryId, amount, quantity, shared, remark: '', tags: getValues('tags') ?? [] })
           }
         />
 
@@ -817,6 +848,7 @@ export default function ExpenseEditor({
                 setValue={setValue}
                 cats={cats}
                 suggestions={suggestions}
+                tagSuggestions={tagNames}
                 summary={watchedItems?.[index]}
                 currency={group.currency}
                 expanded={expandedIds.has(field.id)}

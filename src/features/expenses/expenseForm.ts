@@ -30,6 +30,8 @@ export const schema = z
     applyDiscount: z.boolean(),
     discountPercent: z.string().optional(),
     items: z.array(lineItemSchema).min(1, 'Add at least one item'),
+    // Expense-wide tags: kept on every item; the editor's own state, never written.
+    tags: z.array(z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.applyDiscount) return;

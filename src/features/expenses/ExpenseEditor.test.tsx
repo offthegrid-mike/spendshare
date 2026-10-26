@@ -414,3 +414,74 @@ describe('ExpenseEditor page title', () => {
     expect(useUIStore.getState().pageTitle ?? null).toBeNull();
   });
 });
+
+describe('ExpenseEditor tags', () => {
+  const tagged = [
+    { ...editItems[0], tags: ['Trip', 'Food'] },
+    { ...editItems[1], tags: ['trip'] },
+  ];
+  const everyItem = () => screen.getByRole('combobox', { name: /^Tags for every item/ });
+  const itemSets = () => batchSets.filter((d) => 'expenseId' in d) as { name: string; tags?: string[] }[];
+
+  beforeEach(() => {
+    batchSets.length = 0;
+    mockCommit.mockClear();
+  });
+
+  it('tags one item from its row, and shows the tag on the collapsed row', async () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    fireEvent.click(screen.getByRole('button', { name: /cherry/i }));
+    const itemTags = screen.getByRole('combobox', { name: /^Tags \(optional\)/ });
+    fireEvent.change(itemTags, { target: { value: 'Holiday' } });
+    fireEvent.keyDown(itemTags, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: /cherry/i }));
+    expect(screen.getByRole('button', { name: /cherry/i })).toHaveTextContent('Holiday');
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(itemSets().find((d) => d.name === 'Cherry')?.tags).toEqual(['Holiday']);
+    expect(itemSets().find((d) => d.name === 'Bread')).not.toHaveProperty('tags');
+  });
+
+  it('applies an expense-wide tag to every item, including ones added after', async () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    fireEvent.change(everyItem(), { target: { value: 'Renovation' } });
+    fireEvent.keyDown(everyItem(), { key: 'Enter' });
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Nails' } });
+    fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '4.00' } });
+    fireEvent.click(screen.getByRole('button', { name: /add item/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(itemSets()).toHaveLength(3);
+    expect(itemSets().every((d) => d.tags?.includes('Renovation'))).toBe(true);
+  });
+
+  it('starts the expense-wide field with the tags every item shares, and removing one clears it from all', async () => {
+    renderEditor({ expense: editExpense, items: tagged });
+    expect(screen.getByRole('button', { name: 'Remove tag Trip' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove tag Food' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag Trip' }));
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(itemSets().find((d) => d.name === 'Cherry')?.tags).toEqual(['Food']);
+    expect(itemSets().find((d) => d.name === 'Bread')).not.toHaveProperty('tags');
+  });
+
+  it("keeps the original's item tags on a refund", async () => {
+    renderEditor({ refundOf: { expense: editExpense, items: tagged, remaining: 570 } });
+    fireEvent.click(screen.getByRole('button', { name: /save refund/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(itemSets().find((d) => d.name === 'Cherry')?.tags).toEqual(['Trip', 'Food']);
+  });
+
+  it('counts the tags in the suggestions when saved', async () => {
+    renderEditor({ expense: editExpense, items: editItems });
+    fireEvent.change(everyItem(), { target: { value: 'Renovation' } });
+    fireEvent.keyDown(everyItem(), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(batchSets.find((d) => 'shops' in d)?.tags).toEqual([{ name: 'Renovation', count: 1 }]);
+  });
+});

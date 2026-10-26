@@ -26,6 +26,7 @@ function Harness({
       register={register}
       setValue={setValue}
       cats={cats}
+      tagSuggestions={[]}
       suggestions={[]}
       summary={{ name: 'Cherry', categoryId: 'c1', amount: '3.00', shared, remark }}
       currency="AUD"
@@ -131,7 +132,7 @@ function WatchedHarness({ categoryUnconfirmed }: { categoryUnconfirmed: boolean 
   return (
     <ItemRow
       index={0} control={control} register={register} setValue={setValue}
-      cats={twoCats} suggestions={[]} summary={items[0]} currency="AUD"
+      cats={twoCats} suggestions={[]} tagSuggestions={[]} summary={items[0]} currency="AUD"
       expanded onToggle={vi.fn()} onRemove={vi.fn()}
     />
   );
