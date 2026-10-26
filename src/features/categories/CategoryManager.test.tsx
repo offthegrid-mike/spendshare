@@ -320,5 +320,30 @@ describe('CategoryManager', () => {
       expect(screen.queryByDisplayValue('Groceries')).not.toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Monthly budget for Dining' })).toBeInTheDocument();
     });
+
+    it('closes an open budget field when a rename starts', async () => {
+      const u = userEvent.setup();
+      render(<CategoryManager />);
+
+      await u.click(screen.getByRole('button', { name: 'Budget for Dining' }));
+      expect(screen.getByRole('textbox', { name: 'Monthly budget for Dining' })).toBeInTheDocument();
+      await u.click(screen.getAllByRole('button', { name: /rename/i })[0]);
+
+      expect(screen.queryByRole('textbox', { name: /monthly budget/i })).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue('Groceries')).toBeInTheDocument();
+    });
+
+    it('fills the field with the budget as a plain figure, thousands included', async () => {
+      useCategories.mockReturnValue({
+        all: [{ id: 'cat1', name: 'Groceries', order: 0, archived: false, monthlyBudget: 123456 }],
+        active: [],
+        loading: false,
+      });
+      const u = userEvent.setup();
+      render(<CategoryManager />);
+
+      await u.click(screen.getByRole('button', { name: 'Budget for Groceries' }));
+      expect(screen.getByRole('textbox', { name: 'Monthly budget for Groceries' })).toHaveValue('1234.56');
+    });
   });
 });

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { categoriesCol } from '../../lib/converters';
-import { parseBudgetInput } from '../../lib/budget';
-import { formatMoney } from '../../lib/money';
+import { hasBudget, parseBudgetInput } from '../../lib/budget';
+import { formatMoney, plainSigned } from '../../lib/money';
 import { useCategories } from '../../hooks/useCategories';
 import { useGroup } from '../../hooks/useGroup';
 import { useUIStore } from '../../stores/uiStore';
@@ -10,11 +10,6 @@ import LoadingButton from '../../components/LoadingButton';
 import CategoryTile from '../../components/ui/CategoryTile';
 import { iconForCategory } from '../../lib/categoryIcons';
 import type { CategoryDoc } from '../../types/models';
-
-/** A category with a budget above zero; a missing or zero one has none. */
-function hasBudget(cat: CategoryDoc): cat is CategoryDoc & { monthlyBudget: number } {
-  return typeof cat.monthlyBudget === 'number' && cat.monthlyBudget > 0;
-}
 
 export default function CategoryManager() {
   const { selectedGroupId: gid } = useUIStore();
@@ -68,7 +63,7 @@ export default function CategoryManager() {
     setEditingId(null);
     setError('');
     setBudgetEditingId(cat.id);
-    setBudgetText(hasBudget(cat) ? (cat.monthlyBudget / 100).toFixed(2) : '');
+    setBudgetText(hasBudget(cat) ? plainSigned(cat.monthlyBudget) : '');
   }
 
   function cancelBudgetEdit() {

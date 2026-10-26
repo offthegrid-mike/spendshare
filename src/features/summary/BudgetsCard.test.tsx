@@ -38,6 +38,16 @@ describe('BudgetsCard', () => {
     expect(item).not.toHaveTextContent('left');
   });
 
+  it('shows the percent rounded down, so it agrees with the colour', () => {
+    renderCard([
+      row({ categoryId: 'a', name: 'Calm', pct: 79.6, status: 'ok' }),
+      row({ categoryId: 'b', name: 'Close', pct: 99.6, status: 'warn', spent: 49800, remaining: 200 }),
+    ]);
+    const [calm, close] = screen.getAllByTestId('budget-row');
+    expect(calm).toHaveTextContent('79%');
+    expect(close).toHaveTextContent('99%');
+  });
+
   it('says a budget is fully used when it is spent to the cent', () => {
     renderCard([row({ spent: 50000, remaining: 0, pct: 100, status: 'over' })]);
     expect(screen.getByTestId('budget-row')).toHaveTextContent('Fully used');

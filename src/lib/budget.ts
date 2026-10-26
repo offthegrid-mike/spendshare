@@ -1,4 +1,5 @@
 import { daysElapsedInMonth, daysInMonthKey } from './month';
+import { toCents } from './money';
 import { signedAmount } from './refund';
 import type { CategoryDoc, ItemDoc } from '../types/models';
 
@@ -33,7 +34,23 @@ const WARN_PCT = 80;
 const OVER_PCT = 100;
 
 /** The most a budget can be, in cents, so a typo can't store something absurd. */
-export const MAX_BUDGET_CENTS = 1_000_000_000;
+const MAX_BUDGET_CENTS = 1_000_000_000;
+
+/** A category with a budget above zero; a missing, zero or negative one has none. */
+export function hasBudget<T extends Pick<CategoryDoc, 'monthlyBudget'>>(category: T): category is T & { monthlyBudget: number } {
+  return typeof category.monthlyBudget === 'number' && category.monthlyBudget > 0;
+}
+
+/** The percent used as shown: rounded down, so 79.6% isn't "80%" without the amber, nor 99.6% "100%" while still under. */
+export function percentUsed(row: Pick<BudgetRow, 'pct'>): number {
+  return Math.floor(row.pct);
+}
+
+/** '12 days left', '1 day left', or 'Last day' once none are left. */
+export function daysLeftText(daysLeft: number): string {
+  if (daysLeft === 0) return 'Last day';
+  return `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+}
 
 /**
  * How each budgeted category is doing in `month`. Spending is every item in the
@@ -53,8 +70,8 @@ export function computeBudgetProgress(
   const rows: BudgetRow[] = [...categories]
     .sort((a, b) => a.order - b.order)
     .flatMap((c): BudgetRow[] => {
+      if (c.archived || !hasBudget(c)) return [];
       const limit = c.monthlyBudget;
-      if (c.archived || limit === undefined || !(limit > 0)) return [];
       const spent = spentBy.get(c.id) ?? 0;
       // Compared in whole cents (spent × 100 against limit × percent), not as floats.
       const status: BudgetStatus =
@@ -92,13 +109,14 @@ export function tightestBudget(rows: BudgetRow[]): BudgetRow | null {
 
 /**
  * What was typed in the budget field: null for blank (remove the budget), the
- * amount in cents, or 'invalid'. A leading currency symbol, thousands commas
- * and spaces are fine; zero, negatives and more than two decimals are not.
+ * amount in cents, or 'invalid'. A leading currency symbol, spaces and commas
+ * between thousands are fine; zero, negatives, more than two decimals and a
+ * decimal comma ("400,50") are not.
  */
 export function parseBudgetInput(text: string): number | null | 'invalid' {
   if (!text.trim()) return null;
-  const cleaned = text.replace(/[\s,]/g, '').replace(/^[A-Za-z]{0,3}[$€£]/, '');
-  if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(cleaned)) return 'invalid';
-  const cents = Math.round(parseFloat(cleaned) * 100);
+  const cleaned = text.replace(/\s/g, '').replace(/^[A-Za-z]{0,3}[$€£]/, '');
+  if (!/^(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{0,2})?|\.\d{1,2})$/.test(cleaned)) return 'invalid';
+  const cents = toCents(cleaned.replace(/,/g, ''));
   return cents > 0 && cents <= MAX_BUDGET_CENTS ? cents : 'invalid';
 }

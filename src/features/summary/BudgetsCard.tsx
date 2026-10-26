@@ -1,5 +1,5 @@
 import { formatMoney } from '../../lib/money';
-import type { BudgetRow, BudgetStatus } from '../../lib/budget';
+import { daysLeftText, percentUsed, type BudgetRow, type BudgetStatus } from '../../lib/budget';
 
 interface Props {
   rows: BudgetRow[];
@@ -24,7 +24,7 @@ export default function BudgetsCard({ rows, pace, daysLeft, currency }: Props) {
     <section className="card p-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3">
         <h2 className="text-base font-semibold text-ink">Budgets</h2>
-        {pace !== null && <p className="text-xs text-ink-muted">{`${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`}</p>}
+        {pace !== null && <p className="text-xs text-ink-muted">{daysLeftText(daysLeft)}</p>}
       </div>
       <ul className="divide-y divide-line">
         {rows.map((row) => (
@@ -35,7 +35,7 @@ export default function BudgetsCard({ rows, pace, daysLeft, currency }: Props) {
                 <span className="text-ink">
                   <span className="money">{money(row.spent)}</span> of <span className="money">{money(row.limit)}</span>
                 </span>
-                <span className="w-9 text-right text-xs text-ink-muted">{Math.round(row.pct)}%</span>
+                <span className="w-9 text-right text-xs text-ink-muted">{percentUsed(row)}%</span>
               </span>
             </div>
             <div
@@ -43,7 +43,7 @@ export default function BudgetsCard({ rows, pace, daysLeft, currency }: Props) {
               aria-label={`${row.name} budget`}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={Math.min(Math.round(row.pct), 100)}
+              aria-valuenow={Math.min(percentUsed(row), 100)}
               aria-valuetext={`${money(row.spent)} of ${money(row.limit)}`}
               className="relative mt-1.5 h-1.5 rounded-full bg-recessed"
             >

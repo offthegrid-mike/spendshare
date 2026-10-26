@@ -100,6 +100,11 @@ describe('budgetTileLine', () => {
     expect(budgetTileLine(rows, 9, 'AUD')).toEqual({ label: 'Dining over budget', note: 'A$48.00 over', tone: 'over' });
   });
 
+  it('shows the percent rounded down, so 99.6% is not "100% used"', () => {
+    expect(budgetTileLine([row({ pct: 99.6, status: 'warn', spent: 39840, remaining: 160 })], 9, 'AUD')?.label)
+      .toBe('Groceries 99% used');
+  });
+
   it('says a budget spent to the cent is fully used', () => {
     expect(budgetTileLine([row({ pct: 100, status: 'over', spent: 40000, remaining: 0 })], 9, 'AUD'))
       .toEqual({ label: 'Groceries fully used', note: '9 days left', tone: 'over' });

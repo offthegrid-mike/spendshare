@@ -1,5 +1,5 @@
 import { describeBalance, type BalanceTone } from './balance';
-import { tightestBudget, type BudgetRow, type BudgetStatus } from './budget';
+import { daysLeftText, percentUsed, tightestBudget, type BudgetRow, type BudgetStatus } from './budget';
 import { formatMoney } from './money';
 import { monthName } from './month';
 import { computeSummary, type SummaryItem } from './settlement';
@@ -51,12 +51,12 @@ export interface BudgetTileLine {
  */
 export function budgetTileLine(rows: BudgetRow[], daysLeft: number, currency: string): BudgetTileLine | null {
   if (rows.length === 0) return null;
-  const left = daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+  const left = daysLeftText(daysLeft);
   const row = tightestBudget(rows);
   if (!row) return { label: 'Budgets on track', note: left, tone: 'ok' };
   if (row.remaining < 0) {
     return { label: `${row.name} over budget`, note: `${formatMoney(-row.remaining, currency)} over`, tone: 'over' };
   }
   if (row.remaining === 0) return { label: `${row.name} fully used`, note: left, tone: 'over' };
-  return { label: `${row.name} ${Math.round(row.pct)}% used`, note: left, tone: 'warn' };
+  return { label: `${row.name} ${percentUsed(row)}% used`, note: left, tone: 'warn' };
 }

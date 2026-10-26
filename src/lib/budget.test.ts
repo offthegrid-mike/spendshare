@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeBudgetProgress, parseBudgetInput, tightestBudget, type BudgetRow } from './budget';
+import {
+  computeBudgetProgress, daysLeftText, hasBudget, parseBudgetInput, percentUsed, tightestBudget, type BudgetRow,
+} from './budget';
 
 const cat = (id: string, name: string, order: number, over: { monthlyBudget?: number; archived?: boolean } = {}) =>
   ({ id, name, order, archived: false, ...over });
@@ -47,8 +49,8 @@ describe('computeBudgetProgress rows', () => {
 });
 
 describe('computeBudgetProgress spending', () => {
-  it('counts every item in the category, shared or personal', () => {
-    // The items carry no shared flag: all of them count, which is the point.
+  it('sums every item in the category, whatever its shared flag', () => {
+    // BudgetItem has no shared field at all, so nothing is filtered out by it.
     const { rows } = progress([item('groceries', 12000), item('groceries', 3000), item('dining', 500)]);
     expect(rows[0].spent).toBe(15000);
     expect(rows[1].spent).toBe(500);
@@ -177,8 +179,45 @@ describe('parseBudgetInput', () => {
     }
   });
 
+  it('takes a comma only as a thousands separator, never as a decimal comma', () => {
+    expect(parseBudgetInput('1,200')).toBe(120000);
+    expect(parseBudgetInput('1,200,000.50')).toBe(120000050);
+    // "400,50" would be 40,050 dollars if the comma were just dropped.
+    for (const text of ['400,50', '12,34', '1,2000', ',500', '1,,200']) {
+      expect(parseBudgetInput(text), text).toBe('invalid');
+    }
+  });
+
   it('rejects an amount too large to be a household budget', () => {
     expect(parseBudgetInput('10000000')).toBe(1_000_000_000);
     expect(parseBudgetInput('10000001')).toBe('invalid');
+  });
+});
+
+describe('hasBudget', () => {
+  it('is true only for a budget above zero', () => {
+    expect(hasBudget({})).toBe(false);
+    expect(hasBudget({ monthlyBudget: 0 })).toBe(false);
+    expect(hasBudget({ monthlyBudget: -100 })).toBe(false);
+    expect(hasBudget({ monthlyBudget: 500 })).toBe(true);
+  });
+});
+
+describe('percentUsed', () => {
+  it('rounds down, so a budget never reads as further along than its status', () => {
+    expect(percentUsed({ pct: 0 })).toBe(0);
+    expect(percentUsed({ pct: 79.6 })).toBe(79); // still ok, so not "80%"
+    expect(percentUsed({ pct: 80 })).toBe(80);
+    expect(percentUsed({ pct: 99.6 })).toBe(99); // not yet over, so not "100%"
+    expect(percentUsed({ pct: 100 })).toBe(100);
+    expect(percentUsed({ pct: 125.9 })).toBe(125);
+  });
+});
+
+describe('daysLeftText', () => {
+  it('counts the days, in the singular for one, and names the last day', () => {
+    expect(daysLeftText(12)).toBe('12 days left');
+    expect(daysLeftText(1)).toBe('1 day left');
+    expect(daysLeftText(0)).toBe('Last day');
   });
 });

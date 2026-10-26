@@ -126,9 +126,9 @@ describe('SpendTile', () => {
     });
 
     it('names the budget at 80% or more, amber, with the days left', () => {
-      budget(38000); // 33024 of 38000 = 87%
+      budget(38000); // 33024 of 38000 = 86.9%, shown as 86% (rounded down, like its colour)
       renderTile();
-      expect(screen.getByText('Groceries 87% used')).toHaveClass('text-warning');
+      expect(screen.getByText('Groceries 86% used')).toHaveClass('text-warning');
       expect(screen.getByText('12 days left')).toBeInTheDocument();
     });
 
@@ -148,7 +148,7 @@ describe('SpendTile', () => {
     it('links to the Summary, where the bars are', () => {
       budget(38000);
       renderTile();
-      expect(screen.getByRole('link', { name: /Groceries 87% used/ })).toHaveAttribute('href', paths.summary);
+      expect(screen.getByRole('link', { name: /Groceries 86% used/ })).toHaveAttribute('href', paths.summary);
     });
 
     it('does not hold the tile back while the categories load', () => {
