@@ -33,6 +33,7 @@ export default function TagScreen({ group, tag }: { group: GroupDoc; tag: string
   return (
     <div className="space-y-5">
       <div>
+        <h2 className="text-xl font-semibold tracking-tight text-ink">{tag}</h2>
         <p className="money text-[28px] font-semibold tracking-[-0.03em] text-ink">{formatMoney(total, group.currency)}</p>
         <p className="text-xs text-ink-muted">
           across {entries.length} expense{entries.length === 1 ? '' : 's'}, refunds taken off
@@ -42,7 +43,7 @@ export default function TagScreen({ group, tag }: { group: GroupDoc; tag: string
         const headingId = `tag-month-${month}`;
         return (
           <section key={month} aria-labelledby={headingId} className="space-y-2">
-            <h2 id={headingId} className="px-1 text-xs font-medium text-ink-muted">{formatMonthLabel(month)}</h2>
+            <h3 id={headingId} className="px-1 text-xs font-medium text-ink-muted">{formatMonthLabel(month)}</h3>
             <div className="card divide-y divide-line overflow-hidden">
               {monthEntries.map(({ expense, amount }) => (
                 <Link

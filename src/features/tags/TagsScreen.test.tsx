@@ -42,6 +42,7 @@ describe('TagsScreen', () => {
 
   it('lists every tag with what it adds up to, refunds taken off, linking to each', () => {
     renderTags();
+    expect(screen.getByRole('heading', { name: 'Tags' })).toBeInTheDocument();
     const holiday = screen.getByRole('link', { name: /Holiday 2026/ });
     expect(holiday).toHaveAttribute('href', paths.tag('Holiday 2026'));
     expect(holiday).toHaveTextContent('A$430.00');
@@ -71,7 +72,8 @@ describe('TagScreen', () => {
   const renderTag = (tag: string) => render(<MemoryRouter><TagScreen group={group} tag={tag} /></MemoryRouter>);
 
   it("totals the tag and lists its expenses by month, each with what it spent on the tag", () => {
-    renderTag('holiday 2026');
+    renderTag('Holiday 2026');
+    expect(screen.getByRole('heading', { name: 'Holiday 2026' })).toBeInTheDocument();
     expect(screen.getByText('A$430.00')).toBeInTheDocument();
 
     const october = screen.getByRole('region', { name: 'October 2026' });

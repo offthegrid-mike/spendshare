@@ -16,33 +16,35 @@ export default function TagsScreen({ group }: { group: GroupDoc }) {
   if (loading) return <RouteSkeleton />;
 
   const totals = tagTotals(expenses, itemsByExpense);
-  if (totals.length === 0) {
-    return (
-      <p className="px-1 py-8 text-center text-sm text-ink-muted">
-        No tags yet. Tag items when you add or edit an expense, or tag every item in one go.
-      </p>
-    );
-  }
 
   return (
-    <div className="card divide-y divide-line overflow-hidden">
-      {totals.map((t) => (
-        <Link
-          key={t.tag}
-          to={paths.tag(t.tag)}
-          className="flex min-h-[52px] items-center gap-3 px-4 py-2.5 transition hover:bg-recessed"
-        >
-          <Tags size={18} className="shrink-0 text-accent-ink" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-ink">{t.tag}</span>
-            <span className="block text-xs text-ink-muted">
-              {t.expenses} expense{t.expenses === 1 ? '' : 's'} · last {formatMonthLabel(t.lastMonth)}
-            </span>
-          </span>
-          <span className="money shrink-0 text-sm font-semibold text-ink">{formatMoney(t.amount, group.currency)}</span>
-          <ChevronRight size={16} className="shrink-0 text-ink-faint" aria-hidden="true" />
-        </Link>
-      ))}
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold tracking-tight text-ink">Tags</h2>
+      {totals.length === 0 ? (
+        <p className="px-1 py-8 text-center text-sm text-ink-muted">
+          No tags yet. Tag items when you add or edit an expense, or tag every item in one go.
+        </p>
+      ) : (
+        <div className="card divide-y divide-line overflow-hidden">
+          {totals.map((t) => (
+            <Link
+              key={t.tag}
+              to={paths.tag(t.tag)}
+              className="flex min-h-[52px] items-center gap-3 px-4 py-2.5 transition hover:bg-recessed"
+            >
+              <Tags size={18} className="shrink-0 text-accent-ink" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink">{t.tag}</span>
+                <span className="block text-xs text-ink-muted">
+                  {t.expenses} expense{t.expenses === 1 ? '' : 's'} · last {formatMonthLabel(t.lastMonth)}
+                </span>
+              </span>
+              <span className="money shrink-0 text-sm font-semibold text-ink">{formatMoney(t.amount, group.currency)}</span>
+              <ChevronRight size={16} className="shrink-0 text-ink-faint" aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
