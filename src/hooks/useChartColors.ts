@@ -8,6 +8,12 @@ export interface ChartColors {
   label: string;
   tick: string;
   surface: string;
+  /** Categorical colours, in the order a chart hands them out: one per line, never cycled. */
+  series1: string;
+  series2: string;
+  series3: string;
+  series4: string;
+  series5: string;
 }
 
 // Each chart role and the colour token (src/index.css) it takes.
@@ -19,6 +25,11 @@ const TOKENS: Record<keyof ChartColors, string> = {
   label: '--ink-muted',
   tick: '--ink-muted',
   surface: '--surface',
+  series1: '--series-1',
+  series2: '--series-2',
+  series3: '--series-3',
+  series4: '--series-4',
+  series5: '--series-5',
 };
 
 // Light values, for when custom properties can't be read.
@@ -30,7 +41,17 @@ const FALLBACK: ChartColors = {
   label: '#5b6660',
   tick: '#5b6660',
   surface: '#fcfdfc',
+  series1: '#2a78d6',
+  series2: '#eb6834',
+  series3: '#1baf7a',
+  series4: '#eda100',
+  series5: '#e87ba4',
 };
+
+/** The five series colours as a list, so a chart can pick one by its slot. */
+export function seriesColours(c: ChartColors): string[] {
+  return [c.series1, c.series2, c.series3, c.series4, c.series5];
+}
 
 /** Maps token triplets ("4 120 87") to rgb() colours, falling back per token. */
 export function chartColorsFrom(read: (name: string) => string): ChartColors {

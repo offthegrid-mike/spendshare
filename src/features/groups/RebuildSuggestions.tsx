@@ -94,8 +94,9 @@ function RebuildRun({ groupId, active, stored, onStart }: RunProps) {
       <h2 className="mb-3 text-lg font-semibold text-ink">Autocomplete</h2>
       <div className="card space-y-3 p-4 sm:p-5">
         <p className="text-sm text-ink-muted">
-          Shop and item suggestions are ranked by how often they appear. If they look off,
-          recount them from every expense in this group.
+          Shop and item suggestions are ranked by how often they appear, and items remember
+          what they last cost. If they look off, or items bought before prices were kept show
+          no last price, recount them from every expense in this group.
         </p>
         <button type="button" onClick={onStart} disabled={loading || saving} className="btn-outline w-full sm:w-auto">
           <RefreshCw size={14} />

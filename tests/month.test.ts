@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   monthKey, prevMonthKey, nextMonthKey, formatMonthLabel, monthRange, daysElapsedInMonth, comparablePrevDays, comparisonLabel,
-  daysInMonthKey,
+  daysInMonthKey, formatDayMonth, formatDayMonthYear, formatShortMonthYear, dayKey,
 } from '../src/lib/month';
 describe('month', () => {
   it('formats a date as YYYY-MM', () => {
@@ -99,6 +99,29 @@ describe('month', () => {
       expect(daysInMonthKey('2024-02')).toBe(29);
       expect(daysInMonthKey('2100-02')).toBe(28);
       expect(daysInMonthKey('2000-02')).toBe(29);
+    });
+  });
+
+  describe('formatDayMonth', () => {
+    it('gives the day and a short month name', () => {
+      expect(formatDayMonth('2026-10-12')).toBe('12 Oct');
+      expect(formatDayMonth('2026-01-05')).toBe('5 Jan');
+      expect(formatDayMonth('2026-09-30')).toBe('30 Sep');
+    });
+  });
+
+  describe('formatDayMonthYear and formatShortMonthYear', () => {
+    it('add the year to the day and month, or leave out the day', () => {
+      expect(formatDayMonthYear('2026-10-12')).toBe('12 Oct 2026');
+      expect(formatDayMonthYear('2025-01-05')).toBe('5 Jan 2025');
+      expect(formatShortMonthYear('2026-10-12')).toBe('Oct 2026');
+    });
+  });
+
+  describe('dayKey', () => {
+    it('is the local day as YYYY-MM-DD', () => {
+      expect(dayKey(new Date(2026, 9, 12, 23, 59))).toBe('2026-10-12');
+      expect(dayKey(new Date(2026, 0, 5, 0, 1))).toBe('2026-01-05');
     });
   });
 

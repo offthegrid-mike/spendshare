@@ -73,6 +73,9 @@ vi.mock('./features/tags/TagsScreen', () => ({ default: () => <div data-testid="
 vi.mock('./features/tags/TagScreen', () => ({
   default: ({ tag }: { tag: string }) => <div data-testid="tag-screen" data-tag={tag} />,
 }));
+vi.mock('./features/prices/PriceScreen', () => ({
+  default: ({ name }: { name: string }) => <div data-testid="price-screen" data-name={name} />,
+}));
 vi.mock('./features/expenses/ExpenseList', () => ({ default: () => <div data-testid="expense-list" /> }));
 vi.mock('./features/income/IncomeEditor', () => ({ default: () => <div data-testid="income-editor" /> }));
 vi.mock('./features/summary/Summary', () => ({ default: () => <div data-testid="summary" /> }));
@@ -198,6 +201,13 @@ describe('App tags', () => {
   it("opens a tag's page with the tag decoded from the path", () => {
     renderApp(paths.tag('Holiday 2026'));
     expect(screen.getByTestId('tag-screen')).toHaveAttribute('data-tag', 'Holiday 2026');
+  });
+});
+
+describe('App prices', () => {
+  it("opens an item's price page with the name decoded from the path", () => {
+    renderApp(paths.price('Milk 2L'));
+    expect(screen.getByTestId('price-screen')).toHaveAttribute('data-name', 'Milk 2L');
   });
 });
 

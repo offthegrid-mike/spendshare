@@ -75,3 +75,17 @@ describe('isEditExpensePath', () => {
     },
   );
 });
+
+describe('price history route', () => {
+  it("titles an item's price page with the item and gives it a back link to Spend", () => {
+    expect(routeInfo(paths.price('Milk 2L'))).toEqual({ kind: 'secondary', title: 'Milk 2L', back: paths.spend });
+  });
+
+  it('titles it with the raw name when the address is not valid encoding, instead of failing', () => {
+    expect(routeInfo('/spend/prices/%E0')).toEqual({ kind: 'secondary', title: '%E0', back: paths.spend });
+  });
+
+  it('is not the page for a longer address', () => {
+    expect(routeInfo('/spend/prices/Milk/extra').kind).toBe('primary');
+  });
+});

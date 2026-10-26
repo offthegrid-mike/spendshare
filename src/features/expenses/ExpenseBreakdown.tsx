@@ -5,6 +5,7 @@ import { computeAdjustment } from '../../lib/adjustment';
 import { plainSigned } from '../../lib/money';
 import { isRefund } from '../../lib/refund';
 import { memberName } from '../../lib/balance';
+import { canLinkPrices } from '../../lib/priceHistory';
 import { paths } from '../../lib/paths';
 import { TAG_CHIP_CLASS } from '../../components/ui/TagChip';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
@@ -59,7 +60,15 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
             return (
               <li key={it.id} className="flex items-baseline justify-between gap-3 text-ink-muted">
                 <span className="min-w-0">
-                  <span className="text-ink">{it.name}</span>
+                  {canLinkPrices(it.name)
+                    ? <Link
+                        to={paths.price(it.name)}
+                        title="Price history"
+                        className="text-ink underline decoration-dotted decoration-ink-faint underline-offset-4 hover:decoration-ink"
+                      >
+                        {it.name}
+                      </Link>
+                    : <span className="text-ink">{it.name}</span>}
                   {!it.shared && <span className="ml-1.5"><Chip>Personal</Chip></span>}
                   {it.remark && <span data-testid="item-remark" className="block text-xs text-ink-muted">{it.remark}</span>}
                   {it.tags && it.tags.length > 0 && (

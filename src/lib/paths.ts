@@ -12,6 +12,7 @@ export const paths = {
   categories: '/spend/categories',
   tags: '/spend/tags',
   tag: (tag: string): string => `/spend/tags/${encodeURIComponent(tag)}`,
+  price: (name: string): string => `/spend/prices/${encodeURIComponent(name)}`,
   groupSettings: '/spend/group/settings',
   groupInvites: '/spend/group/invites',
   work: '/work',

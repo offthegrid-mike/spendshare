@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
 export function monthKey(d: Date): string { return format(d, 'yyyy-MM'); }
+/** The local day as 'YYYY-MM-DD'. */
+export function dayKey(d: Date): string { return format(d, 'yyyy-MM-dd'); }
 
 // Pure 'YYYY-MM' string helpers below: no `new Date()`, so render code using
 // them stays safe for tests that spy on the Date constructor.
@@ -96,6 +98,22 @@ export function comparablePrevDays(ym: string, now: number = Date.now()): number
   const prev = parseYM(prevMonthKey(ym));
   if (elapsed >= daysInMonth(year, month) || elapsed >= daysInMonth(prev.year, prev.month)) return null;
   return elapsed;
+}
+
+/** '12 Oct' for 'YYYY-MM-DD'. */
+export function formatDayMonth(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  return `${day} ${MONTH_NAMES[month - 1].slice(0, 3)}`;
+}
+
+/** '12 Oct 2026' for 'YYYY-MM-DD'. */
+export function formatDayMonthYear(date: string): string {
+  return `${formatDayMonth(date)} ${date.slice(0, 4)}`;
+}
+
+/** 'Oct 2026' for 'YYYY-MM-DD'. */
+export function formatShortMonthYear(date: string): string {
+  return `${MONTH_NAMES[Number(date.slice(5, 7)) - 1].slice(0, 3)} ${date.slice(0, 4)}`;
 }
 
 /** What a comparison is against: 'September', or '1–12 September' for its first twelve days. */

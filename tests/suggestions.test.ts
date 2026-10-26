@@ -155,7 +155,7 @@ describe('computeShopsDelta', () => {
   });
 });
 
-import { countSuggestionChanges, recountSuggestions } from '../src/lib/suggestions';
+import { countSuggestionChanges, lastPriceFor, recountSuggestions } from '../src/lib/suggestions';
 import { makeExpense, makeItem } from '../src/test/fixtures';
 
 describe('recountSuggestions', () => {
@@ -172,9 +172,9 @@ describe('recountSuggestions', () => {
   it('counts every item and shop across the history', () => {
     const { items, shops } = recountSuggestions([newer, blankShop, older], itemsByExpense);
     expect(items).toEqual([
-      { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 2 },
-      { name: 'Bread', categoryId: 'cat1', category: 'Dairy', count: 1 },
-      { name: 'Milk', categoryId: 'cat2', category: 'Other', count: 1 },
+      { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 2, last: { unit: 1000, shop: 'woolworths', date: '2026-10-05' } },
+      { name: 'Bread', categoryId: 'cat1', category: 'Dairy', count: 1, last: { unit: 1000, shop: 'Woolworths', date: '2026-10-01' } },
+      { name: 'Milk', categoryId: 'cat2', category: 'Other', count: 1, last: { unit: 1000, shop: '', date: '2026-10-02' } },
     ]);
     expect(shops).toEqual([{ name: 'woolworths', count: 2 }]);
   });
@@ -227,7 +227,7 @@ describe('recountSuggestions with refunds', () => {
       e1: [makeItem('i1', 'e1', { name: 'Milk', categoryId: 'cat1', category: 'Dairy' })],
       r1: [makeItem('i2', 'r1', { name: 'Milk', categoryId: 'cat1', category: 'Dairy', refund: true })],
     });
-    expect(items).toEqual([{ name: 'Milk', categoryId: 'cat1', category: 'Dairy', count: 1 }]);
+    expect(items).toEqual([{ name: 'Milk', categoryId: 'cat1', category: 'Dairy', count: 1, last: { unit: 1000, shop: 'Coles', date: '2026-10-01' } }]);
     expect(shops).toEqual([{ name: 'Coles', count: 1 }]);
   });
 });
@@ -252,5 +252,121 @@ describe('suggestions with tags', () => {
     const lists = (tags: { name: string; count: number }[]) => ({ items: [], shops: [], tags });
     expect(countSuggestionChanges(lists([{ name: 'Holiday', count: 2 }]), lists([{ name: 'Holiday', count: 2 }]))).toEqual({ items: 0, shops: 0, tags: 0 });
     expect(countSuggestionChanges(lists([{ name: 'Holiday', count: 2 }]), lists([{ name: 'Holiday', count: 1 }, { name: 'Snacks', count: 1 }]))).toEqual({ items: 0, shops: 0, tags: 2 });
+  });
+});
+
+describe('suggestions with last prices', () => {
+  const price = (unit: number, shop: string, date: string) => ({ unit, shop, date });
+  const milkAt = (unit: number, shop: string, date: string) => ({
+    name: 'Milk', categoryId: 'cat1', category: 'Groceries', price: price(unit, shop, date),
+  });
+
+  it('records the price a new entry was last bought at', () => {
+    const [entry] = computeSuggestionsDelta([], [], [milkAt(350, 'Coles', '2026-10-12')]);
+    expect(entry.last).toEqual(price(350, 'Coles', '2026-10-12'));
+  });
+
+  it('moves the price on to a newer purchase', () => {
+    const current = [{ ...milk, last: price(350, 'Coles', '2026-10-12') }];
+    const [entry] = computeSuggestionsDelta(current, [], [milkAt(380, 'Aldi', '2026-10-20')]);
+    expect(entry.last).toEqual(price(380, 'Aldi', '2026-10-20'));
+  });
+
+  it('keeps a newer price when an older purchase is saved later', () => {
+    const current = [{ ...milk, last: price(350, 'Coles', '2026-10-12') }];
+    const [entry] = computeSuggestionsDelta(current, [], [milkAt(300, 'Aldi', '2026-09-01')]);
+    expect(entry.last).toEqual(price(350, 'Coles', '2026-10-12'));
+    expect(entry.count).toBe(4);
+  });
+
+  it('lets a purchase on the same day replace the price, so an edit takes effect', () => {
+    const current = [{ ...milk, last: price(350, 'Coles', '2026-10-12') }];
+    const [entry] = computeSuggestionsDelta(current, [milkAt(350, 'Coles', '2026-10-12')], [milkAt(340, 'Coles', '2026-10-12')]);
+    expect(entry.last).toEqual(price(340, 'Coles', '2026-10-12'));
+    expect(entry.count).toBe(3);
+  });
+
+  it('prices an old entry that had none once it is bought again', () => {
+    const [entry] = computeSuggestionsDelta([milk], [], [milkAt(350, 'Coles', '2026-10-12')]);
+    expect(entry.last).toEqual(price(350, 'Coles', '2026-10-12'));
+  });
+
+  it('leaves the price alone when an item with no price is added or removed', () => {
+    const current = [{ ...milk, last: price(350, 'Coles', '2026-10-12') }];
+    const bare = { name: 'Milk', categoryId: 'cat1', category: 'Groceries' };
+    expect(computeSuggestionsDelta(current, [], [bare])[0].last).toEqual(price(350, 'Coles', '2026-10-12'));
+    expect(computeSuggestionsDelta(current, [bare], [])[0].last).toEqual(price(350, 'Coles', '2026-10-12'));
+  });
+
+  it('never writes a last key it has no price for, since Firestore refuses undefined', () => {
+    const [entry] = computeSuggestionsDelta([], [], [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries' }]);
+    expect('last' in entry).toBe(false);
+  });
+
+  describe('recountSuggestions', () => {
+    it('takes the price from the newest purchase, per unit, with its shop and day', () => {
+      const old = makeExpense('e1', { shopName: 'Coles', day: '2026-09-01' });
+      const recent = makeExpense('e2', { shopName: ' Aldi  ', day: '2026-10-12' });
+      const { items } = recountSuggestions([recent, old], {
+        e1: [makeItem('i1', 'e1', { name: 'Milk', amount: 310 })],
+        e2: [makeItem('i2', 'e2', { name: 'Milk', amount: 700, quantity: 2, unitAmount: 350 })],
+      });
+      expect(items[0].last).toEqual(price(350, 'Aldi', '2026-10-12'));
+    });
+
+    it('leaves out refunds and items with no price', () => {
+      const bought = makeExpense('e1', { shopName: 'Coles', day: '2026-10-01' });
+      const free = makeExpense('e2', { shopName: 'Aldi', day: '2026-10-05' });
+      const refund = makeExpense('r1', { shopName: 'Coles', day: '2026-10-09', kind: 'refund', refundOf: 'e1' });
+      const { items } = recountSuggestions([refund, free, bought], {
+        e1: [makeItem('i1', 'e1', { name: 'Milk', amount: 310 })],
+        e2: [makeItem('i2', 'e2', { name: 'Milk', amount: 0 })],
+        r1: [makeItem('i3', 'r1', { name: 'Milk', amount: 310, refund: true })],
+      });
+      expect(items[0]).toMatchObject({ count: 2, last: price(310, 'Coles', '2026-10-01') });
+    });
+
+    it('has no price for an entry none of whose purchases had one', () => {
+      const free = makeExpense('e1', { day: '2026-10-05' });
+      const { items } = recountSuggestions([free], { e1: [makeItem('i1', 'e1', { name: 'Sample', amount: 0 })] });
+      expect('last' in items[0]).toBe(false);
+    });
+  });
+
+  describe('countSuggestionChanges', () => {
+    const lists = (last?: ReturnType<typeof price>) => ({
+      items: [{ ...milk, ...(last ? { last } : {}) }], shops: [], tags: [],
+    });
+
+    it('counts a changed price as a change', () => {
+      const a = lists(price(350, 'Coles', '2026-10-12'));
+      expect(countSuggestionChanges(a, lists(price(350, 'Coles', '2026-10-12')))).toEqual({ items: 0, shops: 0, tags: 0 });
+      expect(countSuggestionChanges(a, lists(price(360, 'Coles', '2026-10-12')))).toEqual({ items: 1, shops: 0, tags: 0 });
+      expect(countSuggestionChanges(a, lists(price(350, 'Aldi', '2026-10-12')))).toEqual({ items: 1, shops: 0, tags: 0 });
+      expect(countSuggestionChanges(a, lists(price(350, 'Coles', '2026-10-13')))).toEqual({ items: 1, shops: 0, tags: 0 });
+    });
+
+    it('counts a price that was missing as a change', () => {
+      expect(countSuggestionChanges(lists(), lists(price(350, 'Coles', '2026-10-12')))).toEqual({ items: 1, shops: 0, tags: 0 });
+    });
+  });
+
+  describe('lastPriceFor', () => {
+    const entries = [
+      { ...milk, last: price(350, 'Coles', '2026-10-12') },
+      { name: 'MILK ', categoryId: 'cat2', category: 'Other', count: 1, last: price(380, 'Aldi', '2026-10-20') },
+      { name: 'Milk', categoryId: 'cat3', category: 'Misc', count: 1 },
+      { ...bread, last: price(500, 'Coles', '2026-10-25') },
+    ];
+
+    it('is the newest price among the entries with that name, whatever the case or spacing', () => {
+      expect(lastPriceFor(entries, ' milk')).toEqual(price(380, 'Aldi', '2026-10-20'));
+    });
+
+    it('is null for a name with no price, or no entry', () => {
+      expect(lastPriceFor(entries, 'Eggs')).toBeNull();
+      expect(lastPriceFor([{ ...milk }], 'Milk')).toBeNull();
+      expect(lastPriceFor(entries, '  ')).toBeNull();
+    });
   });
 });

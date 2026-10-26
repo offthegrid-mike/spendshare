@@ -1,4 +1,4 @@
-import { collapseWhitespace, normalizeNameKey } from './textNormalize';
+import { collapseWhitespace, isDotsOnly, normalizeNameKey } from './textNormalize';
 import { signedAmount } from './refund';
 import type { ExpenseDoc, ItemDoc } from '../types/models';
 
@@ -26,7 +26,7 @@ export function hasTag(tags: string[], tag: string): boolean {
 export function addTag(tags: string[], tag: string): string[] {
   const clean = cleanTag(tag);
   // "." and ".." would make a tag page's path resolve somewhere else.
-  if (!clean || /^\.+$/.test(clean) || tags.length >= MAX_TAGS || hasTag(tags, clean)) return tags;
+  if (!clean || isDotsOnly(clean) || tags.length >= MAX_TAGS || hasTag(tags, clean)) return tags;
   return [...tags, clean];
 }
 

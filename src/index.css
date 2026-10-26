@@ -20,6 +20,12 @@
     --negative: 194 54 75;
     --warning: 146 84 5;
     --warning-soft: 253 241 217;
+    /* Categorical series for charts, validated as a set (light and dark chosen apart). */
+    --series-1: 42 120 214;
+    --series-2: 235 104 52;
+    --series-3: 27 175 122;
+    --series-4: 237 161 0;
+    --series-5: 232 123 164;
     --shadow-pop: 0 8px 24px -8px rgb(16 40 28 / 0.18);
     color-scheme: light;
   }
@@ -42,6 +48,11 @@
       --negative: 255 138 151;
       --warning: 251 191 36;
       --warning-soft: 58 42 8;
+      --series-1: 57 135 229;
+      --series-2: 217 89 38;
+      --series-3: 25 158 112;
+      --series-4: 201 133 0;
+      --series-5: 213 81 129;
       --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
       color-scheme: dark;
     }
@@ -62,6 +73,11 @@
     --negative: 255 138 151;
     --warning: 251 191 36;
     --warning-soft: 58 42 8;
+    --series-1: 57 135 229;
+    --series-2: 217 89 38;
+    --series-3: 25 158 112;
+    --series-4: 201 133 0;
+    --series-5: 213 81 129;
     --shadow-pop: 0 8px 24px -8px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }

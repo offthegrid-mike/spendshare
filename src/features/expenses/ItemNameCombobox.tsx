@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { SuggestionEntry } from '../../types/models';
+import { formatMoney } from '../../lib/money';
+import { lastPriceFor } from '../../lib/suggestions';
 import { dedupeByName, highlightMatch } from './comboboxUtils';
 
 interface ItemNameComboboxProps {
   value: string;
   onChange: (name: string, suggestion?: SuggestionEntry) => void;
   suggestions: SuggestionEntry[];
+  /** What each remembered item last cost is shown in this currency. */
+  currency: string;
   id?: string;
   placeholder?: string;
   onEnter?: () => void;
@@ -15,6 +19,7 @@ export default function ItemNameCombobox({
   value,
   onChange,
   suggestions,
+  currency,
   id,
   placeholder = 'Item name',
   onEnter,
@@ -116,24 +121,30 @@ export default function ItemNameCombobox({
           role="listbox"
           className="absolute z-50 mt-1 min-w-full w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-pop"
         >
-          {filtered.map((s, i) => (
-            <li
-              key={`${s.name}|${s.categoryId}`}
-              id={`${optionPrefix}-${i}`}
-              role="option"
-              dir="auto"
-              aria-selected={i === activeIndex}
-              onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
-              className={`flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-ink ${
-                i === activeIndex ? 'bg-accent-soft' : 'hover:bg-recessed'
-              }`}
-            >
-              {highlightMatch(s.name, value)}
-              <span className="ml-2 shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-muted">
-                {s.category}
-              </span>
-            </li>
-          ))}
+          {filtered.map((s, i) => {
+            const last = lastPriceFor(suggestions, s.name);
+            return (
+              <li
+                key={`${s.name}|${s.categoryId}`}
+                id={`${optionPrefix}-${i}`}
+                role="option"
+                dir="auto"
+                aria-selected={i === activeIndex}
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
+                className={`flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-ink ${
+                  i === activeIndex ? 'bg-accent-soft' : 'hover:bg-recessed'
+                }`}
+              >
+                {highlightMatch(s.name, value)}
+                <span className="ml-2 flex shrink-0 items-center gap-2">
+                  {last && <span className="money text-xs text-ink-muted">{formatMoney(last.unit, currency)}</span>}
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-muted">
+                    {s.category}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

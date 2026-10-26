@@ -10,7 +10,7 @@ import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
 import { collapseWhitespace } from '../../lib/textNormalize';
-import { monthKey } from '../../lib/month';
+import { dayKey, monthKey } from '../../lib/month';
 import { useCategories, fetchActiveCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
 import { carryEntry } from '../../lib/carryEntry';
@@ -18,6 +18,7 @@ import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
+import { priceInput } from '../../lib/suggestions';
 import { addTag, cleanTag, expenseTags, hasTag, MAX_TAGS, removeTag, sharedTags } from '../../lib/tags';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
@@ -506,10 +507,13 @@ export default function ExpenseEditor({
         categoryId: it.categoryId,
         category: it.category,
       }));
+      // The same local day purchaseDate gives the saved expense, so the price filed here matches its history.
+      const day = dayKey(expDate);
       const newItemInputs = data.items.map((it) => ({
         name: it.name,
         categoryId: it.categoryId,
         category: cats.find((c) => c.id === it.categoryId)?.name ?? '',
+        price: priceInput(toCents(it.amount), data.shopName, day),
       }));
       const oldShop = expense?.shopName?.trim() ?? '';
       const newShop = data.shopName?.trim() ?? '';
@@ -841,6 +845,7 @@ export default function ExpenseEditor({
         <QuickAddBar
           cats={cats}
           suggestions={suggestions}
+          currency={group.currency}
           onAdd={({ name, categoryId, amount, quantity, shared }) =>
             append({ name, categoryId, amount, quantity, shared, remark: '', tags: getValues('tags') ?? [] })
           }
