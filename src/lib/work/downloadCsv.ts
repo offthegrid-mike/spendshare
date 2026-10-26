@@ -1,21 +1,6 @@
-const REVOKE_AFTER_MS = 10_000;
+import { downloadFile } from '../downloadFile';
 
-/**
- * Saves `csv` as `fileName` through a temporary object URL and link, then cleans
- * both up. The URL is revoked a while later, not straight after the click:
- * some browsers (Safari among them) start reading it only after the click
- * returns, and a slow device may take a moment to begin the download.
- */
+/** Saves `csv` as `fileName`. */
 export function downloadCsv(fileName: string, csv: string): void {
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  try {
-    link.click();
-  } finally {
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
-  }
+  downloadFile(fileName, csv, 'text/csv;charset=utf-8');
 }

@@ -13,6 +13,8 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(),
 }));
 vi.mock('../../lib/converters', () => ({ settlementsCol: vi.fn(() => ({})) }));
+const { exportPeriodCsv } = vi.hoisted(() => ({ exportPeriodCsv: vi.fn() }));
+vi.mock('../../lib/exportActions', () => ({ exportPeriodCsv }));
 const { monthState, requestedMonths } = vi.hoisted(() => ({
   monthState: {
     loading: false,
@@ -467,5 +469,79 @@ describe('Summary Month view budgets', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Year' }));
     expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Budgets' })).toBeNull();
+  });
+});
+
+describe('Summary export', () => {
+  beforeEach(() => {
+    exportPeriodCsv.mockReset();
+    exportPeriodCsv.mockResolvedValue({ status: 'done', message: 'Downloaded spendshare-family-2026-06.csv' });
+  });
+  afterEach(resetMonthState);
+
+  it('exports the month on screen and says what was saved', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(exportPeriodCsv).toHaveBeenCalledWith(mockGroup, { kind: 'month', month: '2026-06' });
+    expect(await screen.findByText('Downloaded spendshare-family-2026-06.csv')).toBeInTheDocument();
+  });
+
+  it('exports the year in the Year view', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    await screen.findByText('Year view 2026');
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(exportPeriodCsv).toHaveBeenCalledWith(mockGroup, { kind: 'year', year: '2026' });
+  });
+
+  it('is busy while it works, so it cannot be started twice', async () => {
+    let finish: (r: { status: 'done'; message: string }) => void = () => {};
+    exportPeriodCsv.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    const busy = screen.getByRole('button', { name: 'Exporting…' });
+    expect(busy).toBeDisabled();
+    await userEvent.click(busy);
+    expect(exportPeriodCsv).toHaveBeenCalledTimes(1);
+    finish({ status: 'done', message: 'Downloaded it' });
+    expect(await screen.findByText('Downloaded it')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
+  });
+
+  it('shows an empty period or a failure where it can be read', async () => {
+    exportPeriodCsv.mockResolvedValue({ status: 'empty', message: 'No expenses in June 2026 to export.' });
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('No expenses in June 2026 to export.');
+    exportPeriodCsv.mockResolvedValue({ status: 'error', message: "Couldn't reach the server. Check your connection and try again." });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/couldn't reach the server/i);
+  });
+
+  it('drops the message once another month is shown, since it was about the first', async () => {
+    const { rerender } = renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByText('Downloaded spendshare-family-2026-06.csv')).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <Summary group={mockGroup} currentUserUid="u1" selectedMonth="2026-07" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText('Downloaded spendshare-family-2026-06.csv')).toBeNull();
+  });
+
+  it('drops the message when the view changes between Month and Year', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByText('Downloaded spendshare-family-2026-06.csv')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    await screen.findByText('Year view 2026');
+    expect(screen.queryByText('Downloaded spendshare-family-2026-06.csv')).toBeNull();
+  });
+
+  it('is there while the month is still loading', () => {
+    monthState.loading = true;
+    renderSummary();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
   });
 });
