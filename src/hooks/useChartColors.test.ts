@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { chartColorsFrom, useChartColors } from './useChartColors';
+import { chartColorsFrom, seriesColours, useChartColors } from './useChartColors';
 
 const LIGHT: Record<string, string> = {
   '--accent': '4 120 87', '--ink': '16 22 20', '--line': '224 230 226',
@@ -33,7 +33,7 @@ describe('chartColorsFrom', () => {
 
   it('reads the five series colours, in order', () => {
     const c = chartColorsFrom((name) => LIGHT[name] ?? '');
-    expect([c.series1, c.series2, c.series3, c.series4, c.series5]).toEqual([
+    expect(seriesColours(c)).toEqual([
       'rgb(42 120 214)', 'rgb(235 104 52)', 'rgb(27 175 122)', 'rgb(237 161 0)', 'rgb(232 123 164)',
     ]);
   });

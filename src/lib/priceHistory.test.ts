@@ -125,6 +125,11 @@ describe('computePriceHistory shops', () => {
     expect(aldi.latest).toMatchObject({ date: '2026-10-05', unit: 305 });
   });
 
+  it("carries each shop's purchases, oldest first, whatever the case or spacing of the shop", () => {
+    const aldi = history('Milk 2L', bought).shops.find((s) => s.shop === 'Aldi')!;
+    expect(aldi.points.map((p) => p.expenseId)).toEqual(['b', 'c', 'e']);
+  });
+
   it('puts shops that differ only in case and spacing together, under their newest spelling', () => {
     const shops = history('Milk 2L', bought).shops;
     expect(shops.map((s) => s.shop)).toEqual(['Aldi', 'Coles']);
@@ -171,6 +176,11 @@ describe('computePriceHistory changes', () => {
     const { changes } = history('Milk 2L', bought.slice(1));
     expect(changes.map((c) => c.months)).toEqual([6]);
     expect(history('Milk 2L', bought.slice(2)).changes).toEqual([]);
+  });
+
+  it('keeps only the first horizon when both rest on the same purchase, as the second says nothing more', () => {
+    const { changes } = history('Milk 2L', [buy('a', '2025-01-01', 'Coles', 300), buy('b', '2026-10-01', 'Coles', 360)]);
+    expect(changes.map((c) => c.months)).toEqual([6]);
   });
 
   it('has none for a single purchase', () => {

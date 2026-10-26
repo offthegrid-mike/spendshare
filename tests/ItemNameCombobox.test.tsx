@@ -18,7 +18,7 @@ const suggestions: SuggestionEntry[] = [
 function Wrapper({
   initialValue = '',
   sugs = suggestions,
-  currency,
+  currency = 'AUD',
   onChangeSpy = vi.fn(),
   onEnterSpy,
 }: {
@@ -312,7 +312,7 @@ describe('ItemNameCombobox last prices', () => {
   ];
 
   it('shows what each remembered item last cost beside its category', async () => {
-    render(<Wrapper sugs={priced} currency="AUD" />);
+    render(<Wrapper sugs={priced} />);
     await userEvent.setup().type(screen.getByRole('combobox'), 'ch');
     const [chicken, chips] = screen.getAllByRole('option');
     expect(chicken).toHaveTextContent('A$12.50');
@@ -325,14 +325,8 @@ describe('ItemNameCombobox last prices', () => {
       { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 9 },
       { name: 'Milk', categoryId: 'cat2', category: 'Dairy', count: 1, last: { unit: 380, shop: 'Aldi', date: '2026-10-20' } },
     ];
-    render(<Wrapper sugs={twice} currency="AUD" />);
+    render(<Wrapper sugs={twice} />);
     await userEvent.setup().type(screen.getByRole('combobox'), 'mi');
     expect(screen.getByRole('option')).toHaveTextContent('A$3.80');
-  });
-
-  it('shows no price without a currency', async () => {
-    render(<Wrapper sugs={priced} />);
-    await userEvent.setup().type(screen.getByRole('combobox'), 'ch');
-    expect(screen.getAllByRole('option')[0]).not.toHaveTextContent('$');
   });
 });

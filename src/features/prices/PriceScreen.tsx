@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { RouteSkeleton } from '../../components/AppSkeletons';
 import { useAllExpenses } from '../../hooks/useAllExpenses';
+import { seriesColours, useChartColors } from '../../hooks/useChartColors';
 import { formatMoney } from '../../lib/money';
-import { formatDayMonth } from '../../lib/month';
+import { formatDayMonth, formatDayMonthYear } from '../../lib/month';
 import { paths } from '../../lib/paths';
 import { computePriceHistory, priceSeries, type PriceChange } from '../../lib/priceHistory';
 import type { GroupDoc } from '../../types/models';
@@ -12,9 +13,6 @@ import PriceChart from './PriceChart';
 
 /** The newest purchases listed; the chart and shop list still count them all. */
 const PURCHASES_SHOWN = 30;
-
-const dayWithYear = (date: string) => `${formatDayMonth(date)} ${date.slice(0, 4)}`;
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function ChangeRow({ change, currency }: { change: PriceChange; currency: string }) {
   const pct = Math.abs(change.pct).toFixed(1);
@@ -24,7 +22,7 @@ function ChangeRow({ change, currency }: { change: PriceChange; currency: string
     <li className="flex items-baseline justify-between gap-3 text-sm">
       <span className="min-w-0 text-ink-muted">
         {`vs ${change.months} months ago`}
-        <span className="block text-xs">{`from ${formatMoney(change.from.unit, currency)} on ${dayWithYear(change.from.date)}`}</span>
+        <span className="block text-xs">{`from ${formatMoney(change.from.unit, currency)} on ${formatDayMonthYear(change.from.date)}`}</span>
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 font-medium text-ink">
         {!flat && <Icon size={14} strokeWidth={1.75} aria-hidden="true" />}
@@ -39,6 +37,7 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
   const { expenses, itemsByExpense, loading, error } = useAllExpenses(group.id);
   const history = useMemo(() => computePriceHistory(name, expenses, itemsByExpense), [name, expenses, itemsByExpense]);
   const { series, hidden } = useMemo(() => priceSeries(history), [history]);
+  const colours = seriesColours(useChartColors());
 
   if (error) return <p className="text-sm text-negative">{error}</p>;
   if (loading) return <RouteSkeleton />;
@@ -54,11 +53,9 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
     );
   }
 
-  // A second horizon that rests on the same purchase as the first says nothing more.
-  const changes = history.changes.filter((c, i) => i === 0 || c.from.expenseId !== history.changes[0].from.expenseId);
   const cheapest = shops.length >= 2 ? shops[0] : null;
   const slotOf = new Map(series.map((s) => [s.shop, s.slot]));
-  const keyed = series.length >= 2;
+  const showKey = series.length >= 2;
   const recent = [...points].reverse().slice(0, PURCHASES_SHOWN);
 
   return (
@@ -72,9 +69,9 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
         )}
       </div>
 
-      {changes.length > 0 && (
+      {history.changes.length > 0 && (
         <ul aria-label="Price change" className="card space-y-2 px-4 py-3">
-          {changes.map((change) => <ChangeRow key={change.months} change={change} currency={currency} />)}
+          {history.changes.map((change) => <ChangeRow key={change.months} change={change} currency={currency} />)}
         </ul>
       )}
 
@@ -101,7 +98,7 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
                 <span
                   aria-hidden="true"
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: keyed && slot !== undefined ? `rgb(var(--series-${slot + 1}))` : 'transparent' }}
+                  style={{ backgroundColor: showKey && slot !== undefined ? colours[slot] : 'transparent' }}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">{shop.shop}</span>
@@ -136,7 +133,7 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">{point.shop}</span>
-                  <span className="block text-xs text-ink-muted">{dayWithYear(point.date)}</span>
+                  <span className="block text-xs text-ink-muted">{formatDayMonthYear(point.date)}</span>
                 </span>
                 <span className="money shrink-0 text-sm font-semibold text-ink">{formatMoney(point.unit, currency)}</span>
               </Link>
@@ -145,7 +142,7 @@ export default function PriceScreen({ group, name }: { group: GroupDoc; name: st
         </ul>
         {points.length > PURCHASES_SHOWN && (
           <p className="px-1 text-xs text-ink-muted">
-            {`Showing the latest ${PURCHASES_SHOWN} of ${plural(points.length, 'purchase', 'purchases')}.`}
+            {`Showing the latest ${PURCHASES_SHOWN} of ${points.length} purchases.`}
           </p>
         )}
       </section>

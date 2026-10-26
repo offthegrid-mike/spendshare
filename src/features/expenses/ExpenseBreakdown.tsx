@@ -61,7 +61,13 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
               <li key={it.id} className="flex items-baseline justify-between gap-3 text-ink-muted">
                 <span className="min-w-0">
                   {canLinkPrices(it.name)
-                    ? <Link to={paths.price(it.name)} className="text-ink hover:underline">{it.name}</Link>
+                    ? <Link
+                        to={paths.price(it.name)}
+                        title="Price history"
+                        className="text-ink underline decoration-dotted decoration-ink-faint underline-offset-4 hover:decoration-ink"
+                      >
+                        {it.name}
+                      </Link>
                     : <span className="text-ink">{it.name}</span>}
                   {!it.shared && <span className="ml-1.5"><Chip>Personal</Chip></span>}
                   {it.remark && <span data-testid="item-remark" className="block text-xs text-ink-muted">{it.remark}</span>}

@@ -1,9 +1,9 @@
 import { CartesianGrid, Legend, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMoney } from '../../lib/money';
-import { formatDayMonth } from '../../lib/month';
+import { formatDayMonth, formatDayMonthYear, formatShortMonthYear } from '../../lib/month';
 import type { PricePoint, PriceSeries } from '../../lib/priceHistory';
 import { dayDate, dayNumber, timeTicks } from '../../lib/timeTicks';
-import { useChartColors } from '../../hooks/useChartColors';
+import { seriesColours, useChartColors } from '../../hooks/useChartColors';
 
 const MONO = '"Geist Mono Variable", ui-monospace, monospace';
 const MARKER_RADIUS = 5;
@@ -11,7 +11,7 @@ const HIT_RADIUS = 12;
 
 interface Mark extends PricePoint {
   /** Day number, for the date axis. */
-  t: number;
+  day: number;
 }
 
 interface TooltipProps {
@@ -27,7 +27,7 @@ function PurchaseTooltip({ active, payload, currency }: TooltipProps) {
   return (
     <div className="rounded-[10px] border border-line bg-surface px-3 py-2 shadow-pop">
       <p className="money text-sm font-semibold text-ink">{formatMoney(mark.unit, currency)}</p>
-      <p className="text-xs text-ink-muted">{`${mark.shop} · ${formatDayMonth(mark.date)} ${mark.date.slice(0, 4)}`}</p>
+      <p className="text-xs text-ink-muted">{`${mark.shop} · ${formatDayMonthYear(mark.date)}`}</p>
     </div>
   );
 }
@@ -35,14 +35,14 @@ function PurchaseTooltip({ active, payload, currency }: TooltipProps) {
 /** One line per shop, a marker per purchase, over a time axis. */
 export default function PriceChart({ series, currency }: { series: PriceSeries[]; currency: string }) {
   const c = useChartColors();
-  const colours = [c.series1, c.series2, c.series3, c.series4, c.series5];
+  const colours = seriesColours(c);
   const lines = series.map((s) => ({
     ...s,
     colour: colours[s.slot],
-    marks: s.points.map((p): Mark => ({ ...p, t: dayNumber(p.date) })),
+    marks: s.points.map((p): Mark => ({ ...p, day: dayNumber(p.date) })),
   }));
 
-  const days = lines.flatMap((l) => l.marks.map((m) => m.t));
+  const days = lines.flatMap((l) => l.marks.map((m) => m.day));
   const first = Math.min(...days);
   const last = Math.max(...days);
   // Room either side so the end markers aren't cut off.
@@ -50,7 +50,7 @@ export default function PriceChart({ series, currency }: { series: PriceSeries[]
   const { ticks, unit } = timeTicks(first, last);
   const tickLabel = (day: number) => {
     const date = dayDate(day);
-    return unit === 'month' ? `${formatDayMonth(date).split(' ')[1]} ${date.slice(0, 4)}` : formatDayMonth(date);
+    return unit === 'month' ? formatShortMonthYear(date) : formatDayMonth(date);
   };
   const tick = { fill: c.tick, fontFamily: MONO };
 
@@ -61,7 +61,7 @@ export default function PriceChart({ series, currency }: { series: PriceSeries[]
           <CartesianGrid vertical={false} stroke={c.grid} />
           <XAxis
             type="number"
-            dataKey="t"
+            dataKey="day"
             domain={[first - pad, last + pad]}
             ticks={ticks}
             tickFormatter={tickLabel}

@@ -10,7 +10,7 @@ import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol } from '../../lib/converters';
 import { toCents, formatMoney } from '../../lib/money';
 import { collapseWhitespace } from '../../lib/textNormalize';
-import { monthKey } from '../../lib/month';
+import { dayKey, monthKey } from '../../lib/month';
 import { useCategories, fetchActiveCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
 import { carryEntry } from '../../lib/carryEntry';
@@ -508,7 +508,7 @@ export default function ExpenseEditor({
         category: it.category,
       }));
       // The same local day purchaseDate gives the saved expense, so the price filed here matches its history.
-      const day = format(expDate, 'yyyy-MM-dd');
+      const day = dayKey(expDate);
       const newItemInputs = data.items.map((it) => ({
         name: it.name,
         categoryId: it.categoryId,

@@ -590,6 +590,27 @@ describe('ExpenseEditor', () => {
     });
   });
 
+  it('files the price of one, not of the line, when an item is bought several at a time', async () => {
+    const { setSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), 'Coles');
+    await u.type(screen.getByPlaceholderText(/item name/i), 'Apples');
+    await u.type(screen.getByLabelText(/unit price/i), '3.00');
+    await u.clear(screen.getByLabelText('Quantity'));
+    await u.type(screen.getByLabelText('Quantity'), '2');
+    await u.click(screen.getByRole('button', { name: /add item/i }));
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const suggestionsCall = setSpy.mock.calls.find(([ref]: [any]) => String(ref?.path ?? '').includes('suggestions'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { items } = (suggestionsCall as any)[1];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(items.find((entry: any) => entry.name === 'Apples').last.unit).toBe(300);
+  });
+
   // 23. Discount — checkbox reveals percent field defaulting to 2% -------------
   it('reveals a percent field defaulting to 2 when "Apply card discount" is checked', async () => {
     const u = userEvent.setup();

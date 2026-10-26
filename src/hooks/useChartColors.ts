@@ -48,6 +48,11 @@ const FALLBACK: ChartColors = {
   series5: '#e87ba4',
 };
 
+/** The five series colours as a list, so a chart can pick one by its slot. */
+export function seriesColours(c: ChartColors): string[] {
+  return [c.series1, c.series2, c.series3, c.series4, c.series5];
+}
+
 /** Maps token triplets ("4 120 87") to rgb() colours, falling back per token. */
 export function chartColorsFrom(read: (name: string) => string): ChartColors {
   const out = {} as ChartColors;

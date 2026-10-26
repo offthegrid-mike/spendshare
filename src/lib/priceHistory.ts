@@ -1,17 +1,11 @@
-import { format } from 'date-fns';
 import { formatMoney } from './money';
-import { daysInMonthKey, formatDayMonth } from './month';
+import { dayKey, daysInMonthKey, formatDayMonth } from './month';
 import { isRefund } from './refund';
-import { collapseWhitespace, normalizeNameKey } from './textNormalize';
+import { collapseWhitespace, isDotsOnly, normalizeNameKey } from './textNormalize';
 import type { ExpenseDoc, ItemDoc, LastPrice } from '../types/models';
 
 /** One purchase of an item: what a single one cost, where, and when. */
-export interface PricePoint {
-  /** 'YYYY-MM-DD' */
-  date: string;
-  shop: string;
-  /** Cents for one. */
-  unit: number;
+export interface PricePoint extends LastPrice {
   expenseId: string;
 }
 
@@ -24,6 +18,8 @@ export interface ShopPrices {
   /** Average unit price, in whole cents. */
   mean: number;
   latest: PricePoint;
+  /** Oldest first. */
+  points: PricePoint[];
 }
 
 export interface PriceChange {
@@ -61,7 +57,7 @@ export function unitPrice(item: Pick<ItemDoc, 'amount' | 'quantity' | 'unitAmoun
 
 /** The day an expense was made, 'YYYY-MM-DD' in local time. */
 export function purchaseDate(expense: Pick<ExpenseDoc, 'date'>): string {
-  return format(expense.date.toDate(), 'yyyy-MM-dd');
+  return dayKey(expense.date.toDate());
 }
 
 /** `date` some months earlier, with the day cut back to fit a shorter month (31 Aug less 6 months is 28 Feb). */
@@ -115,23 +111,27 @@ export function computePriceHistory(
 }
 
 function shopPrices(points: PricePoint[]): ShopPrices[] {
-  const sums = new Map<string, { shop: string; total: number; count: number; min: number; max: number; latest: PricePoint }>();
+  const byShop = new Map<string, PricePoint[]>();
   for (const point of points) {
-    const shopKey = normalizeNameKey(point.shop);
-    const entry = sums.get(shopKey);
-    if (entry) {
-      entry.shop = point.shop; // the newest spelling wins
-      entry.total += point.unit;
-      entry.count += 1;
-      entry.min = Math.min(entry.min, point.unit);
-      entry.max = Math.max(entry.max, point.unit);
-      entry.latest = point;
-    } else {
-      sums.set(shopKey, { shop: point.shop, total: point.unit, count: 1, min: point.unit, max: point.unit, latest: point });
-    }
+    const key = normalizeNameKey(point.shop);
+    const group = byShop.get(key);
+    if (group) group.push(point);
+    else byShop.set(key, [point]);
   }
-  return [...sums.values()]
-    .map(({ total, ...rest }) => ({ ...rest, mean: Math.round(total / rest.count) }))
+  return [...byShop.values()]
+    .map((group): ShopPrices => {
+      const units = group.map((p) => p.unit);
+      const latest = group[group.length - 1];
+      return {
+        shop: latest.shop, // the newest spelling wins
+        count: group.length,
+        min: Math.min(...units),
+        max: Math.max(...units),
+        mean: Math.round(units.reduce((sum, u) => sum + u, 0) / group.length),
+        latest,
+        points: group,
+      };
+    })
     .sort((a, b) => a.mean - b.mean || a.shop.localeCompare(b.shop));
 }
 
@@ -140,7 +140,10 @@ function priceChanges(points: PricePoint[], latest: PricePoint): PriceChange[] {
   for (const months of CHANGE_MONTHS) {
     const target = monthsBefore(latest.date, months);
     const from = [...points].reverse().find((p) => p.date <= target);
-    if (from) changes.push({ months, from, to: latest, pct: ((latest.unit - from.unit) * 100) / from.unit });
+    // A longer horizon resting on the same purchase as a shorter one says nothing more.
+    if (from && from.expenseId !== changes[0]?.from.expenseId) {
+      changes.push({ months, from, to: latest, pct: ((latest.unit - from.unit) * 100) / from.unit });
+    }
   }
   return changes;
 }
@@ -160,19 +163,14 @@ export interface PriceSeries {
 }
 
 /** The most lines a chart can tell apart. */
-export const MAX_PRICE_SERIES = 5;
+const MAX_PRICE_SERIES = 5;
 
 /**
  * A line per shop for the chart. When more shops have sold the item than the chart can
  * draw, it keeps the ones bought at most (the more recent on a tie) and counts the rest as hidden.
  */
 export function priceSeries(history: PriceHistory, max = MAX_PRICE_SERIES): { series: PriceSeries[]; hidden: number } {
-  const byShop = new Map<string, PricePoint[]>();
-  for (const point of history.points) {
-    const key = normalizeNameKey(point.shop);
-    byShop.set(key, [...(byShop.get(key) ?? []), point]);
-  }
-  const lines = history.shops.map(({ shop }) => ({ shop, points: byShop.get(normalizeNameKey(shop)) ?? [] }));
+  const lines = history.shops.map(({ shop, points }) => ({ shop, points }));
   const newest = (line: { points: PricePoint[] }) => line.points[line.points.length - 1].date;
   const kept = [...lines]
     .sort((a, b) => b.points.length - a.points.length || newest(b).localeCompare(newest(a)) || a.shop.localeCompare(b.shop))
@@ -183,5 +181,6 @@ export function priceSeries(history: PriceHistory, max = MAX_PRICE_SERIES): { se
 
 /** Whether an item's price page can be reached by name: not blank, and not dots only, which an address reads as a folder. */
 export function canLinkPrices(name: string): boolean {
-  return !/^\.*$/.test(collapseWhitespace(name));
+  const clean = collapseWhitespace(name);
+  return clean !== '' && !isDotsOnly(clean);
 }
