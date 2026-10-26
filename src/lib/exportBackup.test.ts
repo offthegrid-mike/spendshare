@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Timestamp } from 'firebase/firestore';
-import { BACKUP_SCHEMA_VERSION, backupFileName, buildBackup, type BackupInput } from './exportBackup';
+import { BACKUP_SCHEMA_VERSION, buildBackup, type BackupInput } from './exportBackup';
 import { makeExpense, makeGroup, makeItem } from '../test/fixtures';
 import type { CategoryDoc, ExpenseDoc, GroupDoc, IncomeDoc, SettlementDoc, SuggestionsDoc } from '../types/models';
 
@@ -91,6 +91,17 @@ describe('buildBackup', () => {
     expect(json).not.toContain('"email"');
   });
 
+  it('cuts a name that is an email back to what is before the @, so the address is not given away', () => {
+    const emailNamed: GroupDoc = {
+      ...group,
+      members: { ...group.members, sam: { role: 'member', displayName: 'sam@example.com', email: 'sam@example.com', joinedAt: stamp('2026-02-01T00:00:00Z') } },
+      memberUids: [...group.memberUids, 'sam'],
+    };
+    const backup = buildBackup(input({ group: emailNamed }), exportedAt);
+    expect(backup.group.members.sam.displayName).toBe('sam');
+    expect(JSON.stringify(backup)).not.toContain('@');
+  });
+
   it("does not change what it was given, emails included", () => {
     buildBackup(input(), exportedAt);
     expect(group.members.mike.email).toBe('mike@example.com');
@@ -168,11 +179,5 @@ describe('buildBackup', () => {
   it('is plain JSON: nothing is lost or changed by writing it out and reading it back', () => {
     const backup = buildBackup(input(), exportedAt);
     expect(JSON.parse(JSON.stringify(backup))).toEqual(backup);
-  });
-});
-
-describe('backupFileName', () => {
-  it('names the group and the day', () => {
-    expect(backupFileName(group, new Date(2026, 9, 26, 12))).toBe('spendshare-hartley-house-backup-2026-10-26.json');
   });
 });

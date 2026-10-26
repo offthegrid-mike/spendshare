@@ -20,3 +20,10 @@ export function csvMoney(cents: number): string {
   const figure = (Math.abs(cents) / 100).toFixed(2);
   return cents < 0 ? `-${figure}` : figure;
 }
+
+/** 'yes' or 'no', the way a CSV writes a boolean. */
+export function csvYesNo(value: boolean): string {
+  return value ? 'yes' : 'no';
+}
+
+export const CSV_MIME_TYPE = 'text/csv;charset=utf-8';

@@ -5,7 +5,7 @@ import {
 import { db } from './firebase';
 import { categoriesCol, expensesCol, incomeCol, settlementsCol, suggestionsDocRef } from './converters';
 import type { BackupInput } from './exportBackup';
-import { periodMonths, type ExportPeriod } from './exportCsv';
+import { periodMonths, type ExportPeriod } from './exportNames';
 import type { CategoryDoc, ExpenseDoc, IncomeDoc, ItemDoc, SettlementDoc, SuggestionsDoc } from '../types/models';
 
 // What an export reads. Always from the server, never the offline cache or the

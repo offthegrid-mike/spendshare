@@ -1,8 +1,9 @@
+import { CSV_MIME_TYPE } from './csv';
 import { downloadFile } from './downloadFile';
-import { backupFileName, buildBackup } from './exportBackup';
-import { buildExpensesCsv, csvFileName, type ExportPeriod } from './exportCsv';
+import { buildBackup } from './exportBackup';
+import { buildExpensesCsv } from './exportCsv';
 import { ExportError, loadBackupData, loadPeriodData } from './exportData';
-import { formatMonthLabel } from './month';
+import { backupFileName, csvFileName, periodLabel, type ExportPeriod } from './exportNames';
 import type { GroupDoc } from '../types/models';
 
 // An export end to end: read from the server, build the file, save it. Each
@@ -13,13 +14,8 @@ export interface ExportResult {
   message: string;
 }
 
-const CSV_TYPE = 'text/csv;charset=utf-8';
 // Without it Excel reads a UTF-8 file as Windows-1252 and garbles non-Latin names.
 const BYTE_ORDER_MARK = '﻿';
-
-function periodLabel(period: ExportPeriod): string {
-  return period.kind === 'month' ? formatMonthLabel(period.month) : period.year;
-}
 
 function failed(err: unknown): ExportResult {
   if (err instanceof ExportError) return { status: 'error', message: err.message };
@@ -35,7 +31,7 @@ export async function exportPeriodCsv(group: GroupDoc, period: ExportPeriod): Pr
       return { status: 'empty', message: `No expenses in ${periodLabel(period)} to export.` };
     }
     const fileName = csvFileName(group, period);
-    downloadFile(fileName, BYTE_ORDER_MARK + buildExpensesCsv(group, expenses, itemsByExpense), CSV_TYPE);
+    downloadFile(fileName, BYTE_ORDER_MARK + buildExpensesCsv(group, expenses, itemsByExpense), CSV_MIME_TYPE);
     return { status: 'done', message: `Downloaded ${fileName}` };
   } catch (err) {
     return failed(err);

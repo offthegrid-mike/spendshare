@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildExpensesCsv, csvFileName, periodMonths } from './exportCsv';
+import { buildExpensesCsv } from './exportCsv';
 import { computeYearSummary } from './yearSummary';
 import { makeExpense, makeGroup, makeItem } from '../test/fixtures';
-import type { ExpenseDoc, ItemDoc } from '../types/models';
+import type { ExpenseDoc, GroupDoc, ItemDoc } from '../types/models';
 
 const group = makeGroup('g1', 'Hartley House');
 
@@ -110,6 +110,26 @@ describe('buildExpensesCsv', () => {
     expect(row).toEqual(['2026-10-03', 'Coles', 'Mike', '', '', '', '', '45.00', '', '', '', 'purchase', 'e1', '', '']);
   });
 
+  it("never gives away a payer's email: a name that is one is cut back to what is before the @", () => {
+    const emailNamed: GroupDoc = {
+      ...group,
+      members: { ...group.members, sam: { role: 'member', displayName: 'sam@example.com', email: 'sam@example.com', joinedAt: null as never } },
+      memberUids: [...group.memberUids, 'sam'],
+    };
+    const e1 = makeExpense('e1', { payerUid: 'sam' });
+    expect(rows(buildExpensesCsv(emailNamed, [e1], { e1: [makeItem('i1', 'e1')] }))[1][2]).toBe('sam');
+  });
+
+  it("falls back to no more than the part of the email before the @ when a payer has no name", () => {
+    const unnamed: GroupDoc = {
+      ...group,
+      members: { ...group.members, sam: { role: 'member', displayName: '', email: 'sam@example.com', joinedAt: null as never } },
+      memberUids: [...group.memberUids, 'sam'],
+    };
+    const e1 = makeExpense('e1', { payerUid: 'sam' });
+    expect(buildExpensesCsv(unnamed, [e1], { e1: [makeItem('i1', 'e1')] })).not.toContain('@');
+  });
+
   it('names a payer who has left the group by whatever is known of them', () => {
     const e1 = makeExpense('e1', { payerUid: 'someone-else' });
     expect(rows(build([e1], { e1: [makeItem('i1', 'e1')] }))[1][2]).toBe('someone-else');
@@ -127,24 +147,5 @@ describe('buildExpensesCsv', () => {
     const csvTotal = rows(build([e1, e2, r1], items)).slice(1).reduce((sum, r) => sum + Math.round(Number(r[7]) * 100), 0);
     const year = computeYearSummary('2026', group.memberUids, Object.values(items).flat(), []);
     expect(csvTotal).toBe(year.grandTotal);
-  });
-});
-
-describe('periodMonths', () => {
-  it('is one month for a month, and January to December for a year', () => {
-    expect(periodMonths({ kind: 'month', month: '2026-10' })).toEqual({ from: '2026-10', to: '2026-10' });
-    expect(periodMonths({ kind: 'year', year: '2026' })).toEqual({ from: '2026-01', to: '2026-12' });
-  });
-});
-
-describe('csvFileName', () => {
-  it('names the group and the period', () => {
-    expect(csvFileName(group, { kind: 'month', month: '2026-10' })).toBe('spendshare-hartley-house-2026-10.csv');
-    expect(csvFileName(group, { kind: 'year', year: '2026' })).toBe('spendshare-hartley-house-2026.csv');
-  });
-
-  it('keeps a file name safe, whatever the group is called', () => {
-    expect(csvFileName({ ...group, name: "Mike & Priya's / flat #2" }, { kind: 'year', year: '2026' })).toBe('spendshare-mike-priya-s-flat-2-2026.csv');
-    expect(csvFileName({ ...group, name: '我的家' }, { kind: 'year', year: '2026' })).toBe('spendshare-group-2026.csv');
   });
 });

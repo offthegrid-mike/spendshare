@@ -74,6 +74,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   const year = selectedMonth.slice(0, 4);
   // The export's message is about the month or year on screen, so it goes when that changes.
   const exportRun = useExportRun(`${view}:${selectedMonth}`);
+  const periodTitle = view === 'year' ? year : formatMonthLabel(selectedMonth);
   const money = (cents: number) => formatMoney(cents, group.currency);
   const nameOf = (uid: string) => (uid === currentUserUid ? 'You' : memberName(group, uid));
 
@@ -87,7 +88,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
       {/* A long month on a narrow phone drops the controls to their own row rather than wrapping the title. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h1 className="text-[22px] font-semibold tracking-tight text-ink">
-          {view === 'year' ? year : formatMonthLabel(selectedMonth)}
+          {periodTitle}
         </h1>
         <div className="ml-auto flex items-center gap-2">
           <button
@@ -95,7 +96,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
             disabled={exportRun.busy}
             onClick={() => void exportRun.run(() =>
               exportPeriodCsv(group, view === 'year' ? { kind: 'year', year } : { kind: 'month', month: selectedMonth }))}
-            title={`Download ${view === 'year' ? year : formatMonthLabel(selectedMonth)} as a spreadsheet (CSV)`}
+            title={`Download ${periodTitle} as a spreadsheet (CSV)`}
             className="btn-ghost px-2.5"
           >
             <Download size={16} strokeWidth={1.75} aria-hidden="true" />

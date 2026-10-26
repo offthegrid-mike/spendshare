@@ -1,6 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
-import { fileSlug } from './exportCsv';
-import { dayKey } from './month';
+import { exportName } from './exportNames';
 import type {
   CategoryDoc, ExpenseDoc, GroupDoc, GroupMember, IncomeDoc, ItemDoc, SettlementDoc, SuggestionsDoc, Uid,
 } from '../types/models';
@@ -65,9 +64,11 @@ function toJson<T>(value: T): Json<T> {
   return value as Json<T>;
 }
 
+/** A member without the email, and with a name that is one cut back to what is before the @. */
 function withoutEmail(member: GroupMember): Omit<Json<GroupMember>, 'email'> {
   const copy: Partial<Json<GroupMember>> = toJson(member);
   delete copy.email;
+  copy.displayName = exportName(member.displayName);
   return copy as Omit<Json<GroupMember>, 'email'>;
 }
 
@@ -96,9 +97,4 @@ export function buildBackup(input: BackupInput, exportedAt: Date): Backup {
     settlements: [...input.settlements].sort((a, b) => a.month.localeCompare(b.month) || byId(a, b)).map(toJson),
     suggestions: input.suggestions ? toJson(input.suggestions) : null,
   };
-}
-
-/** 'spendshare-hartley-house-backup-2026-10-26.json' */
-export function backupFileName(group: Pick<GroupDoc, 'name'>, exportedAt: Date): string {
-  return `spendshare-${fileSlug(group.name)}-backup-${dayKey(exportedAt)}.json`;
 }

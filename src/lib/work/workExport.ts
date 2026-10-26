@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore';
 import type { WorkDayDoc } from '../../types/models';
-import { csvLine } from '../csv';
+import { csvLine, csvYesNo } from '../csv';
 import type { Clock } from './workDates';
 import { byDate, weekdayShort } from './workFormat';
 import type { ResolvedRate } from './workRates';
@@ -48,10 +48,6 @@ function iso(stamp: Timestamp | null | undefined): string {
   return stamp ? stamp.toDate().toISOString() : '';
 }
 
-function yesNo(value: boolean): string {
-  return value ? 'yes' : 'no';
-}
-
 function rateSource(rate: ResolvedRate): string {
   return rate.source === 'carried' && rate.carriedFrom !== undefined ? `carried from ${rate.carriedFrom}` : rate.source;
 }
@@ -70,9 +66,9 @@ export function daysCsv(days: WorkDayDoc[], incomeYear: string, rate: ResolvedRa
       iso(day.firstRecordedAt),
       iso(day.recordedAt),
       iso(day.syncedAt),
-      yesNo(day.addedLater),
-      yesNo(day.countedInClaim),
-      yesNo(day.finishConfirmed),
+      csvYesNo(day.addedLater),
+      csvYesNo(day.countedInClaim),
+      csvYesNo(day.finishConfirmed),
       iso(day.finishConfirmedAt),
       day.revisions.length,
     ]),
@@ -106,9 +102,9 @@ export function revisionsCsv(days: WorkDayDoc[]): string {
         revision.startTime,
         revision.finishTime,
         revision.minutes,
-        yesNo(revision.addedLater),
-        yesNo(revision.countedInClaim),
-        yesNo(revision.finishConfirmed),
+        csvYesNo(revision.addedLater),
+        csvYesNo(revision.countedInClaim),
+        csvYesNo(revision.finishConfirmed),
       ]),
     ),
   );
