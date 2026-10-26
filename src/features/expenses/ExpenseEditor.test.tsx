@@ -514,3 +514,40 @@ describe('ExpenseEditor tags and receipt scans', () => {
     expect(items.map((d) => [d.name, d.tags])).toEqual([['Paint', ['Renovation']]]);
   });
 });
+
+describe('ExpenseEditor expense-wide tags on a full item', () => {
+  it('says which items were already full and did not get the tag', () => {
+    const full = Array.from({ length: 10 }, (_, i) => `t${i}`);
+    renderEditor({ expense: editExpense, items: [{ ...editItems[0], tags: full }, editItems[1]] });
+    const everyItem = screen.getByRole('combobox', { name: /^Tags for every item/ });
+    fireEvent.change(everyItem, { target: { value: 'Renovation' } });
+    fireEvent.keyDown(everyItem, { key: 'Enter' });
+    expect(screen.getByText('1 item already has 10 tags and didn’t get “Renovation”.')).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseEditor tag counts', () => {
+  beforeEach(() => {
+    batchSets.length = 0;
+    mockCommit.mockClear();
+  });
+
+  it('moves the tag counts when an edit swaps one tag for another', async () => {
+    renderEditor({ expense: editExpense, items: [{ ...editItems[0], tags: ['Trip'] }, { ...editItems[1], tags: ['Trip'] }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag Trip' }));
+    const everyItem = screen.getByRole('combobox', { name: /^Tags for every item/ });
+    fireEvent.change(everyItem, { target: { value: 'Holiday' } });
+    fireEvent.keyDown(everyItem, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    // The mocked suggestions start empty: Trip comes off (nothing to lower), Holiday goes on once.
+    expect(batchSets.find((d) => 'shops' in d)?.tags).toEqual([{ name: 'Holiday', count: 1 }]);
+  });
+
+  it('leaves the tag counts alone when a refund is saved', async () => {
+    renderEditor({ refundOf: { expense: editExpense, items: [{ ...editItems[0], tags: ['Trip'] }], remaining: 570 } });
+    fireEvent.click(screen.getByRole('button', { name: /save refund/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    expect(batchSets.find((d) => 'shops' in d)).toBeUndefined();
+  });
+});

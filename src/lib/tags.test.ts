@@ -83,3 +83,18 @@ describe('tag totals', () => {
     ]);
   });
 });
+
+describe('odd tags', () => {
+  it('refuses a tag that is only dots, which would break its page path', () => {
+    expect(addTag([], '.')).toEqual([]);
+    expect(addTag([], ' .. ')).toEqual([]);
+    expect(addTag([], '...ok')).toEqual(['...ok']);
+  });
+
+  it('ignores tags that are not text rather than failing', () => {
+    const odd = makeExpense('e9', { day: '2026-10-01' });
+    const items = { e9: [makeItem('i9', 'e9', { tags: [42 as unknown as string, 'Real'] })] };
+    expect(tagTotals([odd], items).map((t) => t.tag)).toEqual(['Real']);
+    expect(sharedTags(items.e9)).toEqual(['Real']);
+  });
+});

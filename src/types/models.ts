@@ -100,5 +100,5 @@ export const itemSchema = z.object({
   quantity: z.number().int().positive().optional(),
   unitAmount: z.number().int().nonnegative().optional(),
   refund: z.boolean().optional(),
-  tags: z.array(z.string()).max(10).optional(),
+  tags: z.array(z.string()).max(10).optional(), // MAX_TAGS in lib/tags (kept literal: models must not import lib)
 });

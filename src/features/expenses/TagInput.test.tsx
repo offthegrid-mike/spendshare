@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TagInput from './TagInput';
+import { MAX_TAGS } from '../../lib/tags';
 
-function Harness({ initial = [], onChange }: { initial?: string[]; onChange?: (tags: string[]) => void }) {
+function Harness({ initial = [], onChange, hint }: { initial?: string[]; onChange?: (tags: string[]) => void; hint?: string }) {
   const [tags, setTags] = useState(initial);
   return (
     <TagInput
@@ -12,6 +13,7 @@ function Harness({ initial = [], onChange }: { initial?: string[]; onChange?: (t
       label="Tags"
       tags={tags}
       suggestions={['Holiday 2026', 'Renovation']}
+      hint={hint}
       onChange={(next) => {
         setTags(next);
         onChange?.(next);
@@ -76,5 +78,32 @@ describe('TagInput', () => {
     render(<Harness initial={['Renovation']} />);
     const options = [...document.querySelectorAll('#tags-suggestions option')].map((o) => o.getAttribute('value'));
     expect(options).toEqual(['Holiday 2026']);
+  });
+
+  it('says when an item is full, and stops taking tags', () => {
+    render(<Harness initial={Array.from({ length: MAX_TAGS }, (_, i) => `t${i}`)} />);
+    expect(screen.getByText(`${MAX_TAGS} tags is the most.`)).toBeInTheDocument();
+    expect(field()).toBeDisabled();
+  });
+
+  it('does not add a tag on Enter while an input method is composing', () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    fireEvent.change(field(), { target: { value: '街' } });
+    fireEvent.keyDown(field(), { key: 'Enter', isComposing: true });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('turns pasted comma-separated text into separate tags', () => {
+    render(<Harness />);
+    fireEvent.change(field(), { target: { value: 'Holiday, Food, Snacks' } });
+    expect(screen.getByText('Holiday')).toBeInTheDocument();
+    expect(screen.getByText('Food')).toBeInTheDocument();
+    expect(field()).toHaveValue(' Snacks');
+  });
+
+  it('describes the field with its hint', () => {
+    render(<Harness hint="Tag single items from their own row." />);
+    expect(field()).toHaveAccessibleDescription('Tag single items from their own row.');
   });
 });

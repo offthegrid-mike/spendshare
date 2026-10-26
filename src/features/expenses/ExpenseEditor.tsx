@@ -18,8 +18,7 @@ import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
-import { expenseTags } from '../../lib/suggestions';
-import { addTag, cleanTag, removeTag, sharedTags, tagKey } from '../../lib/tags';
+import { addTag, cleanTag, expenseTags, hasTag, MAX_TAGS, removeTag, sharedTags } from '../../lib/tags';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
@@ -348,20 +347,29 @@ export default function ExpenseEditor({
   // Live totals
   const watchedItems = useWatch({ control, name: 'items' });
   const watchedTags = useWatch({ control, name: 'tags' });
+  const [tagNote, setTagNote] = useState<string | null>(null);
   const tagNames = tagSuggestions.map((t) => t.name);
 
   /** Sets the expense-wide tags, adding the new ones to every item and taking removed ones off. */
   function applyExpenseTags(next: string[]) {
     const before = getValues('tags') ?? [];
-    const added = next.filter((t) => !before.some((b) => tagKey(b) === tagKey(t)));
-    const removed = before.filter((b) => !next.some((t) => tagKey(t) === tagKey(b)));
+    const added = next.filter((t) => !hasTag(before, t));
+    const removed = before.filter((b) => !hasTag(next, b));
     setValue('tags', next);
+    let full = 0;
     (getValues('items') ?? []).forEach((item, i) => {
       let tags = item.tags ?? [];
       for (const tag of removed) tags = removeTag(tags, tag);
       for (const tag of added) tags = addTag(tags, tag);
+      // An item already holding MAX_TAGS can't take a new one.
+      if (added.some((tag) => !hasTag(tags, tag))) full += 1;
       setValue(`items.${i}.tags`, tags);
     });
+    setTagNote(
+      full > 0 && added.length > 0
+        ? `${full} item${full === 1 ? ' already has' : 's already have'} ${MAX_TAGS} tags and didn’t get “${added.join('”, “')}”.`
+        : null,
+    );
   }
   const watchedGiftCard = useWatch({ control, name: 'giftCardAmount' });
   const watchedApplyDiscount = useWatch({ control, name: 'applyDiscount' });
@@ -752,6 +760,7 @@ export default function ExpenseEditor({
         suggestions={tagNames}
         hint="Tag single items from their own row."
       />
+      {tagNote && <p role="status" className="-mt-2 text-xs text-warning">{tagNote}</p>}
 
       {/* Gift card & discount; a refund has neither. */}
       {!refundMode && (

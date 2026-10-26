@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { addTag, removeTag, tagKey } from '../../lib/tags';
+import { addTag, hasTag, MAX_TAGS, removeTag, tagKey } from '../../lib/tags';
+import { TAG_CHIP_CLASS } from '../../components/ui/TagChip';
 
 interface Props {
   id: string;
@@ -16,12 +17,14 @@ interface Props {
 export default function TagInput({ id, label, tags, onChange, suggestions, hint }: Props) {
   const [draft, setDraft] = useState('');
   const listId = `${id}-suggestions`;
-  const offered = suggestions.filter((s) => !tags.some((t) => tagKey(t) === tagKey(s)));
+  const hintId = `${id}-hint`;
+  const full = tags.length >= MAX_TAGS;
+  const offered = suggestions.filter((s) => !hasTag(tags, s));
 
-  function commit() {
-    if (draft.trim() === '') return;
-    const next = addTag(tags, draft);
-    setDraft('');
+  /** Adds each of `values` as a tag and clears the field to `rest`. */
+  function commit(values: string[], rest = '') {
+    const next = values.reduce(addTag, tags);
+    setDraft(rest);
     if (next !== tags) onChange(next);
   }
 
@@ -32,7 +35,7 @@ export default function TagInput({ id, label, tags, onChange, suggestions, hint 
       </label>
       <div className="field flex min-h-10 flex-wrap items-center gap-1.5 py-1.5">
         {tags.map((tag) => (
-          <span key={tagKey(tag)} className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-ink">
+          <span key={tagKey(tag)} className={TAG_CHIP_CLASS}>
             {tag}
             <button
               type="button"
@@ -44,32 +47,32 @@ export default function TagInput({ id, label, tags, onChange, suggestions, hint 
             </button>
           </span>
         ))}
+        {/* An input with a datalist is a combobox in its own right. */}
         <input
           id={id}
-          role="combobox"
-          aria-expanded={false}
           list={listId}
           value={draft}
+          disabled={full}
+          aria-describedby={hint || full ? hintId : undefined}
           onChange={(e) => {
-            const value = e.target.value;
-            // A comma ends the tag being typed.
-            if (value.endsWith(',')) {
-              const next = addTag(tags, value.slice(0, -1));
-              setDraft('');
-              if (next !== tags) onChange(next);
-            } else {
-              setDraft(value);
-            }
+            // A comma ends a tag, so typed or pasted "a, b, c" makes three.
+            const parts = e.target.value.split(',');
+            const rest = parts.pop() ?? '';
+            if (parts.length > 0) commit(parts, rest);
+            else setDraft(rest);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            // Enter while an input method is composing picks a character, not a tag.
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              commit();
+              if (draft.trim() !== '') commit([draft]);
             } else if (e.key === 'Backspace' && draft === '' && tags.length > 0) {
               onChange(tags.slice(0, -1));
             }
           }}
-          onBlur={commit}
+          onBlur={() => {
+            if (draft.trim() !== '') commit([draft]);
+          }}
           placeholder={tags.length === 0 ? 'e.g. Holiday 2026' : ''}
           className="min-w-24 flex-1 bg-transparent text-sm outline-none"
         />
@@ -77,7 +80,11 @@ export default function TagInput({ id, label, tags, onChange, suggestions, hint 
           {offered.map((s) => <option key={tagKey(s)} value={s} />)}
         </datalist>
       </div>
-      {hint && <p className="mt-1 text-xs text-ink-muted">{hint}</p>}
+      {(hint || full) && (
+        <p id={hintId} className="mt-1 text-xs text-ink-muted">
+          {full ? `${MAX_TAGS} tags is the most.` : hint}
+        </p>
+      )}
     </div>
   );
 }

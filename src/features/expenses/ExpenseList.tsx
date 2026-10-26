@@ -4,7 +4,7 @@ import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
-import { expenseTags } from '../../lib/suggestions';
+import { expenseTags } from '../../lib/tags';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney, plainSigned } from '../../lib/money';
 import { isRefund, signedNet } from '../../lib/refund';

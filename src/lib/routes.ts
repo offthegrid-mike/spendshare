@@ -34,13 +34,22 @@ export function routeInfo(pathname: string): RouteInfo {
   if (isEditExpensePath(pathname)) return { kind: 'secondary', title: 'Edit expense', back: paths.spend };
   if (isRefundExpensePath(pathname)) return { kind: 'secondary', title: 'Refund', back: paths.spend };
   const tag = TAG_PATH.exec(pathname);
-  if (tag) return { kind: 'secondary', title: decodeURIComponent(tag[1]), back: paths.tags };
+  if (tag) return { kind: 'secondary', title: safeDecode(tag[1]), back: paths.tags };
   return { kind: 'primary', monthScoped: MONTH_SCOPED.has(pathname) };
 }
 
 /** An existing expense being edited. */
 export function isEditExpensePath(pathname: string): boolean {
   return EDIT_EXPENSE_PATH.test(pathname);
+}
+
+/** A path segment decoded, or as it is when it isn't valid encoding (a hand-typed %E0). */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 /** The page making a new refund of an expense. */

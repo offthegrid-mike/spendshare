@@ -6,6 +6,7 @@ import { plainSigned } from '../../lib/money';
 import { isRefund } from '../../lib/refund';
 import { memberName } from '../../lib/balance';
 import { paths } from '../../lib/paths';
+import { TAG_CHIP_CLASS } from '../../components/ui/TagChip';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 interface Props {
@@ -67,7 +68,7 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
                         <Link
                           key={tag}
                           to={paths.tag(tag)}
-                          className="rounded-full bg-accent-soft px-2 py-px text-[11px] font-medium text-accent-ink hover:underline"
+                          className={`${TAG_CHIP_CLASS} hover:underline`}
                         >
                           {tag}
                         </Link>

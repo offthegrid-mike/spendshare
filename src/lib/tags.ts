@@ -16,10 +16,17 @@ export function tagKey(tag: string): string {
   return normalizeNameKey(tag);
 }
 
-/** `tags` with `tag` added, unless it's blank, already there in any case, or the list is full. */
+/** Whether `tags` has `tag`, whatever its case or spacing. */
+export function hasTag(tags: string[], tag: string): boolean {
+  const key = tagKey(tag);
+  return tags.some((t) => typeof t === 'string' && tagKey(t) === key);
+}
+
+/** `tags` with `tag` added, unless it's blank, only dots, already there in any case, or the list is full. */
 export function addTag(tags: string[], tag: string): string[] {
   const clean = cleanTag(tag);
-  if (!clean || tags.length >= MAX_TAGS || tags.some((t) => tagKey(t) === tagKey(clean))) return tags;
+  // "." and ".." would make a tag page's path resolve somewhere else.
+  if (!clean || /^\.+$/.test(clean) || tags.length >= MAX_TAGS || hasTag(tags, clean)) return tags;
   return [...tags, clean];
 }
 
@@ -32,7 +39,7 @@ export function removeTag(tags: string[], tag: string): string[] {
 export function sharedTags(items: Pick<ItemDoc, 'tags'>[]): string[] {
   if (items.length === 0) return [];
   const [first, ...rest] = items;
-  return (first.tags ?? []).filter((tag) => rest.every((it) => (it.tags ?? []).some((t) => tagKey(t) === tagKey(tag))));
+  return itemTags(first).filter((tag) => rest.every((it) => hasTag(itemTags(it), tag)));
 }
 
 export interface TagTotal {
@@ -46,7 +53,10 @@ export interface TagTotal {
   lastMonth: string;
 }
 
-const hasTag = (item: Pick<ItemDoc, 'tags'>, key: string) => (item.tags ?? []).some((t) => tagKey(t) === key);
+/** An item's tags, leaving out anything that isn't text (the rules only check it's a list). */
+function itemTags(item: Pick<ItemDoc, 'tags'>): string[] {
+  return (item.tags ?? []).filter((t): t is string => typeof t === 'string');
+}
 
 /** Every tag in a group's history with what it adds up to, biggest first. */
 export function tagTotals(expenses: ExpenseDoc[], itemsByExpense: Record<string, ItemDoc[]>): TagTotal[] {
@@ -55,7 +65,7 @@ export function tagTotals(expenses: ExpenseDoc[], itemsByExpense: Record<string,
   const oldestFirst = [...expenses].sort((a, b) => a.date.toMillis() - b.date.toMillis());
   for (const expense of oldestFirst) {
     for (const item of itemsByExpense[expense.id] ?? []) {
-      for (const tag of item.tags ?? []) {
+      for (const tag of itemTags(item)) {
         const key = tagKey(tag);
         const total = totals.get(key) ?? { tag, amount: 0, items: 0, expenses: 0, lastMonth: expense.month, expenseIds: new Set<string>() };
         total.tag = tag;
@@ -78,11 +88,21 @@ export function tagExpenses(
   expenses: ExpenseDoc[],
   itemsByExpense: Record<string, ItemDoc[]>,
 ): { expense: ExpenseDoc; amount: number }[] {
-  const key = tagKey(tag);
   return [...expenses]
     .sort((a, b) => b.date.toMillis() - a.date.toMillis())
     .flatMap((expense) => {
-      const tagged = (itemsByExpense[expense.id] ?? []).filter((it) => hasTag(it, key));
+      const tagged = (itemsByExpense[expense.id] ?? []).filter((it) => hasTag(itemTags(it), tag));
       return tagged.length > 0 ? [{ expense, amount: tagged.reduce((sum, it) => sum + signedAmount(it), 0) }] : [];
     });
 }
+
+/**
+ * An expense's tags, each once (whatever its case), as its items spell them:
+ * what the tag suggestions count per expense.
+ */
+export function expenseTags(items: Pick<ItemDoc, 'tags'>[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const item of items) for (const tag of itemTags(item)) byKey.set(tagKey(tag), cleanTag(tag));
+  return [...byKey.values()];
+}
+

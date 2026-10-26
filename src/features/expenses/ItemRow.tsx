@@ -4,6 +4,7 @@ import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form'
 import { ChevronDown, ChevronRight, TriangleAlert } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
+import TagChip from '../../components/ui/TagChip';
 import { iconForCategory } from '../../lib/categoryIcons';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import { toCents, formatMoney } from '../../lib/money';
@@ -103,7 +104,7 @@ export default function ItemRow({
           )}
           {summary?.tags && summary.tags.length > 0 && (
             <span className="mt-0.5 flex flex-wrap gap-1">
-              {summary.tags.map((tag) => <Chip key={tag}>{tag}</Chip>)}
+              {summary.tags.map((tag) => <TagChip key={tag}>{tag}</TagChip>)}
             </span>
           )}
         </span>

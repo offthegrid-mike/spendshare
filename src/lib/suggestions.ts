@@ -1,5 +1,6 @@
 import type { ExpenseDoc, ItemDoc, SuggestionEntry, ShopEntry } from '../types/models';
 import { isRefund } from './refund';
+import { expenseTags } from './tags';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 export type ItemInput = { name: string; categoryId: string; category: string };
@@ -82,15 +83,6 @@ export function computeShopsDelta(
 
 export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[]; tags: ShopEntry[] }
 
-/**
- * An expense's tags, each once (whatever its case), as its items spell them:
- * what the tag suggestions count per expense.
- */
-export function expenseTags(items: Pick<ItemDoc, 'tags'>[]): string[] {
-  const byKey = new Map<string, string>();
-  for (const item of items) for (const tag of item.tags ?? []) byKey.set(normalizeNameKey(tag), collapseWhitespace(tag));
-  return [...byKey.values()];
-}
 
 /**
  * Recounts the suggestions from a group's whole history. Expenses are replayed
