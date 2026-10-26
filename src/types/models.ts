@@ -35,6 +35,7 @@ export interface ItemDoc {
   quantity?: number;   // count (default 1); amount is the line total = unitAmount * quantity
   unitAmount?: number; // per-item price in cents (default: same as amount when quantity is 1)
   refund?: boolean;    // denormalized from the expense's kind, so item-only sums can subtract it
+  tags?: string[];     // as typed; matched by lib/tags tagKey; at most MAX_TAGS
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
@@ -97,4 +98,5 @@ export const itemSchema = z.object({
   quantity: z.number().int().positive().optional(),
   unitAmount: z.number().int().nonnegative().optional(),
   refund: z.boolean().optional(),
+  tags: z.array(z.string()).max(10).optional(),
 });
