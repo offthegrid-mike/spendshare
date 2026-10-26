@@ -12,6 +12,8 @@ describe('paths', () => {
     expect(paths.newExpense).toBe('/spend/expense/new');
     expect(paths.editExpense('abc123')).toBe('/spend/expense/abc123/edit');
     expect(paths.refundExpense('abc123')).toBe('/spend/expense/abc123/refund');
+    expect(paths.tags).toBe('/spend/tags');
+    expect(paths.tag('Holiday 2026')).toBe('/spend/tags/Holiday%202026');
     expect(paths.categories).toBe('/spend/categories');
     expect(paths.groupSettings).toBe('/spend/group/settings');
     expect(paths.groupInvites).toBe('/spend/group/invites');

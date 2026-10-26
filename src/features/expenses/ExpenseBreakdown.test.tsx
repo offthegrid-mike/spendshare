@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import ExpenseBreakdown from './ExpenseBreakdown';
 import { makeExpense, makeGroup, makeItem } from '../../test/fixtures';
 
@@ -77,5 +78,21 @@ describe('ExpenseBreakdown for a refund', () => {
     );
     expect(screen.getByText('Shared').nextElementSibling).toHaveTextContent('−16.50');
     expect(screen.getByText('Your half').nextElementSibling).toHaveTextContent('−8.25');
+  });
+});
+
+describe('ExpenseBreakdown tags', () => {
+  it("shows each item's tags, linking to the tag's page", () => {
+    render(
+      <MemoryRouter>
+        <ExpenseBreakdown
+          expense={makeExpense('e1', { total: 3000 })}
+          items={[makeItem('i1', 'e1', { name: 'Paint', amount: 3000, tags: ['Renovation'] })]}
+          group={pair}
+          viewerUid="mike"
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Renovation' })).toHaveAttribute('href', '/spend/tags/Renovation');
   });
 });

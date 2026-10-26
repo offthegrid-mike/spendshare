@@ -13,6 +13,8 @@ import CategoryManager from './features/categories/CategoryManager';
 import { useGroup } from './hooks/useGroup';
 import ExpenseEditor from './features/expenses/ExpenseEditor';
 import RefundRoute from './features/expenses/RefundRoute';
+import TagsScreen from './features/tags/TagsScreen';
+import TagScreen from './features/tags/TagScreen';
 import { useExpense } from './hooks/useExpense';
 import { useRefunds } from './hooks/useRefunds';
 import { isRefund, refundedTotal } from './lib/refund';
@@ -87,6 +89,12 @@ function PurchaseEditRoute({ group, user, expense, items }: { group: GroupDoc; u
   );
 }
 
+function TagRoute({ group }: { group: GroupDoc }) {
+  const { tag } = useParams<{ tag: string }>();
+  // The key starts each tag's page fresh.
+  return tag ? <TagScreen key={tag} group={group} tag={tag} /> : null;
+}
+
 function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
   if (!id) return null;
@@ -138,6 +146,8 @@ function App() {
           path="search"
           element={group ? <SearchScreen group={group} /> : <RouteSkeleton />}
         />
+        <Route path="tags" element={group ? <TagsScreen group={group} /> : <RouteSkeleton />} />
+        <Route path="tags/:tag" element={group ? <TagRoute group={group} /> : <RouteSkeleton />} />
         <Route
           path="group/settings"
           element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}

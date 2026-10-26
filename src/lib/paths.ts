@@ -10,6 +10,8 @@ export const paths = {
   editExpense: (id: string): string => `/spend/expense/${id}/edit`,
   refundExpense: (id: string): string => `/spend/expense/${id}/refund`,
   categories: '/spend/categories',
+  tags: '/spend/tags',
+  tag: (tag: string): string => `/spend/tags/${encodeURIComponent(tag)}`,
   groupSettings: '/spend/group/settings',
   groupInvites: '/spend/group/invites',
   work: '/work',
