@@ -3,7 +3,7 @@ import type { Timestamp } from 'firebase/firestore';
 import type { WorkDayDoc, WorkRevision } from '../../types/models';
 import type { ResolvedRate } from './workRates';
 import { summariseYear } from './workYear';
-import { DAYS_HEADER, csvEscape, daysCsv, exportFileName, revisionsCsv } from './workExport';
+import { DAYS_HEADER, daysCsv, exportFileName, revisionsCsv } from './workExport';
 
 const ISO = '2026-10-19T08:00:00.000Z';
 const at = (iso = ISO) => ({ toDate: () => new Date(iso) }) as unknown as Timestamp;
@@ -79,21 +79,6 @@ function summaryLines(csv: string): string[] {
   const lines = csv.split('\n');
   return lines.slice(lines.indexOf('') + 1).filter((line) => line !== '');
 }
-
-describe('csvEscape', () => {
-  it('quotes a value with a comma, a quote or a newline', () => {
-    expect(csvEscape('a,b')).toBe('"a,b"');
-    expect(csvEscape('say "hi"')).toBe('"say ""hi"""');
-    expect(csvEscape('a\nb')).toBe('"a\nb"');
-  });
-
-  it('leaves a plain value alone and prints nothing for null or undefined', () => {
-    expect(csvEscape('home')).toBe('home');
-    expect(csvEscape(456)).toBe('456');
-    expect(csvEscape(null)).toBe('');
-    expect(csvEscape(undefined)).toBe('');
-  });
-});
 
 describe('daysCsv', () => {
   const csv = daysCsv([OFFICE, HOME, LATE], '2026-27', CARRIED, CLOCK);

@@ -52,6 +52,11 @@ describe('GroupSettings', () => {
     expect(screen.getByRole('button', { name: 'Rebuild autocomplete' })).toBeInTheDocument();
   });
 
+  it('shows Download backup to members who are not the owner', () => {
+    render(<GroupSettings group={group} currentUserUid="u2" />);
+    expect(screen.getByRole('button', { name: 'Download backup' })).toBeInTheDocument();
+  });
+
   it('shows Add member form for owner', () => {
     render(<GroupSettings group={group} currentUserUid="u1" />);
     expect(screen.getByPlaceholderText(/jane smith/i)).toBeTruthy();

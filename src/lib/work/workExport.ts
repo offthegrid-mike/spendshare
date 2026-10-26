@@ -1,5 +1,6 @@
 import type { Timestamp } from 'firebase/firestore';
 import type { WorkDayDoc } from '../../types/models';
+import { csvLine, csvYesNo } from '../csv';
 import type { Clock } from './workDates';
 import { byDate, weekdayShort } from './workFormat';
 import type { ResolvedRate } from './workRates';
@@ -10,15 +11,6 @@ import { summariseYear } from './workYear';
 // same day documents the screens show: one row per day with a summary block, and
 // one row per revision so every change can be traced. Pure: the download is
 // downloadCsv's job.
-
-type Cell = string | number | null | undefined;
-
-/** A CSV cell: empty for null or undefined, quoted when it holds a comma, a quote or a newline. */
-export function csvEscape(value: Cell): string {
-  if (value === null || value === undefined) return '';
-  const text = String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
 
 export const DAYS_HEADER = [
   'date',
@@ -51,17 +43,9 @@ const REVISIONS_HEADER = [
   'finish_confirmed',
 ];
 
-function line(cells: Cell[]): string {
-  return `${cells.map(csvEscape).join(',')}\n`;
-}
-
 // A pending write's syncedAt is null until the server acknowledges it.
 function iso(stamp: Timestamp | null | undefined): string {
   return stamp ? stamp.toDate().toISOString() : '';
-}
-
-function yesNo(value: boolean): string {
-  return value ? 'yes' : 'no';
 }
 
 function rateSource(rate: ResolvedRate): string {
@@ -71,7 +55,7 @@ function rateSource(rate: ResolvedRate): string {
 /** The days file: the header, a row per day ascending by date, a blank line, then the year's totals. */
 export function daysCsv(days: WorkDayDoc[], incomeYear: string, rate: ResolvedRate, clock: Clock): string {
   const rows = [...days].sort(byDate).map((day) =>
-    line([
+    csvLine([
       day.date,
       weekdayShort(day.date),
       day.type,
@@ -82,9 +66,9 @@ export function daysCsv(days: WorkDayDoc[], incomeYear: string, rate: ResolvedRa
       iso(day.firstRecordedAt),
       iso(day.recordedAt),
       iso(day.syncedAt),
-      yesNo(day.addedLater),
-      yesNo(day.countedInClaim),
-      yesNo(day.finishConfirmed),
+      csvYesNo(day.addedLater),
+      csvYesNo(day.countedInClaim),
+      csvYesNo(day.finishConfirmed),
       iso(day.finishConfirmedAt),
       day.revisions.length,
     ]),
@@ -92,25 +76,25 @@ export function daysCsv(days: WorkDayDoc[], incomeYear: string, rate: ResolvedRa
 
   const summary = summariseYear(days, rate.cents, clock);
   const totals = [
-    line(['Income year', incomeYear]),
-    line(['Counted home days', summary.counted.days]),
-    line(['Counted home hours', formatHours(summary.counted.minutes)]),
-    line(['Not confirmed hours (still counted)', formatHours(summary.notConfirmed.minutes)]),
-    line(['Added later hours (not counted)', formatHours(summary.addedLater.minutes)]),
-    line(['Rate (cents per hour)', rate.cents]),
-    line(['Rate source', rateSource(rate)]),
-    line(['Claim before dropping cents', (summary.claimCents / 100).toFixed(2)]),
-    line(['Claim (cents dropped)', summary.claimDollars]),
+    csvLine(['Income year', incomeYear]),
+    csvLine(['Counted home days', summary.counted.days]),
+    csvLine(['Counted home hours', formatHours(summary.counted.minutes)]),
+    csvLine(['Not confirmed hours (still counted)', formatHours(summary.notConfirmed.minutes)]),
+    csvLine(['Added later hours (not counted)', formatHours(summary.addedLater.minutes)]),
+    csvLine(['Rate (cents per hour)', rate.cents]),
+    csvLine(['Rate source', rateSource(rate)]),
+    csvLine(['Claim before dropping cents', (summary.claimCents / 100).toFixed(2)]),
+    csvLine(['Claim (cents dropped)', summary.claimDollars]),
   ];
 
-  return [line(DAYS_HEADER), ...rows, '\n', ...totals].join('');
+  return [csvLine(DAYS_HEADER), ...rows, '\n', ...totals].join('');
 }
 
 /** The revisions file: the header, then every revision of every day, by date then revision order. */
 export function revisionsCsv(days: WorkDayDoc[]): string {
   const rows = [...days].sort(byDate).flatMap((day) =>
     day.revisions.map((revision) =>
-      line([
+      csvLine([
         day.date,
         iso(revision.at),
         revision.kind,
@@ -118,13 +102,13 @@ export function revisionsCsv(days: WorkDayDoc[]): string {
         revision.startTime,
         revision.finishTime,
         revision.minutes,
-        yesNo(revision.addedLater),
-        yesNo(revision.countedInClaim),
-        yesNo(revision.finishConfirmed),
+        csvYesNo(revision.addedLater),
+        csvYesNo(revision.countedInClaim),
+        csvYesNo(revision.finishConfirmed),
       ]),
     ),
   );
-  return [line(REVISIONS_HEADER), ...rows].join('');
+  return [csvLine(REVISIONS_HEADER), ...rows].join('');
 }
 
 /** 'work-days-2026-27.csv' or 'work-revisions-2026-27.csv'. */
