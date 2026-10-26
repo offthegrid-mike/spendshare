@@ -136,7 +136,13 @@ service cloud.firestore {
           || (isInvitee() && request.resource.data.status != 'pending');
         allow delete: if isMember(groupId);
       }
-      match /categories/{categoryId}    { allow read, write: if isMember(groupId); }
+      match /categories/{categoryId} {
+        allow read, delete: if isMember(groupId);
+        // A budget is whole cents a month, zero or more; a category with none omits the field.
+        allow create, update: if isMember(groupId)
+          && (!('monthlyBudget' in request.resource.data)
+              || (request.resource.data.monthlyBudget is int && request.resource.data.monthlyBudget >= 0));
+      }
       match /expenses/{expenseId} {
         allow read, delete: if isMember(groupId);
         // Bind the author and require a non-negative numeric total on create/update.

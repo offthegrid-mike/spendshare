@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { spendTileFigures } from './homeSpend';
+import { budgetTileLine, spendTileFigures } from './homeSpend';
+import type { BudgetRow } from './budget';
 import { makeGroup } from '../test/fixtures';
 
 const group = makeGroup('g1', 'The Smiths'); // uids 'mike', 'priya'
@@ -66,5 +67,46 @@ describe('spendTileFigures with refunds', () => {
       { amount: 2500, shared: true, payerUid: 'mike', refund: true },
     ];
     expect(spendTileFigures(group, 'mike', items, [], '2026-10').spent).toBe(7500);
+  });
+});
+
+describe('budgetTileLine', () => {
+  const row = (over: Partial<BudgetRow> = {}): BudgetRow => ({
+    categoryId: 'groceries', name: 'Groceries', spent: 0, limit: 40000, remaining: 40000, pct: 0, status: 'ok', ...over,
+  });
+
+  it('has no line without budgets', () => {
+    expect(budgetTileLine([], 12, 'AUD')).toBeNull();
+  });
+
+  it('says budgets are on track while none is at 80%', () => {
+    expect(budgetTileLine([row({ pct: 79, status: 'ok' }), row({ categoryId: 'd', name: 'Dining' })], 12, 'AUD'))
+      .toEqual({ label: 'Budgets on track', note: '12 days left', tone: 'ok' });
+  });
+
+  it('names the budget most used once it is at 80% or more', () => {
+    const rows = [
+      row({ pct: 85.4, status: 'warn', spent: 34160, remaining: 5840 }),
+      row({ categoryId: 'd', name: 'Dining', pct: 91.2, status: 'warn', spent: 36480, remaining: 3520 }),
+    ];
+    expect(budgetTileLine(rows, 9, 'AUD')).toEqual({ label: 'Dining 91% used', note: '9 days left', tone: 'warn' });
+  });
+
+  it('says how far over a budget that has been passed, ahead of ones that are close', () => {
+    const rows = [
+      row({ pct: 99, status: 'warn', spent: 39600, remaining: 400 }),
+      row({ categoryId: 'd', name: 'Dining', pct: 112, status: 'over', spent: 44800, remaining: -4800 }),
+    ];
+    expect(budgetTileLine(rows, 9, 'AUD')).toEqual({ label: 'Dining over budget', note: 'A$48.00 over', tone: 'over' });
+  });
+
+  it('says a budget spent to the cent is fully used', () => {
+    expect(budgetTileLine([row({ pct: 100, status: 'over', spent: 40000, remaining: 0 })], 9, 'AUD'))
+      .toEqual({ label: 'Groceries fully used', note: '9 days left', tone: 'over' });
+  });
+
+  it('counts down to the last day, in the singular for one', () => {
+    expect(budgetTileLine([row()], 1, 'AUD')?.note).toBe('1 day left');
+    expect(budgetTileLine([row()], 0, 'AUD')?.note).toBe('Last day');
   });
 });

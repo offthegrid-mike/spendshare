@@ -5,16 +5,19 @@ import { markSettlementPaid, undoSettlement as removeSettlement } from '../../li
 import { computeSummary } from '../../lib/settlement';
 import { formatMoney } from '../../lib/money';
 import { computeMonthBreakdown } from '../../lib/monthSummary';
+import { computeBudgetProgress } from '../../lib/budget';
 import { comparablePrevDays, comparisonLabel, daysElapsedInMonth, formatMonthLabel, prevMonthKey } from '../../lib/month';
 import { memberBalanceCopy, memberName } from '../../lib/balance';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useIncome } from '../../hooks/useIncome';
+import { useCategories } from '../../hooks/useCategories';
 import { useUIStore } from '../../stores/uiStore';
 import Avatar from '../../components/ui/Avatar';
 import SegmentedControl from '../../components/ui/SegmentedControl';
 import { RouteSkeleton } from '../../components/AppSkeletons';
 import MonthOverview from './MonthOverview';
+import BudgetsCard from './BudgetsCard';
 import CategoryBreakdown from './CategoryBreakdown';
 import TopShops from './TopShops';
 import type { GroupDoc } from '../../types/models';
@@ -54,6 +57,8 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   const prevLoading = prev.loading || prev.itemsLoading;
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
   const { income, loading: incomeLoading } = useIncome(group.id, selectedMonth);
+  // Budgets never gate the page: the card joins once the categories have loaded.
+  const { all: categories } = useCategories(group.id);
   const [isPending, setIsPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   // The Year view belongs to the month it was opened from: picking another
@@ -116,6 +121,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
     prevThroughDay,
     daysElapsed: daysElapsedInMonth(selectedMonth),
   });
+  const budgets = computeBudgetProgress(items, categories, selectedMonth);
   const comparedWith = comparisonLabel(prevMonth, prevThroughDay);
   const pendingTransactions = summary.transactions;
   const paidSettlements = settlements.filter((s) => s.paid);
@@ -267,6 +273,7 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
         </div>
       </section>
 
+      <BudgetsCard rows={budgets.rows} pace={budgets.pace} daysLeft={budgets.daysLeft} currency={group.currency} />
       <CategoryBreakdown
         categories={breakdown.categories}
         currency={group.currency}

@@ -1,4 +1,6 @@
 import { describeBalance, type BalanceTone } from './balance';
+import { tightestBudget, type BudgetRow, type BudgetStatus } from './budget';
+import { formatMoney } from './money';
 import { monthName } from './month';
 import { computeSummary, type SummaryItem } from './settlement';
 import { signedAmount } from './refund';
@@ -33,4 +35,28 @@ export function spendTileFigures(
   const summary = computeSummary(group.memberUids, items, settlements);
   const balance = describeBalance(summary, viewerUid, group, monthLabel);
   return { monthLabel, spent, empty: false, balanceLabel: balance.label, balanceAmount: balance.amount, tone: balance.tone };
+}
+
+export interface BudgetTileLine {
+  label: string;
+  /** What sits at the right of the line: the amount over, or the days left. */
+  note: string;
+  tone: BudgetStatus;
+}
+
+/**
+ * The one budget line on Home's tile, for the current month: the budget most
+ * used once it is at 80% or more, otherwise that they are on track. null when
+ * no category has a budget.
+ */
+export function budgetTileLine(rows: BudgetRow[], daysLeft: number, currency: string): BudgetTileLine | null {
+  if (rows.length === 0) return null;
+  const left = daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+  const row = tightestBudget(rows);
+  if (!row) return { label: 'Budgets on track', note: left, tone: 'ok' };
+  if (row.remaining < 0) {
+    return { label: `${row.name} over budget`, note: `${formatMoney(-row.remaining, currency)} over`, tone: 'over' };
+  }
+  if (row.remaining === 0) return { label: `${row.name} fully used`, note: left, tone: 'over' };
+  return { label: `${row.name} ${Math.round(row.pct)}% used`, note: left, tone: 'warn' };
 }

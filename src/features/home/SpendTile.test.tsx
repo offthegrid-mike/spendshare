@@ -10,9 +10,11 @@ import type { GroupDoc, ItemDoc, SettlementDoc } from '../../types/models';
 const data = vi.hoisted(() => ({
   expenses: { itemsByExpense: {} as Record<string, unknown[]>, loading: false, itemsLoading: false },
   settlements: { settlements: [] as unknown[], loading: false },
+  categories: { all: [] as unknown[], active: [] as unknown[], loading: false },
 }));
 vi.mock('../../hooks/useMonthExpenses', () => ({ useMonthExpenses: () => data.expenses }));
 vi.mock('../../hooks/useSettlements', () => ({ useSettlements: () => data.settlements }));
+vi.mock('../../hooks/useCategories', () => ({ useCategories: () => data.categories }));
 
 const household = makeGroup('g1', 'The Smiths');
 
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 9, 19, 9));
   data.expenses = { itemsByExpense: october, loading: false, itemsLoading: false };
   data.settlements = { settlements: [], loading: false };
+  data.categories = { all: [], active: [], loading: false };
 });
 
 afterEach(() => vi.useRealTimers());
@@ -99,6 +102,61 @@ describe('SpendTile', () => {
     expect(add).toHaveAttribute('href', paths.newExpense);
     expect(add).toHaveClass('hidden', 'lg:inline-flex');
     expect(screen.getByRole('link', { name: 'SpendShare' })).not.toContainElement(add);
+  });
+
+  describe('budget line', () => {
+    // The month's A$330.24 is all Groceries (cat-groceries), 19 of October's 31 days in.
+    const budget = (monthlyBudget?: number, extra: Record<string, unknown> = {}) => {
+      const all = [{ id: 'cat-groceries', name: 'Groceries', order: 0, archived: false, monthlyBudget, ...extra }];
+      data.categories = { all, active: all, loading: false };
+    };
+
+    it('shows nothing when no category has a budget', () => {
+      budget(undefined);
+      renderTile();
+      expect(screen.queryByText(/budget/i)).toBeNull();
+      expect(screen.queryByText(/days left/)).toBeNull();
+    });
+
+    it('says budgets are on track while none is at 80%', () => {
+      budget(100000);
+      renderTile();
+      expect(screen.getByText('Budgets on track')).toBeInTheDocument();
+      expect(screen.getByText('12 days left')).toBeInTheDocument();
+    });
+
+    it('names the budget at 80% or more, amber, with the days left', () => {
+      budget(38000); // 33024 of 38000 = 87%
+      renderTile();
+      expect(screen.getByText('Groceries 87% used')).toHaveClass('text-warning');
+      expect(screen.getByText('12 days left')).toBeInTheDocument();
+    });
+
+    it('says how far over a budget that has been passed, in red', () => {
+      budget(30000);
+      renderTile();
+      expect(screen.getByText('Groceries over budget')).toHaveClass('text-negative');
+      expect(screen.getByText(`${formatMoney(3024, 'AUD')} over`)).toHaveClass('text-negative');
+    });
+
+    it('leaves out an archived category’s budget', () => {
+      budget(30000, { archived: true });
+      renderTile();
+      expect(screen.queryByText(/budget|used/i)).toBeNull();
+    });
+
+    it('links to the Summary, where the bars are', () => {
+      budget(38000);
+      renderTile();
+      expect(screen.getByRole('link', { name: /Groceries 87% used/ })).toHaveAttribute('href', paths.summary);
+    });
+
+    it('does not hold the tile back while the categories load', () => {
+      data.categories = { all: [], active: [], loading: true };
+      renderTile();
+      expect(screen.getByText('Priya owes you')).toBeInTheDocument();
+      expect(screen.queryByText(/budget/i)).toBeNull();
+    });
   });
 
   describe('with no household yet', () => {

@@ -17,7 +17,10 @@ export interface InviteDoc {
   email: string; invitedByUid: Uid; invitedByName: string; groupName: string;
   status: 'pending' | 'accepted' | 'revoked' | 'declined'; createdAt: Timestamp;
 }
-export interface CategoryDoc { id: string; name: string; order: number; archived: boolean; }
+export interface CategoryDoc {
+  id: string; name: string; order: number; archived: boolean;
+  monthlyBudget?: number; // cents a month across all spending in the category; missing means no budget (see lib/budget.ts)
+}
 export interface ExpenseDoc {
   id: string; groupId: string; date: Timestamp; month: string; shopName: string;
   payerUid: Uid; total: number; itemCount: number; createdByUid: Uid;
