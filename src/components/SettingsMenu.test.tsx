@@ -38,6 +38,7 @@ describe('SettingsMenu', () => {
     renderMenu();
     await userEvent.click(gear());
     expect(screen.getByRole('menuitem', { name: 'Categories' })).toHaveAttribute('href', paths.categories);
+    expect(screen.getByRole('menuitem', { name: 'Tags' })).toHaveAttribute('href', paths.tags);
     expect(screen.getByRole('menuitem', { name: 'Invite' })).toHaveAttribute('href', paths.groupInvites);
     expect(screen.getByRole('menuitem', { name: 'Group settings' })).toHaveAttribute('href', paths.groupSettings);
     expect(screen.getByRole('group', { name: 'Appearance' })).toBeInTheDocument();
@@ -94,10 +95,10 @@ describe('SettingsMenu', () => {
     renderMenu();
     await userEvent.click(gear());
     await userEvent.keyboard('{ArrowDown}');
-    expect(screen.getByRole('menuitem', { name: 'Invite' })).toHaveFocus();
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Tags' })).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
     expect(screen.getByRole('menuitemradio', { name: 'System' })).toHaveFocus();
-    await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}');
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}');
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toHaveFocus();
   });
 
@@ -120,7 +121,7 @@ describe('SettingsMenu', () => {
     expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull();
     await userEvent.click(gear());
     expect(screen.getByRole('menu', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').filter((el) => el.getAttribute('href'))).toHaveLength(3);
+    expect(screen.getAllByRole('menuitem').filter((el) => el.getAttribute('href'))).toHaveLength(4);
   });
 
   describe('with an account', () => {

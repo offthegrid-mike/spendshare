@@ -1,9 +1,12 @@
+import { Link } from 'react-router-dom';
 import { CreditCard, Gift } from 'lucide-react';
 import Chip from '../../components/ui/Chip';
 import { computeAdjustment } from '../../lib/adjustment';
 import { plainSigned } from '../../lib/money';
 import { isRefund } from '../../lib/refund';
 import { memberName } from '../../lib/balance';
+import { paths } from '../../lib/paths';
+import { TAG_CHIP_CLASS } from '../../components/ui/TagChip';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 interface Props {
@@ -59,6 +62,19 @@ export default function ExpenseBreakdown({ expense, items, group, viewerUid }: P
                   <span className="text-ink">{it.name}</span>
                   {!it.shared && <span className="ml-1.5"><Chip>Personal</Chip></span>}
                   {it.remark && <span data-testid="item-remark" className="block text-xs text-ink-muted">{it.remark}</span>}
+                  {it.tags && it.tags.length > 0 && (
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      {it.tags.map((tag) => (
+                        <Link
+                          key={tag}
+                          to={paths.tag(tag)}
+                          className={`${TAG_CHIP_CLASS} hover:underline`}
+                        >
+                          {tag}
+                        </Link>
+                      ))}
+                    </span>
+                  )}
                 </span>
                 <span className="flex shrink-0 items-baseline gap-3">
                   {qty > 1 && (

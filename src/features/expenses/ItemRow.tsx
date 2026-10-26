@@ -4,12 +4,14 @@ import type { Control, UseFormRegister, UseFormSetValue } from 'react-hook-form'
 import { ChevronDown, ChevronRight, TriangleAlert } from 'lucide-react';
 import CategoryTile from '../../components/ui/CategoryTile';
 import Chip from '../../components/ui/Chip';
+import TagChip from '../../components/ui/TagChip';
 import { iconForCategory } from '../../lib/categoryIcons';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import { toCents, formatMoney } from '../../lib/money';
 import type { FormValues } from './expenseForm';
 import { parseQty } from './expenseForm';
 import ItemNameCombobox from './ItemNameCombobox';
+import TagInput from './TagInput';
 
 interface ItemRowProps {
   index: number;
@@ -18,8 +20,13 @@ interface ItemRowProps {
   setValue: UseFormSetValue<FormValues>;
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
+  /** Earlier tags, to offer in the item's tag field. */
+  tagSuggestions: string[];
   summary:
-    | { name: string; categoryId: string; amount: string; quantity?: string; shared: boolean; remark?: string; categoryUnconfirmed?: boolean }
+    | {
+        name: string; categoryId: string; amount: string; quantity?: string; shared: boolean; remark?: string;
+        tags?: string[]; categoryUnconfirmed?: boolean;
+      }
     | undefined;
   currency: string;
   expanded: boolean;
@@ -28,7 +35,7 @@ interface ItemRowProps {
 }
 
 export default function ItemRow({
-  index, control, register, setValue, cats, suggestions,
+  index, control, register, setValue, cats, suggestions, tagSuggestions,
   summary, currency, expanded, onToggle, onRemove,
 }: ItemRowProps) {
   const catName = cats.find((c) => c.id === summary?.categoryId)?.name ?? '';
@@ -93,6 +100,11 @@ export default function ItemRow({
               )}
               {catName && summary?.remark && ' · '}
               {summary?.remark && <span dir="auto">{summary.remark}</span>}
+            </span>
+          )}
+          {summary?.tags && summary.tags.length > 0 && (
+            <span className="mt-0.5 flex flex-wrap gap-1">
+              {summary.tags.map((tag) => <TagChip key={tag}>{tag}</TagChip>)}
             </span>
           )}
         </span>
@@ -198,6 +210,20 @@ export default function ItemRow({
               className="field"
             />
           </div>
+
+          <Controller
+            control={control}
+            name={`items.${index}.tags`}
+            render={({ field }) => (
+              <TagInput
+                id={`items.${index}.tags`}
+                label="Tags"
+                tags={field.value ?? []}
+                onChange={field.onChange}
+                suggestions={tagSuggestions}
+              />
+            )}
+          />
 
           <label className="flex items-center gap-2 text-sm text-ink">
             <input

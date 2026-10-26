@@ -47,6 +47,7 @@ const milk = { name: 'Milk', categoryId: 'cat-groceries', category: 'Groceries' 
 const recount = {
   items: [{ ...milk, count: 1 }],
   shops: [{ name: 'Coles', count: 1 }],
+  tags: [],
 };
 
 function suggestionsSnap(doc: Pick<SuggestionsDoc, 'items' | 'shops'> | null) {

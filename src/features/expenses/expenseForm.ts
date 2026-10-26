@@ -7,6 +7,7 @@ export const lineItemSchema = z.object({
   quantity: z.string().optional(), // count; blank/invalid treated as 1
   shared: z.boolean(),
   remark: z.string().optional(),
+  tags: z.array(z.string()).optional(),
   // Set when a group change couldn't match the category; never written to Firestore.
   categoryUnconfirmed: z.boolean().optional(),
 });
@@ -29,6 +30,8 @@ export const schema = z
     applyDiscount: z.boolean(),
     discountPercent: z.string().optional(),
     items: z.array(lineItemSchema).min(1, 'Add at least one item'),
+    // Expense-wide tags: kept on every item; the editor's own state, never written.
+    tags: z.array(z.string()).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.applyDiscount) return;

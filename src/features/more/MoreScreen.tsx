@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Tag, UserPlus, Settings, ChevronRight } from 'lucide-react';
+import { Tag, Tags, UserPlus, Settings, ChevronRight } from 'lucide-react';
 import AccountSection from '../../components/AccountSection';
 import { formatVersionLabel } from '../../lib/appVersion';
 import { paths } from '../../lib/paths';
 
 const manageItems = [
   { to: paths.categories,     icon: Tag,      label: 'Categories'    },
+  { to: paths.tags,          icon: Tags,     label: 'Tags'          },
   { to: paths.groupInvites,  icon: UserPlus, label: 'Invites'       },
   { to: paths.groupSettings, icon: Settings, label: 'Group settings' },
 ];

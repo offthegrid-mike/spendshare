@@ -56,25 +56,25 @@ describe('useItemSuggestions', () => {
 
   it('returns [[], [], false] before the first snapshot', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
-    expect(result.current).toEqual([[], [], false]);
+    expect(result.current).toEqual([[], [], false, []]);
   });
 
   it('loads items and shops from a server snapshot', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap({ items: suggestions, shops })));
-    expect(result.current).toEqual([suggestions, shops, true]);
+    expect(result.current).toEqual([suggestions, shops, true, []]);
   });
 
   it('treats a missing doc confirmed by the server as empty and loaded', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap(null)));
-    expect(result.current).toEqual([[], [], true]);
+    expect(result.current).toEqual([[], [], true, []]);
   });
 
   it('defaults a missing shops field to an empty list', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap({ items: suggestions })));
-    expect(result.current).toEqual([suggestions, [], true]);
+    expect(result.current).toEqual([suggestions, [], true, []]);
   });
 
   it('does not trust a cached "no doc" snapshot until the server confirms it', () => {
@@ -83,13 +83,13 @@ describe('useItemSuggestions', () => {
     expect(result.current[2]).toBe(false);
 
     act(() => latest().next(snap({ items: suggestions, shops })));
-    expect(result.current).toEqual([suggestions, shops, true]);
+    expect(result.current).toEqual([suggestions, shops, true, []]);
   });
 
   it('uses a cached copy of the doc, so it works offline', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap({ items: suggestions, shops }, true)));
-    expect(result.current).toEqual([suggestions, shops, true]);
+    expect(result.current).toEqual([suggestions, shops, true, []]);
   });
 
   it('follows later snapshots, such as another member saving', () => {
@@ -99,21 +99,21 @@ describe('useItemSuggestions', () => {
     const updated: SuggestionEntry[] = [{ ...suggestions[0], count: 6 }];
     act(() => latest().next(snap({ items: updated, shops })));
 
-    expect(result.current).toEqual([updated, shops, true]);
+    expect(result.current).toEqual([updated, shops, true, []]);
   });
 
   it('loads once the server confirms a doc that the cache also had as missing', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap(null, true)));
     act(() => latest().next(snap(null, false)));
-    expect(result.current).toEqual([[], [], true]);
+    expect(result.current).toEqual([[], [], true, []]);
   });
 
   it('drops to not loaded when the listener errors after a good snapshot', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().next(snap({ items: suggestions, shops })));
     act(() => latest().error(new Error('permission-denied')));
-    expect(result.current).toEqual([[], [], false]);
+    expect(result.current).toEqual([[], [], false, []]);
   });
 
   it('does not show an older copy as loaded when switching back to a group', () => {
@@ -123,13 +123,13 @@ describe('useItemSuggestions', () => {
     rerender({ gid: 'g2' });
     rerender({ gid: 'g1' });
 
-    expect(result.current).toEqual([[], [], false]);
+    expect(result.current).toEqual([[], [], false, []]);
   });
 
   it('stays not loaded on a listener error, so saves never write from an empty list', () => {
     const { result } = renderHook(() => useItemSuggestions('g1'));
     act(() => latest().error(new Error('permission-denied')));
-    expect(result.current).toEqual([[], [], false]);
+    expect(result.current).toEqual([[], [], false, []]);
   });
 
   it("re-subscribes on a group switch and never shows the old group's lists as loaded", () => {
@@ -141,7 +141,7 @@ describe('useItemSuggestions', () => {
 
     expect(first.unsubscribe).toHaveBeenCalled();
     expect(latest().path).toBe('groups/g2/suggestions/index');
-    expect(result.current).toEqual([[], [], false]);
+    expect(result.current).toEqual([[], [], false, []]);
   });
 
   it('unsubscribes on unmount', () => {
@@ -149,5 +149,11 @@ describe('useItemSuggestions', () => {
     const listener = latest();
     unmount();
     expect(listener.unsubscribe).toHaveBeenCalled();
+  });
+
+  it('loads tag counts too', () => {
+    const { result } = renderHook(() => useItemSuggestions('g1'));
+    act(() => latest().next(snap({ items: suggestions, shops, tags: [{ name: 'Holiday', count: 2 }] } as never)));
+    expect(result.current[3]).toEqual([{ name: 'Holiday', count: 2 }]);
   });
 });

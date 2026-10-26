@@ -21,21 +21,33 @@ describe('stageSuggestionsUpdate', () => {
     const result = stageSuggestionsUpdate(
       batch,
       'g1',
-      { items: [milk, bread], shops: [woolies] },
-      { items: [{ name: 'Bread', categoryId: 'cat1', category: 'Groceries' }], shops: ['Woolworths'] },
-      { items: [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries' }], shops: ['Coles'] },
+      { items: [milk, bread], shops: [woolies], tags: [] },
+      { items: [{ name: 'Bread', categoryId: 'cat1', category: 'Groceries' }], shops: ['Woolworths'], tags: [] },
+      { items: [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries' }], shops: ['Coles'], tags: [] },
     );
 
     expect(result).toBeUndefined();
     expect(set).toHaveBeenCalledWith(
       { path: 'groups/g1/suggestions/index' },
-      { items: [{ ...milk, count: 3 }], shops: [{ name: 'Coles', count: 1 }], updatedAt: 'SERVER_TIMESTAMP' },
+      { items: [{ ...milk, count: 3 }], shops: [{ name: 'Coles', count: 1 }], tags: [], updatedAt: 'SERVER_TIMESTAMP' },
     );
+  });
+
+  it('moves tag counts with the change, so a save never drops them', () => {
+    const set = vi.fn();
+    stageSuggestionsUpdate(
+      { set } as unknown as WriteBatch,
+      'g1',
+      { items: [], shops: [], tags: [{ name: 'Holiday', count: 2 }, { name: 'Snacks', count: 1 }] },
+      { items: [], shops: [], tags: ['Snacks'] },
+      { items: [], shops: [], tags: ['Holiday', 'Renovation'] },
+    );
+    expect(set.mock.calls[0][1].tags).toEqual([{ name: 'Holiday', count: 3 }, { name: 'Renovation', count: 1 }]);
   });
 
   it('stageSuggestions replaces the whole suggestions doc', () => {
     const set = vi.fn();
-    const lists = { items: [milk], shops: [woolies] };
+    const lists = { items: [milk], shops: [woolies], tags: [{ name: 'Holiday', count: 1 }] };
     stageSuggestions({ set } as unknown as WriteBatch, 'g1', lists);
     expect(set).toHaveBeenCalledWith(
       { path: 'groups/g1/suggestions/index' },

@@ -31,6 +31,15 @@ describe('routeInfo', () => {
     expect(routeInfo(paths.refundExpense('abc'))).toEqual({ kind: 'secondary', title: 'Refund', back: '/spend' });
   });
 
+  it('gives Tags a back link to More, and a tag page a back link to Tags titled by the tag', () => {
+    expect(routeInfo(paths.tags)).toEqual({ kind: 'secondary', title: 'Tags', back: paths.more });
+    expect(routeInfo(paths.tag('Holiday 2026'))).toEqual({ kind: 'secondary', title: 'Holiday 2026', back: paths.tags });
+  });
+
+  it('titles a tag page with its raw name when the address is not valid encoding, instead of failing', () => {
+    expect(routeInfo('/spend/tags/%E0')).toEqual({ kind: 'secondary', title: '%E0', back: paths.tags });
+  });
+
   it('gives the edit expense page a back link to the expenses list', () => {
     expect(routeInfo('/spend/expense/abc/edit')).toEqual({ kind: 'secondary', title: 'Edit expense', back: '/spend' });
   });

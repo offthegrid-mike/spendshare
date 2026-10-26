@@ -12,6 +12,7 @@ export interface ExpenseDraftItem {
   quantity?: string;
   shared: boolean;
   remark?: string;
+  tags?: string[];
   /** Set when a group change couldn't match this item's category; cleared on pick. */
   categoryUnconfirmed?: boolean;
 }
@@ -24,6 +25,8 @@ export interface ExpenseDraftValues {
   applyDiscount?: boolean;
   discountPercent?: string;
   items: ExpenseDraftItem[];
+  /** Expense-wide tags, applied to every item. */
+  tags?: string[];
 }
 
 export interface ExpenseDraftRecord {

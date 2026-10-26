@@ -1,5 +1,6 @@
 import type { ExpenseDoc, ItemDoc, SuggestionEntry, ShopEntry } from '../types/models';
 import { isRefund } from './refund';
+import { expenseTags } from './tags';
 import { collapseWhitespace, normalizeNameKey } from './textNormalize';
 
 export type ItemInput = { name: string; categoryId: string; category: string };
@@ -80,7 +81,8 @@ export function computeShopsDelta(
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
-export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[] }
+export interface SuggestionLists { items: SuggestionEntry[]; shops: ShopEntry[]; tags: ShopEntry[] }
+
 
 /**
  * Recounts the suggestions from a group's whole history. Expenses are replayed
@@ -98,6 +100,7 @@ export function recountSuggestions(
   return {
     items: computeSuggestionsDelta([], [], oldestFirst.flatMap((exp) => itemsByExpense[exp.id] ?? [])),
     shops: computeShopsDelta([], [], oldestFirst.map((exp) => exp.shopName.trim()).filter(Boolean)),
+    tags: computeShopsDelta([], [], oldestFirst.flatMap((exp) => expenseTags(itemsByExpense[exp.id] ?? []))),
   };
 }
 
@@ -105,10 +108,11 @@ export function recountSuggestions(
 export function countSuggestionChanges(
   current: SuggestionLists,
   next: SuggestionLists,
-): { items: number; shops: number } {
+): { items: number; shops: number; tags: number } {
   return {
     items: countChanged(current.items, next.items, (e) => makeKey(e.name, e.categoryId), (e) => `${e.count}|${e.name}|${e.category}`),
     shops: countChanged(current.shops, next.shops, (e) => normalizeNameKey(e.name), (e) => `${e.count}|${e.name}`),
+    tags: countChanged(current.tags, next.tags, (e) => normalizeNameKey(e.name), (e) => `${e.count}|${e.name}`),
   };
 }
 

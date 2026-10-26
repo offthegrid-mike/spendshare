@@ -174,6 +174,7 @@ describe('ExpenseEditor', () => {
       [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 }],
       [],
       true,
+      [],
     ]);
     makeBatchMock();
   });
@@ -479,6 +480,7 @@ describe('ExpenseEditor', () => {
       [{ name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 5 }],
       mockShops,
       true,
+      [],
     ]);
     render(<ExpenseEditor group={group} currentUserUid="u1" onClose={vi.fn()} />);
     // Type in the shop combobox to trigger suggestions

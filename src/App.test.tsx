@@ -69,6 +69,10 @@ vi.mock('./features/expenses/RefundRoute', () => ({
     <div data-testid="refund-route" data-original={originalId} data-expense={refund?.id ?? ''} />
   ),
 }));
+vi.mock('./features/tags/TagsScreen', () => ({ default: () => <div data-testid="tags-screen" /> }));
+vi.mock('./features/tags/TagScreen', () => ({
+  default: ({ tag }: { tag: string }) => <div data-testid="tag-screen" data-tag={tag} />,
+}));
 vi.mock('./features/expenses/ExpenseList', () => ({ default: () => <div data-testid="expense-list" /> }));
 vi.mock('./features/income/IncomeEditor', () => ({ default: () => <div data-testid="income-editor" /> }));
 vi.mock('./features/summary/Summary', () => ({ default: () => <div data-testid="summary" /> }));
@@ -178,6 +182,7 @@ describe('App route table', () => {
     { name: 'new expense', path: paths.newExpense, screen: 'expense-editor', editing: '' },
     { name: 'edit expense', path: paths.editExpense('x'), screen: 'expense-editor', editing: 'x' },
     { name: 'refund', path: paths.refundExpense('x'), screen: 'refund-route', editing: '' },
+    { name: 'tags', path: paths.tags, screen: 'tags-screen' },
   ];
 
   it.each(screens)('serves $name at $path without redirecting', ({ path, screen: testId, editing }) => {
@@ -186,6 +191,13 @@ describe('App route table', () => {
     expect(screen.getByTestId(testId)).toBeInTheDocument();
     expect(location()).toBe(path);
     if (editing !== undefined) expect(screen.getByTestId(testId)).toHaveAttribute('data-expense', editing);
+  });
+});
+
+describe('App tags', () => {
+  it("opens a tag's page with the tag decoded from the path", () => {
+    renderApp(paths.tag('Holiday 2026'));
+    expect(screen.getByTestId('tag-screen')).toHaveAttribute('data-tag', 'Holiday 2026');
   });
 });
 

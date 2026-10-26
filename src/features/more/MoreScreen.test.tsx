@@ -42,4 +42,9 @@ describe('MoreScreen', () => {
     renderMore();
     expect(screen.getByText(/built \d{4}-\d{2}-\d{2}/)).toBeTruthy();
   });
+
+  it('renders a Tags link', () => {
+    renderMore();
+    expect(screen.getByRole('link', { name: /Tags/ })).toHaveAttribute('href', '/spend/tags');
+  });
 });
