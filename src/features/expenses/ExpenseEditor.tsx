@@ -18,6 +18,7 @@ import { useItemSuggestions } from '../../hooks/useItemSuggestions';
 import { invalidateGroupHistory } from '../../hooks/useAllExpenses';
 import { readDraftRecord, writeDraft, clearDraft, isDraftMeaningful, type ExpenseDraftValues } from '../../hooks/useExpenseDraft';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
+import { expenseTags } from '../../lib/suggestions';
 import { computeDiscountCents } from '../../lib/discount';
 import { paths } from '../../lib/paths';
 import type { GroupDoc, ExpenseDoc, ItemDoc } from '../../types/models';
@@ -87,7 +88,7 @@ export default function ExpenseEditor({
   const navigate = useSafeNavigate();
   const locationState = useSafeLocationState();
   const { active: cats, all: allCats, loading: catsLoading } = useCategories(group.id);
-  const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
+  const [suggestions, shopSuggestions, suggestionsLoaded, tagSuggestions] = useItemSuggestions(group.id);
 
   const isNew = !expense;
   const refundMode = !!refundOf;
@@ -484,9 +485,9 @@ export default function ExpenseEditor({
       stageSuggestionsUpdate(
         batch,
         group.id,
-        { items: suggestions, shops: shopSuggestions },
-        { items: oldItemInputs, shops: removedShops },
-        { items: newItemInputs, shops: addedShops },
+        { items: suggestions, shops: shopSuggestions, tags: tagSuggestions },
+        { items: oldItemInputs, shops: removedShops, tags: expenseTags(items ?? []) },
+        { items: newItemInputs, shops: addedShops, tags: expenseTags(data.items) },
       );
     }
 

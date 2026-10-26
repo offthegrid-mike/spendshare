@@ -40,7 +40,7 @@ vi.mock('../../hooks/useCategories', () => ({
   fetchActiveCategories: vi.fn(),
 }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
-  useItemSuggestions: () => [[], [], true],
+  useItemSuggestions: () => [[], [], true, []],
 }));
 vi.mock('../../hooks/useExpenseDraft', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../hooks/useExpenseDraft')>()),

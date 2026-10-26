@@ -24,6 +24,7 @@ const { commit, batchSet, refundDocs, invalidateGroupHistory, openAddSheet, desk
   suggestions: {
     items: [] as SuggestionEntry[],
     shops: [] as ShopEntry[],
+    tags: [] as ShopEntry[],
     loaded: true,
   },
 }));
@@ -42,7 +43,7 @@ vi.mock('../../lib/converters', () => ({ suggestionsDocRef: (gid: string) => ({ 
 vi.mock('../../hooks/useAllExpenses', () => ({ invalidateGroupHistory }));
 vi.mock('../../hooks/useRefunds', () => ({ useRefunds: () => ({ refunds: [], loading: false, error: false }) }));
 vi.mock('../../hooks/useItemSuggestions', () => ({
-  useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded],
+  useItemSuggestions: () => [suggestions.items, suggestions.shops, suggestions.loaded, suggestions.tags],
 }));
 vi.mock('../../lib/firebase', () => ({ db: {} }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid: vi.fn(), undoSettlement: vi.fn() }));
@@ -90,6 +91,7 @@ beforeEach(() => {
   data.loading = false;
   suggestions.items = [];
   suggestions.shops = [];
+  suggestions.tags = [];
   suggestions.loaded = true;
 });
 
@@ -270,7 +272,7 @@ describe('ExpenseList on desktop', () => {
     const shops = [{ name: 'Coles', count: 2 }];
     expect(batchSet).toHaveBeenCalledWith(
       { path: 'groups/g1/suggestions/index' },
-      { items, shops, updatedAt: 'now' },
+      { items, shops, tags: [], updatedAt: 'now' },
     );
     expect(batchSet.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
   });
@@ -296,6 +298,20 @@ describe('ExpenseList on desktop', () => {
     } finally {
       refundDocs.value = [];
     }
+  });
+
+  it("lowers the deleted expense's tag counts, once per expense", async () => {
+    suggestions.tags = [{ name: 'Holiday', count: 2 }, { name: 'Snacks', count: 1 }];
+    data.itemsByExpense = {
+      ...items,
+      e1: [
+        makeItem('i1', 'e1', { name: 'Bananas', amount: 2000, tags: ['Holiday'] }),
+        makeItem('i5', 'e1', { name: 'Chips', amount: 1000, tags: ['holiday', 'Snacks'] }),
+      ],
+    };
+    renderList();
+    await deleteSelected();
+    expect(batchSet.mock.calls[0][1].tags).toEqual([{ name: 'Holiday', count: 1 }]);
   });
 
   it('leaves the suggestions alone when deleting a refund', async () => {

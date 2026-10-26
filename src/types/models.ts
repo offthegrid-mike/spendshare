@@ -55,6 +55,8 @@ export interface ShopEntry { name: string; count: number; }
 export interface SuggestionsDoc {
   items: SuggestionEntry[];
   shops: ShopEntry[];
+  /** Tags, each counted once per expense; missing before tags existed. */
+  tags?: ShopEntry[];
   updatedAt: Timestamp;
 }
 

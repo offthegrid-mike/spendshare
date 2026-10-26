@@ -3,7 +3,7 @@ import { suggestionsDocRef } from './converters';
 import { computeShopsDelta, computeSuggestionsDelta, type ItemInput, type SuggestionLists } from './suggestions';
 import type { SuggestionsDoc } from '../types/models';
 
-export interface SuggestionChange { items: ItemInput[]; shops: string[] }
+export interface SuggestionChange { items: ItemInput[]; shops: string[]; tags: string[] }
 
 /**
  * Adds the group's updated suggestions to `batch`, so they commit with the
@@ -20,6 +20,7 @@ export function stageSuggestionsUpdate(
   stageSuggestions(batch, groupId, {
     items: computeSuggestionsDelta(current.items, removed.items, added.items),
     shops: computeShopsDelta(current.shops, removed.shops, added.shops),
+    tags: computeShopsDelta(current.tags, removed.tags, added.tags),
   });
 }
 

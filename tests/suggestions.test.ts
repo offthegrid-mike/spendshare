@@ -180,7 +180,7 @@ describe('recountSuggestions', () => {
   });
 
   it('gives empty lists for an empty history', () => {
-    expect(recountSuggestions([], {})).toEqual({ items: [], shops: [] });
+    expect(recountSuggestions([], {})).toEqual({ items: [], shops: [], tags: [] });
   });
 });
 
@@ -188,30 +188,34 @@ describe('countSuggestionChanges', () => {
   const current = {
     items: [milk, bread],
     shops: [{ name: 'Coles', count: 2 }, { name: 'Aldi', count: 1 }],
+    tags: [],
   };
 
   it('is zero when the lists hold the same entries in another order', () => {
     const same = {
       items: [{ ...bread }, { ...milk }],
       shops: [{ name: 'Aldi', count: 1 }, { name: 'Coles', count: 2 }],
+      tags: [],
     };
-    expect(countSuggestionChanges(current, same)).toEqual({ items: 0, shops: 0 });
+    expect(countSuggestionChanges(current, same)).toEqual({ items: 0, shops: 0, tags: 0 });
   });
 
   it('counts a changed name casing or category name as a change', () => {
     const renamed = {
       items: [{ ...milk, name: 'MILK' }, { ...bread, category: 'Bakery' }],
       shops: [{ name: 'aldi', count: 1 }, { name: 'Coles', count: 2 }],
+      tags: [],
     };
-    expect(countSuggestionChanges(current, renamed)).toEqual({ items: 2, shops: 1 });
+    expect(countSuggestionChanges(current, renamed)).toEqual({ items: 2, shops: 1, tags: 0 });
   });
 
   it('counts entries that were added, removed or changed', () => {
     const next = {
       items: [{ ...milk, count: 1 }, { name: 'Eggs', categoryId: 'cat1', category: 'Groceries', count: 1 }],
       shops: [{ name: 'Coles', count: 2 }],
+      tags: [],
     };
-    expect(countSuggestionChanges(current, next)).toEqual({ items: 3, shops: 1 });
+    expect(countSuggestionChanges(current, next)).toEqual({ items: 3, shops: 1, tags: 0 });
   });
 });
 
@@ -225,5 +229,28 @@ describe('recountSuggestions with refunds', () => {
     });
     expect(items).toEqual([{ name: 'Milk', categoryId: 'cat1', category: 'Dairy', count: 1 }]);
     expect(shops).toEqual([{ name: 'Coles', count: 1 }]);
+  });
+});
+
+describe('suggestions with tags', () => {
+  it('counts each tag once per expense, newest spelling first, refunds left out', () => {
+    const older = makeExpense('e1', { shopName: 'Coles', day: '2026-10-01' });
+    const newer = makeExpense('e2', { shopName: 'Coles', day: '2026-10-03' });
+    const refund = makeExpense('r1', { shopName: 'Coles', day: '2026-10-04', kind: 'refund', refundOf: 'e1' });
+    const { tags } = recountSuggestions([refund, newer, older], {
+      e1: [
+        makeItem('i1', 'e1', { tags: ['holiday'] }),
+        makeItem('i2', 'e1', { tags: ['Holiday', 'Snacks'] }),
+      ],
+      e2: [makeItem('i3', 'e2', { tags: ['Holiday'] })],
+      r1: [makeItem('i4', 'r1', { refund: true, tags: ['Holiday'] })],
+    });
+    expect(tags).toEqual([{ name: 'Holiday', count: 2 }, { name: 'Snacks', count: 1 }]);
+  });
+
+  it('counts tag differences as changes', () => {
+    const lists = (tags: { name: string; count: number }[]) => ({ items: [], shops: [], tags });
+    expect(countSuggestionChanges(lists([{ name: 'Holiday', count: 2 }]), lists([{ name: 'Holiday', count: 2 }]))).toEqual({ items: 0, shops: 0, tags: 0 });
+    expect(countSuggestionChanges(lists([{ name: 'Holiday', count: 2 }]), lists([{ name: 'Holiday', count: 1 }, { name: 'Snacks', count: 1 }]))).toEqual({ items: 0, shops: 0, tags: 2 });
   });
 });

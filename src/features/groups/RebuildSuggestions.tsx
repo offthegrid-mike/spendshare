@@ -33,7 +33,7 @@ export default function RebuildSuggestions({ groupId }: Props) {
     getDocFromServer(suggestionsDocRef(groupId))
       .then((snap) => {
         const data = snap.exists() ? snap.data() : null;
-        setStored({ run: next, value: { items: data?.items ?? [], shops: data?.shops ?? [] } });
+        setStored({ run: next, value: { items: data?.items ?? [], shops: data?.shops ?? [], tags: data?.tags ?? [] } });
       })
       .catch(() => setStored({ run: next, value: 'failed' }));
   }

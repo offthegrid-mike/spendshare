@@ -4,6 +4,7 @@ import { CircleCheck, Plus, ShoppingBasket } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { stageSuggestionsUpdate } from '../../lib/suggestionsWrite';
+import { expenseTags } from '../../lib/suggestions';
 import { settlementEventText } from '../../lib/balance';
 import { formatMoney, plainSigned } from '../../lib/money';
 import { isRefund, signedNet } from '../../lib/refund';
@@ -82,7 +83,7 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
   const navigate = useNavigate();
   const { expenses, itemsByExpense, loading, itemsLoading } = useMonthExpenses(group.id, selectedMonth);
   const { settlements, loading: settlementsLoading } = useSettlements(group.id, selectedMonth);
-  const [suggestions, shopSuggestions, suggestionsLoaded] = useItemSuggestions(group.id);
+  const [suggestions, shopSuggestions, suggestionsLoaded, tagSuggestions] = useItemSuggestions(group.id);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -164,9 +165,9 @@ export default function ExpenseList({ group, currentUserUid }: Props) {
         stageSuggestionsUpdate(
           batch,
           group.id,
-          { items: suggestions, shops: shopSuggestions },
-          { items, shops: shop ? [shop] : [] },
-          { items: [], shops: [] },
+          { items: suggestions, shops: shopSuggestions, tags: tagSuggestions },
+          { items, shops: shop ? [shop] : [], tags: expenseTags(items) },
+          { items: [], shops: [], tags: [] },
         );
       }
       const committed = batch.commit();
