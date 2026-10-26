@@ -7,6 +7,11 @@ import { formatMoney } from '../../lib/money';
 import { paths } from '../../lib/paths';
 
 vi.mock('../../lib/firebase', () => ({ db: {} }));
+const { mockScan } = vi.hoisted(() => ({ mockScan: vi.fn() }));
+vi.mock('../../lib/receiptOcr', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/receiptOcr')>()),
+  scanReceipt: (...args: unknown[]) => mockScan(...args),
+}));
 vi.mock('../../lib/converters', () => ({
   expensesCol: vi.fn(() => ({})),
   itemsCol: vi.fn(() => ({})),
@@ -483,5 +488,29 @@ describe('ExpenseEditor tags', () => {
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
     await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
     expect(batchSets.find((d) => 'shops' in d)?.tags).toEqual([{ name: 'Renovation', count: 1 }]);
+  });
+});
+
+describe('ExpenseEditor tags and receipt scans', () => {
+  beforeEach(() => {
+    batchSets.length = 0;
+    mockCommit.mockClear();
+  });
+
+  it('keeps the expense-wide tags on items a receipt scan fills in', async () => {
+    mockScan.mockResolvedValue({ shopName: 'Bunnings', items: [{ name: 'Paint', amount: 30, category: 'Fruit' }] });
+    renderEditor();
+    const everyItem = screen.getByRole('combobox', { name: /^Tags for every item/ });
+    fireEvent.change(everyItem, { target: { value: 'Renovation' } });
+    fireEvent.keyDown(everyItem, { key: 'Enter' });
+
+    const file = new File(['x'], 'receipt.png', { type: 'image/png' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await screen.findByRole('button', { name: /paint/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /save expense/i }));
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    const items = batchSets.filter((d) => 'expenseId' in d) as { name: string; tags?: string[] }[];
+    expect(items.map((d) => [d.name, d.tags])).toEqual([['Paint', ['Renovation']]]);
   });
 });

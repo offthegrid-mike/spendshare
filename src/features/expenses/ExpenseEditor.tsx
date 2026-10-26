@@ -174,7 +174,11 @@ export default function ExpenseEditor({
       );
       if (patch.shopName)
         setValue('shopName', patch.shopName, { shouldValidate: true, shouldDirty: true });
-      if (patch.items && patch.items.length > 0) replace(patch.items);
+      // Scanned items take the expense-wide tags, like items added by hand.
+      if (patch.items && patch.items.length > 0) {
+        const tags = getValues('tags') ?? [];
+        replace(patch.items.map((item) => ({ ...item, tags })));
+      }
     } catch (err) {
       setScanError(
         err instanceof ReceiptOcrError
