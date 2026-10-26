@@ -65,6 +65,12 @@ function daysInMonth(year: number, month: number): number {
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
+/** How many days `ym` has. */
+export function daysInMonthKey(ym: string): number {
+  const { year, month } = parseYM(ym);
+  return daysInMonth(year, month);
+}
+
 /**
  * How many days of `ym` have passed: its full length for a finished month,
  * today's day of the month for the current one, 0 for one yet to start.

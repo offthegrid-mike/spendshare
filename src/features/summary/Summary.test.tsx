@@ -58,6 +58,12 @@ vi.mock('../../lib/settle', () => ({ markSettlementPaid, undoSettlement: vi.fn()
 vi.mock('../../hooks/useIncome', () => ({
   useIncome: () => ({ income: [], loading: false }),
 }));
+const { categoryState } = vi.hoisted(() => ({
+  categoryState: { all: [] as unknown[], loading: false },
+}));
+vi.mock('../../hooks/useCategories', () => ({
+  useCategories: () => ({ all: categoryState.all, active: categoryState.all, loading: categoryState.loading }),
+}));
 vi.mock('../../lib/settlement', () => ({
   computeSummary: () => ({
     transactions: summaryState.transactions,
@@ -74,6 +80,7 @@ function resetMonthState() {
     prevExpenses: [], prevItemsByExpense: {}, prevLoading: false, prevItemsLoading: false,
   });
   requestedMonths.length = 0;
+  Object.assign(categoryState, { all: [], loading: false });
 }
 
 const { setMonth } = vi.hoisted(() => ({ setMonth: vi.fn() }));
@@ -253,8 +260,9 @@ describe('Summary Month view (redesign)', () => {
   });
 });
 
-const item = (expenseId: string, category: string, amount: number) => ({
-  id: `${expenseId}-${category}`, expenseId, category, amount, shared: true, payerUid: 'u1',
+const item = (expenseId: string, category: string, amount: number, extra: Record<string, unknown> = {}) => ({
+  id: `${expenseId}-${category}`, expenseId, category, categoryId: category.toLowerCase(), amount, shared: true, payerUid: 'u1',
+  ...extra,
 });
 
 function loadJune() {
@@ -370,5 +378,94 @@ describe('Summary Month view breakdown', () => {
     expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'By category' })).toBeNull();
     expect(screen.queryByTestId('month-spent')).toBeNull();
+  });
+});
+
+describe('Summary Month view budgets', () => {
+  const cat = (name: string, order: number, extra: Record<string, unknown> = {}) =>
+    ({ id: name.toLowerCase(), name, order, archived: false, ...extra });
+
+  afterEach(() => {
+    resetMonthState();
+    vi.useRealTimers();
+  });
+
+  it('shows what each budget has used, between Per person and By category', () => {
+    loadJune();
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 }), cat('Dining', 1)];
+    renderSummary();
+    const budgets = screen.getByRole('heading', { name: 'Budgets' });
+    expect(screen.getByRole('heading', { name: 'Per person' }).compareDocumentPosition(budgets) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(budgets.compareDocumentPosition(screen.getByRole('heading', { name: 'By category' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const rows = screen.getAllByTestId('budget-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('Groceries');
+    expect(rows[0]).toHaveTextContent('A$60.00 of A$100.00');
+    expect(rows[0]).toHaveTextContent('A$40.00 left');
+  });
+
+  it('counts personal spending as well as shared', () => {
+    loadJune();
+    monthState.itemsByExpense = {
+      e1: [item('e1', 'Groceries', 6000), item('e1', 'Groceries', 1500, { shared: false })],
+    };
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 })];
+    renderSummary();
+    expect(screen.getByTestId('budget-row')).toHaveTextContent('A$75.00 of A$100.00');
+  });
+
+  it('takes refunds off the spending', () => {
+    loadJune();
+    monthState.itemsByExpense = {
+      e1: [item('e1', 'Groceries', 6000), item('e1', 'Groceries', 2000, { refund: true })],
+    };
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 })];
+    renderSummary();
+    expect(screen.getByTestId('budget-row')).toHaveTextContent('A$40.00 of A$100.00');
+  });
+
+  it('leaves out archived categories and the card itself when nothing has a budget', () => {
+    loadJune();
+    categoryState.all = [cat('Groceries', 0), cat('Dining', 1, { monthlyBudget: 5000, archived: true })];
+    renderSummary();
+    expect(screen.queryByRole('heading', { name: 'Budgets' })).toBeNull();
+  });
+
+  it('does not wait for the categories: the page shows, and the card joins once they load', () => {
+    loadJune();
+    categoryState.all = [];
+    categoryState.loading = true;
+    renderSummary();
+    expect(screen.getByRole('heading', { name: 'Per person' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Budgets' })).toBeNull();
+  });
+
+  it('marks the pace through a month in progress', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 5, 15, 9)); // 15 of June's 30 days
+    loadJune();
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 })];
+    renderSummary();
+    expect(screen.getByTestId('budget-pace')).toHaveStyle({ left: '50%' });
+    expect(screen.getByText('15 days left')).toBeInTheDocument();
+  });
+
+  it('has no pace line for a month that is over', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 6, 10, 9));
+    loadJune();
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 })];
+    renderSummary();
+    expect(screen.getByTestId('budget-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('budget-pace')).toBeNull();
+  });
+
+  it('leaves the budgets out of the Year view', async () => {
+    loadJune();
+    categoryState.all = [cat('Groceries', 0, { monthlyBudget: 10000 })];
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Year' }));
+    expect(await screen.findByText('Year view 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Budgets' })).toBeNull();
   });
 });

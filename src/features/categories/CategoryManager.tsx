@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { categoriesCol } from '../../lib/converters';
+import { hasBudget, parseBudgetInput } from '../../lib/budget';
+import { formatMoney, plainSigned } from '../../lib/money';
 import { useCategories } from '../../hooks/useCategories';
+import { useGroup } from '../../hooks/useGroup';
 import { useUIStore } from '../../stores/uiStore';
 import LoadingButton from '../../components/LoadingButton';
 import CategoryTile from '../../components/ui/CategoryTile';
@@ -11,11 +14,15 @@ import type { CategoryDoc } from '../../types/models';
 export default function CategoryManager() {
   const { selectedGroupId: gid } = useUIStore();
   const { all, loading } = useCategories(gid);
+  const { group } = useGroup(gid);
 
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  // Budget edits are one-at-a-time with renames, so each start closes the other.
+  const [budgetEditingId, setBudgetEditingId] = useState<string | null>(null);
+  const [budgetText, setBudgetText] = useState('');
   const [error, setError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set());
@@ -47,8 +54,46 @@ export default function CategoryManager() {
   }
 
   function startEdit(cat: CategoryDoc) {
+    setBudgetEditingId(null);
     setEditingId(cat.id);
     setEditName(cat.name);
+  }
+
+  function startBudgetEdit(cat: CategoryDoc) {
+    setEditingId(null);
+    setError('');
+    setBudgetEditingId(cat.id);
+    setBudgetText(hasBudget(cat) ? plainSigned(cat.monthlyBudget) : '');
+  }
+
+  function cancelBudgetEdit() {
+    setBudgetEditingId(null);
+    setError('');
+  }
+
+  /** Blank (or Remove) takes the budget off; an amount sets it in whole cents. */
+  async function saveBudget(cat: CategoryDoc, text: string) {
+    if (!gid || savingEdit) return;
+    const parsed = parseBudgetInput(text);
+    if (parsed === 'invalid') {
+      setError('Enter an amount like 400 or 400.50.');
+      return;
+    }
+    setError('');
+    // Nothing to remove from a category that has no budget.
+    if (parsed === null && cat.monthlyBudget === undefined) {
+      setBudgetEditingId(null);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateDoc(doc(categoriesCol(gid), cat.id), { monthlyBudget: parsed === null ? deleteField() : parsed });
+      setBudgetEditingId(null);
+    } catch {
+      setError('Failed to save budget.');
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function saveEdit(cat: CategoryDoc) {
@@ -113,10 +158,57 @@ export default function CategoryManager() {
         {visibleCategories.map((cat) => (
           <li
             key={cat.id}
-            className={`flex items-center gap-3 px-4 py-3 ${cat.archived ? 'bg-recessed/60' : ''}`}
+            className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 ${cat.archived ? 'bg-recessed/60' : ''}`}
           >
             <CategoryTile icon={iconForCategory(cat.name)} label={cat.name} />
-            {editingId === cat.id ? (
+            {budgetEditingId === cat.id ? (
+              <>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={budgetText}
+                  onChange={(e) => setBudgetText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void saveBudget(cat, budgetText);
+                    if (e.key === 'Escape') cancelBudgetEdit();
+                  }}
+                  aria-label={`Monthly budget for ${cat.name}`}
+                  placeholder="No budget"
+                  autoFocus
+                  disabled={savingEdit}
+                  className="field min-w-0 flex-1 basis-32 py-1 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <div className="ml-auto flex items-center gap-2">
+                  <LoadingButton
+                    loading={savingEdit}
+                    loadingText="Saving…"
+                    onClick={() => void saveBudget(cat, budgetText)}
+                    className="btn-primary h-8 px-3 text-xs"
+                  >
+                    Save
+                  </LoadingButton>
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={cancelBudgetEdit}
+                    className="btn-outline h-8 px-3 text-xs"
+                  >
+                    Cancel
+                  </button>
+                  {hasBudget(cat) && (
+                    <button
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => void saveBudget(cat, '')}
+                      aria-label={`Remove budget for ${cat.name}`}
+                      className="btn-ghost h-8 px-2.5 text-xs"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : editingId === cat.id ? (
               <>
                 <input
                   type="text"
@@ -128,29 +220,31 @@ export default function CategoryManager() {
                   }}
                   autoFocus
                   disabled={savingEdit}
-                  className="field flex-1 py-1 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="field min-w-0 flex-1 basis-32 py-1 disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <LoadingButton
-                  loading={savingEdit}
-                  loadingText="Saving…"
-                  onClick={() => void saveEdit(cat)}
-                  className="btn-primary h-8 px-3 text-xs"
-                >
-                  Save
-                </LoadingButton>
-                <button
-                  type="button"
-                  disabled={savingEdit}
-                  onClick={cancelEdit}
-                  className="btn-outline h-8 px-3 text-xs"
-                >
-                  Cancel
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <LoadingButton
+                    loading={savingEdit}
+                    loadingText="Saving…"
+                    onClick={() => void saveEdit(cat)}
+                    className="btn-primary h-8 px-3 text-xs"
+                  >
+                    Save
+                  </LoadingButton>
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={cancelEdit}
+                    className="btn-outline h-8 px-3 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </>
             ) : (
               <>
                 <span
-                  className={`flex-1 text-sm ${
+                  className={`min-w-0 flex-1 basis-28 text-sm ${
                     cat.archived ? 'text-ink-faint line-through' : 'text-ink'
                   }`}
                 >
@@ -160,23 +254,42 @@ export default function CategoryManager() {
                       archived
                     </span>
                   )}
+                  {!cat.archived && hasBudget(cat) && group && (
+                    <span className="mt-0.5 block text-xs text-ink-muted">
+                      Budget <span className="money">{formatMoney(cat.monthlyBudget, group.currency)}</span> a month
+                    </span>
+                  )}
                 </span>
-                <button
-                  type="button"
-                  disabled={savingEdit}
-                  onClick={() => startEdit(cat)}
-                  className="btn-outline h-8 px-3 text-xs"
-                >
-                  Rename
-                </button>
-                <LoadingButton
-                  loading={archivingIds.has(cat.id)}
-                  loadingText={cat.archived ? 'Unarchiving…' : 'Archiving…'}
-                  onClick={() => void toggleArchive(cat)}
-                  className="btn-outline h-8 px-3 text-xs"
-                >
-                  {cat.archived ? 'Unarchive' : 'Archive'}
-                </LoadingButton>
+                {/* ml-auto keeps the buttons to the right, on their own line when the row is too narrow for all three. */}
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={() => startEdit(cat)}
+                    className="btn-outline h-8 px-3 text-xs"
+                  >
+                    Rename
+                  </button>
+                  {!cat.archived && (
+                    <button
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => startBudgetEdit(cat)}
+                      aria-label={`Budget for ${cat.name}`}
+                      className="btn-outline h-8 px-3 text-xs"
+                    >
+                      Budget
+                    </button>
+                  )}
+                  <LoadingButton
+                    loading={archivingIds.has(cat.id)}
+                    loadingText={cat.archived ? 'Unarchiving…' : 'Archiving…'}
+                    onClick={() => void toggleArchive(cat)}
+                    className="btn-outline h-8 px-3 text-xs"
+                  >
+                    {cat.archived ? 'Unarchive' : 'Archive'}
+                  </LoadingButton>
+                </div>
               </>
             )}
           </li>

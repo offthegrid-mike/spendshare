@@ -3,9 +3,11 @@ import { ChevronRight, ReceiptText } from 'lucide-react';
 import Skeleton from '../../components/ui/Skeleton';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
 import { useSettlements } from '../../hooks/useSettlements';
+import { useCategories } from '../../hooks/useCategories';
 import { formatMoney } from '../../lib/money';
 import { todayMonthKey } from '../../lib/month';
-import { spendTileFigures } from '../../lib/homeSpend';
+import { budgetTileLine, spendTileFigures } from '../../lib/homeSpend';
+import { computeBudgetProgress } from '../../lib/budget';
 import { paths } from '../../lib/paths';
 import type { GroupDoc } from '../../types/models';
 
@@ -21,17 +23,24 @@ const TONE_CLASS = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'te
 
 const LINE = 'flex items-baseline justify-between gap-3 border-t border-line py-2 text-[13px] text-ink-muted';
 
+// A budget at 80% or more is amber, and red once spent; on track stays quiet.
+const BUDGET_LABEL = { ok: '', warn: 'text-warning', over: 'text-negative' } as const;
+const BUDGET_NOTE = { ok: '', warn: '', over: 'text-negative' } as const;
+
 /** Home's SpendShare tile: this month's spending and the viewer's balance, with a way into SpendShare. */
 export default function SpendTile({ groups, group, viewerUid }: Props) {
   const month = todayMonthKey();
   const gid = group?.id ?? null;
   const { itemsByExpense, loading, itemsLoading } = useMonthExpenses(gid, month);
   const { settlements, loading: settlementsLoading } = useSettlements(gid, month);
+  // Budgets never hold the tile back: the line appears once the categories load.
+  const { all: categories } = useCategories(gid);
 
   const ready = group !== null && !loading && !itemsLoading && !settlementsLoading;
-  const figures = ready
-    ? spendTileFigures(group, viewerUid, Object.values(itemsByExpense).flat(), settlements, month)
-    : null;
+  const items = Object.values(itemsByExpense).flat();
+  const figures = ready ? spendTileFigures(group, viewerUid, items, settlements, month) : null;
+  const budgets = ready ? computeBudgetProgress(items, categories, month) : null;
+  const budgetLine = group && budgets ? budgetTileLine(budgets.rows, budgets.daysLeft, group.currency) : null;
 
   let body;
   if (groups.length === 0) {
@@ -57,6 +66,12 @@ export default function SpendTile({ groups, group, viewerUid }: Props) {
             <span className={`money ${TONE_CLASS[figures.tone]}`}>{formatMoney(figures.balanceAmount, group.currency)}</span>
           )}
         </p>
+        {budgetLine && (
+          <Link to={paths.summary} className={`${LINE} hover:text-ink`}>
+            <span className={BUDGET_LABEL[budgetLine.tone]}>{budgetLine.label}</span>
+            <span className={BUDGET_NOTE[budgetLine.tone]}>{budgetLine.note}</span>
+          </Link>
+        )}
       </div>
     );
   } else {

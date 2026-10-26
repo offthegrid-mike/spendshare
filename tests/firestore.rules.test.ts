@@ -543,6 +543,51 @@ describe('/groups financial sub-collection validation (M-2)', () => {
     }));
   });
 
+  // --- Category budgets ---
+  describe('category budgets', () => {
+    const category = (extra: Record<string, unknown> = {}) => ({ id: 'c1', name: 'Groceries', order: 0, archived: false, ...extra });
+    const catDoc = (db: Firestore) => doc(db, 'groups', 'group6', 'categories', 'c1');
+    const bob = () => testEnv.authenticatedContext('userB', { email: 'bob@test.com', email_verified: true }).firestore();
+
+    it('still lets a member create, rename and archive a category without a budget', async () => {
+      await assertSucceeds(setDoc(catDoc(bob()), category()));
+      await assertSucceeds(updateDoc(catDoc(bob()), { name: 'Food' }));
+      await assertSucceeds(updateDoc(catDoc(bob()), { archived: true }));
+    });
+
+    it('allows a whole-cent budget of zero or more', async () => {
+      await assertSucceeds(setDoc(catDoc(bob()), category({ monthlyBudget: 40000 })));
+      await assertSucceeds(updateDoc(catDoc(bob()), { monthlyBudget: 0 }));
+    });
+
+    it('allows setting a budget on an existing category, and removing it again', async () => {
+      await assertSucceeds(setDoc(catDoc(bob()), category()));
+      await assertSucceeds(updateDoc(catDoc(bob()), { monthlyBudget: 25000 }));
+      await assertSucceeds(updateDoc(catDoc(bob()), { monthlyBudget: deleteField() }));
+    });
+
+    it('denies a budget that is negative, fractional or not a number', async () => {
+      await assertFails(setDoc(catDoc(bob()), category({ monthlyBudget: -1 })));
+      await assertFails(setDoc(catDoc(bob()), category({ monthlyBudget: 12.5 })));
+      await assertFails(setDoc(catDoc(bob()), category({ monthlyBudget: '400' })));
+      await assertFails(setDoc(catDoc(bob()), category({ monthlyBudget: null })));
+    });
+
+    it('denies an update that leaves a bad budget on the category', async () => {
+      await assertSucceeds(setDoc(catDoc(bob()), category({ monthlyBudget: 40000 })));
+      await assertFails(updateDoc(catDoc(bob()), { monthlyBudget: -5 }));
+      await assertFails(updateDoc(catDoc(bob()), { monthlyBudget: 1.5 }));
+    });
+
+    it('lets a member delete a category and denies a non-member any access', async () => {
+      await assertSucceeds(setDoc(catDoc(bob()), category({ monthlyBudget: 40000 })));
+      const stranger = testEnv.authenticatedContext('userC', { email: 'userc@test.com', email_verified: true }).firestore();
+      await assertFails(getDoc(catDoc(stranger)));
+      await assertFails(setDoc(catDoc(stranger), category()));
+      await assertSucceeds(deleteDoc(catDoc(bob())));
+    });
+  });
+
   // --- Expense numeric checks ---
   describe('refunds', () => {
     const expense = (extra: Record<string, unknown>) => ({

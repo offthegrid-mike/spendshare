@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   monthKey, prevMonthKey, nextMonthKey, formatMonthLabel, monthRange, daysElapsedInMonth, comparablePrevDays, comparisonLabel,
+  daysInMonthKey,
 } from '../src/lib/month';
 describe('month', () => {
   it('formats a date as YYYY-MM', () => {
@@ -84,6 +85,20 @@ describe('month', () => {
 
     it('is 0 for a month that has not started', () => {
       expect(comparablePrevDays('2026-11', noon(2026, 10, 11))).toBe(0);
+    });
+  });
+
+  describe('daysInMonthKey', () => {
+    it('gives the length of the month', () => {
+      expect(daysInMonthKey('2026-10')).toBe(31);
+      expect(daysInMonthKey('2026-04')).toBe(30);
+    });
+
+    it('counts February by leap year', () => {
+      expect(daysInMonthKey('2026-02')).toBe(28);
+      expect(daysInMonthKey('2024-02')).toBe(29);
+      expect(daysInMonthKey('2100-02')).toBe(28);
+      expect(daysInMonthKey('2000-02')).toBe(29);
     });
   });
 
