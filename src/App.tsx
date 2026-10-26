@@ -15,6 +15,7 @@ import ExpenseEditor from './features/expenses/ExpenseEditor';
 import RefundRoute from './features/expenses/RefundRoute';
 import TagsScreen from './features/tags/TagsScreen';
 import TagScreen from './features/tags/TagScreen';
+import PriceScreen from './features/prices/PriceScreen';
 import { useExpense } from './hooks/useExpense';
 import { useRefunds } from './hooks/useRefunds';
 import { isRefund, refundedTotal } from './lib/refund';
@@ -95,6 +96,12 @@ function TagRoute({ group }: { group: GroupDoc }) {
   return tag ? <TagScreen key={tag} group={group} tag={tag} /> : null;
 }
 
+function PriceRoute({ group }: { group: GroupDoc }) {
+  const { name } = useParams<{ name: string }>();
+  // The key starts each item's page fresh.
+  return name ? <PriceScreen key={name} group={group} name={name} /> : null;
+}
+
 function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   const { id } = useParams<{ id: string }>();
   if (!id) return null;
@@ -148,6 +155,7 @@ function App() {
         />
         <Route path="tags" element={group ? <TagsScreen group={group} /> : <RouteSkeleton />} />
         <Route path="tags/:tag" element={group ? <TagRoute group={group} /> : <RouteSkeleton />} />
+        <Route path="prices/:name" element={group ? <PriceRoute group={group} /> : <RouteSkeleton />} />
         <Route
           path="group/settings"
           element={group ? <GroupSettings key={group.id} group={group} currentUserUid={user.uid} /> : <RouteSkeleton />}

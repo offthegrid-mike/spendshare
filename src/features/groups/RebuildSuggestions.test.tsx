@@ -45,7 +45,7 @@ import RebuildSuggestions from './RebuildSuggestions';
 const expense = makeExpense('e1', { shopName: 'Coles' });
 const milk = { name: 'Milk', categoryId: 'cat-groceries', category: 'Groceries' };
 const recount = {
-  items: [{ ...milk, count: 1 }],
+  items: [{ ...milk, count: 1, last: { unit: 1000, shop: 'Coles', date: '2026-10-03' } }],
   shops: [{ name: 'Coles', count: 1 }],
   tags: [],
 };
@@ -112,6 +112,18 @@ describe('RebuildSuggestions', () => {
     expect(commit).toHaveBeenCalled();
     expect(await screen.findByText('Autocomplete rebuilt.')).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('fills in last prices for suggestions written before they were kept', async () => {
+    getDocFromServer.mockResolvedValue(suggestionsSnap({ items: [{ ...milk, count: 1 }], shops: [{ name: 'Coles', count: 1 }] }));
+    render(<RebuildSuggestions groupId="g1" />);
+    await userEvent.click(rebuildButton());
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('1 item suggestion');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rebuild' }));
+
+    expect(set).toHaveBeenCalledWith({ path: 'groups/g1/suggestions/index' }, { ...recount, updatedAt: 'SERVER_TIMESTAMP' });
   });
 
   it('writes nothing when the rebuild is cancelled', async () => {

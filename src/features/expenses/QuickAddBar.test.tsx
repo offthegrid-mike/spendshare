@@ -14,7 +14,7 @@ const suggestions = [
 
 function setup(sugs: any[] = []) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const onAdd = vi.fn();
-  render(<QuickAddBar cats={cats} suggestions={sugs} onAdd={onAdd} />);
+  render(<QuickAddBar cats={cats} suggestions={sugs} currency="AUD" onAdd={onAdd} />);
   return { onAdd };
 }
 
@@ -125,5 +125,26 @@ describe('QuickAddBar', () => {
     // Enter picked the suggestion instead of adding the item.
     expect(onAdd).not.toHaveBeenCalled();
     expect((screen.getByPlaceholderText(/item name/i) as HTMLInputElement).value).toBe('Cherry');
+  });
+});
+
+describe('QuickAddBar last price', () => {
+  const priced = [
+    { name: 'Cherry', categoryId: 'c1', category: 'Fruit', count: 5, last: { unit: 340, shop: 'Coles', date: '2026-10-12' } },
+  ];
+
+  it('says what the typed item cost last time', () => {
+    setup(priced);
+    expect(screen.queryByText(/^Last /)).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: ' cherry' } });
+    expect(screen.getByText('Last A$3.40 at Coles, 12 Oct')).toBeTruthy();
+  });
+
+  it('says nothing for a name that is not remembered, or has no price', () => {
+    setup([...priced, { name: 'Bread', categoryId: 'c2', category: 'Bakery', count: 1 }]);
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Bread' } });
+    expect(screen.queryByText(/^Last /)).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Che' } });
+    expect(screen.queryByText(/^Last /)).toBeNull();
   });
 });

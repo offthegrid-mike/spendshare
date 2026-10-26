@@ -46,11 +46,23 @@ export interface SettlementDoc {
   paid: boolean; paidAt?: Timestamp; markedByUid?: Uid;
 }
 
+/** What one of an item cost the last time it was bought, and where. */
+export interface LastPrice {
+  /** Cents for one. */
+  unit: number;
+  /** '' when the expense had no shop. */
+  shop: string;
+  /** 'YYYY-MM-DD' */
+  date: string;
+}
+
 export interface SuggestionEntry {
   name: string;
   categoryId: string;
   category: string;
   count: number;
+  /** Missing until the item is next bought, or the suggestions are rebuilt. */
+  last?: LastPrice;
 }
 
 export interface ShopEntry { name: string; count: number; }

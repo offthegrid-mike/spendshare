@@ -98,6 +98,12 @@ export function comparablePrevDays(ym: string, now: number = Date.now()): number
   return elapsed;
 }
 
+/** '12 Oct' for 'YYYY-MM-DD'. */
+export function formatDayMonth(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  return `${day} ${MONTH_NAMES[month - 1].slice(0, 3)}`;
+}
+
 /** What a comparison is against: 'September', or '1–12 September' for its first twelve days. */
 export function comparisonLabel(prevYm: string, throughDay: number | null): string {
   const name = monthName(prevYm);

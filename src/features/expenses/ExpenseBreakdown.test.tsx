@@ -16,7 +16,7 @@ const items = [
 
 describe('ExpenseBreakdown', () => {
   it('lists each item with its remark, quantity and line total', () => {
-    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />);
+    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />, { wrapper: MemoryRouter });
     expect(screen.getByText('Oat milk')).toBeInTheDocument();
     expect(screen.getByText('Barista edition')).toBeInTheDocument();
     expect(screen.getByText('6.50 × 2')).toBeInTheDocument();
@@ -24,31 +24,31 @@ describe('ExpenseBreakdown', () => {
   });
 
   it('marks personal items', () => {
-    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />);
+    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />, { wrapper: MemoryRouter });
     const razors = screen.getByText('Razors').closest('li')!;
     expect(razors).toHaveTextContent('Personal');
     expect(screen.getByText('Sourdough').closest('li')).not.toHaveTextContent('Personal');
   });
 
   it('splits shared spending and names whose half it is', () => {
-    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />);
+    render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />, { wrapper: MemoryRouter });
     expect(screen.getByText('Shared').nextSibling).toHaveTextContent('20.80');
     expect(screen.getByText('Personal', { selector: 'dt' }).nextSibling).toHaveTextContent('17.00');
     expect(screen.getByText("Priya's half").nextSibling).toHaveTextContent('10.40');
   });
 
   it('says "Your half" when the other person paid', () => {
-    render(<ExpenseBreakdown expense={{ ...exp, payerUid: 'priya' }} items={items} group={pair} viewerUid="mike" />);
+    render(<ExpenseBreakdown expense={{ ...exp, payerUid: 'priya' }} items={items} group={pair} viewerUid="mike" />, { wrapper: MemoryRouter });
     expect(screen.getByText('Your half')).toBeInTheDocument();
   });
 
   it("uses \"Each person's share\" for three or more", () => {
-    render(<ExpenseBreakdown expense={exp} items={items} group={trio} viewerUid="mike" />);
+    render(<ExpenseBreakdown expense={exp} items={items} group={trio} viewerUid="mike" />, { wrapper: MemoryRouter });
     expect(screen.getByText("Each person's share").nextSibling).toHaveTextContent('6.93');
   });
 
   it('shows adjustments only when there is a gift card or discount', () => {
-    const { rerender } = render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />);
+    const { rerender } = render(<ExpenseBreakdown expense={exp} items={items} group={pair} viewerUid="mike" />, { wrapper: MemoryRouter });
     expect(screen.queryByText('Receipt total')).toBeNull();
     rerender(
       <ExpenseBreakdown
@@ -75,6 +75,7 @@ describe('ExpenseBreakdown for a refund', () => {
         group={pair}
         viewerUid="mike"
       />,
+      { wrapper: MemoryRouter },
     );
     expect(screen.getByText('Shared').nextElementSibling).toHaveTextContent('−16.50');
     expect(screen.getByText('Your half').nextElementSibling).toHaveTextContent('−8.25');
@@ -94,5 +95,30 @@ describe('ExpenseBreakdown tags', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('link', { name: 'Renovation' })).toHaveAttribute('href', '/spend/tags/Renovation');
+  });
+});
+
+describe('ExpenseBreakdown price history', () => {
+  const renderItems = (names: string[]) => render(
+    <MemoryRouter>
+      <ExpenseBreakdown
+        expense={makeExpense('e1', { total: 3000 })}
+        items={names.map((name, i) => makeItem(`i${i}`, 'e1', { name, amount: 1000 }))}
+        group={pair}
+        viewerUid="mike"
+      />
+    </MemoryRouter>,
+  );
+
+  it("links each item's name to its price history", () => {
+    renderItems(['Oat milk']);
+    expect(screen.getByRole('link', { name: 'Oat milk' })).toHaveAttribute('href', '/spend/prices/Oat%20milk');
+  });
+
+  it("leaves a name that can't be an address as plain text", () => {
+    renderItems(['..', 'Bread']);
+    expect(screen.getByText('..')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '..' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Bread' })).toBeInTheDocument();
   });
 });

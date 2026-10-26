@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import ItemNameCombobox from './ItemNameCombobox';
+import LastPriceHint from './LastPriceHint';
 
 interface QuickAddBarProps {
   cats: CategoryDoc[];
   suggestions: SuggestionEntry[];
+  currency: string;
   onAdd: (item: {
     name: string;
     categoryId: string;
@@ -15,7 +17,7 @@ interface QuickAddBarProps {
   }) => void;
 }
 
-export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarProps) {
+export default function QuickAddBar({ cats, suggestions, currency, onAdd }: QuickAddBarProps) {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -65,6 +67,7 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
               id="quickadd-name"
               value={name}
               suggestions={suggestions}
+              currency={currency}
               onEnter={handleAdd}
               onChange={(n, suggestion) => {
                 setName(n);
@@ -136,6 +139,9 @@ export default function QuickAddBar({ cats, suggestions, onAdd }: QuickAddBarPro
         </div>
       </div>
 
+      <div className="mt-1.5 empty:hidden">
+        <LastPriceHint name={name} suggestions={suggestions} currency={currency} />
+      </div>
       {error && <p className="mt-2 text-sm text-negative">{error}</p>}
     </div>
   );

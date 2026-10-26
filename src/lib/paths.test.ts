@@ -14,6 +14,8 @@ describe('paths', () => {
     expect(paths.refundExpense('abc123')).toBe('/spend/expense/abc123/refund');
     expect(paths.tags).toBe('/spend/tags');
     expect(paths.tag('Holiday 2026')).toBe('/spend/tags/Holiday%202026');
+    expect(paths.price('Milk 2L')).toBe('/spend/prices/Milk%202L');
+    expect(paths.price('Fish/chips')).toBe('/spend/prices/Fish%2Fchips');
     expect(paths.categories).toBe('/spend/categories');
     expect(paths.groupSettings).toBe('/spend/group/settings');
     expect(paths.groupInvites).toBe('/spend/group/invites');

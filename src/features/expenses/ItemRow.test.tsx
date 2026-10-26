@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useForm, useWatch } from 'react-hook-form';
 import ItemRow from './ItemRow';
 import type { FormValues } from './expenseForm';
+import type { SuggestionEntry } from '../../types/models';
 
 const cats = [{ id: 'c1', name: 'Fruit', order: 0, archived: false }] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -12,7 +13,11 @@ function Harness({
   expanded = false,
   onToggle = vi.fn(),
   onRemove = vi.fn(),
-}: { shared?: boolean; remark?: string; expanded?: boolean; onToggle?: () => void; onRemove?: () => void }) {
+  suggestions = [],
+}: {
+  shared?: boolean; remark?: string; expanded?: boolean; onToggle?: () => void; onRemove?: () => void;
+  suggestions?: SuggestionEntry[];
+}) {
   const { control, register, setValue } = useForm<FormValues>({
     defaultValues: {
       date: '', shopName: '', payerUid: 'u1', giftCardAmount: '',
@@ -27,7 +32,7 @@ function Harness({
       setValue={setValue}
       cats={cats}
       tagSuggestions={[]}
-      suggestions={[]}
+      suggestions={suggestions}
       summary={{ name: 'Cherry', categoryId: 'c1', amount: '3.00', shared, remark }}
       currency="AUD"
       expanded={expanded}
@@ -159,5 +164,26 @@ describe('ItemRow category check', () => {
     render(<WatchedHarness categoryUnconfirmed />);
     fireEvent.blur(screen.getByDisplayValue('Fruit'));
     expect(screen.queryByText(/check category/i)).toBeNull();
+  });
+});
+
+describe('ItemRow last price', () => {
+  const remembered: SuggestionEntry[] = [
+    { name: 'cherry', categoryId: 'c1', category: 'Fruit', count: 4, last: { unit: 340, shop: 'Coles', date: '2026-10-12' } },
+  ];
+
+  it('says what the item cost last time, under its name, when the editor is open', () => {
+    render(<Harness expanded suggestions={remembered} />);
+    expect(screen.getByText('Last A$3.40 at Coles, 12 Oct')).toBeTruthy();
+  });
+
+  it('stays out of the collapsed row', () => {
+    render(<Harness suggestions={remembered} />);
+    expect(screen.queryByText(/^Last /)).toBeNull();
+  });
+
+  it('says nothing for an item that has no remembered price', () => {
+    render(<Harness expanded suggestions={[{ ...remembered[0], last: undefined }]} />);
+    expect(screen.queryByText(/^Last /)).toBeNull();
   });
 });

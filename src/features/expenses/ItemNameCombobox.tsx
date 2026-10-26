@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { SuggestionEntry } from '../../types/models';
+import { formatMoney } from '../../lib/money';
+import { lastPriceFor } from '../../lib/suggestions';
 import { dedupeByName, highlightMatch } from './comboboxUtils';
 
 interface ItemNameComboboxProps {
   value: string;
   onChange: (name: string, suggestion?: SuggestionEntry) => void;
   suggestions: SuggestionEntry[];
+  /** Shows what each remembered item last cost, in this currency. */
+  currency?: string;
   id?: string;
   placeholder?: string;
   onEnter?: () => void;
@@ -15,6 +19,7 @@ export default function ItemNameCombobox({
   value,
   onChange,
   suggestions,
+  currency,
   id,
   placeholder = 'Item name',
   onEnter,
@@ -116,7 +121,9 @@ export default function ItemNameCombobox({
           role="listbox"
           className="absolute z-50 mt-1 min-w-full w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[10px] border border-line bg-surface py-1 shadow-pop"
         >
-          {filtered.map((s, i) => (
+          {filtered.map((s, i) => {
+            const last = currency ? lastPriceFor(suggestions, s.name) : null;
+            return (
             <li
               key={`${s.name}|${s.categoryId}`}
               id={`${optionPrefix}-${i}`}
@@ -129,11 +136,17 @@ export default function ItemNameCombobox({
               }`}
             >
               {highlightMatch(s.name, value)}
-              <span className="ml-2 shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-muted">
-                {s.category}
+              <span className="ml-2 flex shrink-0 items-center gap-2">
+                {last && currency && (
+                  <span className="money text-xs text-ink-muted">{formatMoney(last.unit, currency)}</span>
+                )}
+                <span className="rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-muted">
+                  {s.category}
+                </span>
               </span>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

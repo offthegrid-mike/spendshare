@@ -571,6 +571,25 @@ describe('ExpenseEditor', () => {
     expect((suggestionsCall as any)[1]).toMatchObject({ items: expect.any(Array) });
   });
 
+  it('files what each item cost, where and on which day, with its suggestion', async () => {
+    const { setSpy } = makeBatchMock();
+    const u = userEvent.setup();
+    render(<ExpenseEditor group={group} currentUserUid="u1" />);
+
+    await u.type(screen.getByLabelText(/shop/i), '  Coles ');
+    await addQuickItem(u, 'Apples', '3.00');
+    await u.click(screen.getByRole('button', { name: /save|submit/i }));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const suggestionsCall = setSpy.mock.calls.find(([ref]: [any]) => String(ref?.path ?? '').includes('suggestions'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { items } = (suggestionsCall as any)[1];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(items.find((entry: any) => entry.name === 'Apples')).toMatchObject({
+      last: { unit: 300, shop: 'Coles', date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) },
+    });
+  });
+
   // 23. Discount — checkbox reveals percent field defaulting to 2% -------------
   it('reveals a percent field defaulting to 2 when "Apply card discount" is checked', async () => {
     const u = userEvent.setup();

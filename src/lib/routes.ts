@@ -27,6 +27,7 @@ const MONTH_SCOPED = new Set([paths.spend, paths.summary, paths.income]);
 const EDIT_EXPENSE_PATH = /^\/spend\/expense\/[^/]+\/edit$/;
 const REFUND_EXPENSE_PATH = /^\/spend\/expense\/[^/]+\/refund$/;
 const TAG_PATH = /^\/spend\/tags\/([^/]+)$/;
+const PRICE_PATH = /^\/spend\/prices\/([^/]+)$/;
 
 export function routeInfo(pathname: string): RouteInfo {
   const secondary = SECONDARY[pathname];
@@ -35,6 +36,8 @@ export function routeInfo(pathname: string): RouteInfo {
   if (isRefundExpensePath(pathname)) return { kind: 'secondary', title: 'Refund', back: paths.spend };
   const tag = TAG_PATH.exec(pathname);
   if (tag) return { kind: 'secondary', title: safeDecode(tag[1]), back: paths.tags };
+  const price = PRICE_PATH.exec(pathname);
+  if (price) return { kind: 'secondary', title: safeDecode(price[1]), back: paths.spend };
   return { kind: 'primary', monthScoped: MONTH_SCOPED.has(pathname) };
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   monthKey, prevMonthKey, nextMonthKey, formatMonthLabel, monthRange, daysElapsedInMonth, comparablePrevDays, comparisonLabel,
-  daysInMonthKey,
+  daysInMonthKey, formatDayMonth,
 } from '../src/lib/month';
 describe('month', () => {
   it('formats a date as YYYY-MM', () => {
@@ -99,6 +99,14 @@ describe('month', () => {
       expect(daysInMonthKey('2024-02')).toBe(29);
       expect(daysInMonthKey('2100-02')).toBe(28);
       expect(daysInMonthKey('2000-02')).toBe(29);
+    });
+  });
+
+  describe('formatDayMonth', () => {
+    it('gives the day and a short month name', () => {
+      expect(formatDayMonth('2026-10-12')).toBe('12 Oct');
+      expect(formatDayMonth('2026-01-05')).toBe('5 Jan');
+      expect(formatDayMonth('2026-09-30')).toBe('30 Sep');
     });
   });
 

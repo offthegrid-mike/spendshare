@@ -11,6 +11,7 @@ import { toCents, formatMoney } from '../../lib/money';
 import type { FormValues } from './expenseForm';
 import { parseQty } from './expenseForm';
 import ItemNameCombobox from './ItemNameCombobox';
+import LastPriceHint from './LastPriceHint';
 import TagInput from './TagInput';
 
 interface ItemRowProps {
@@ -127,18 +128,22 @@ export default function ItemRow({
             control={control}
             name={`items.${index}.name`}
             render={({ field }) => (
-              <ItemNameCombobox
-                id={`items.${index}.name`}
-                value={field.value}
-                suggestions={suggestions}
-                onChange={(name, suggestion) => {
-                  field.onChange(name);
-                  if (suggestion) {
-                    setValue(`items.${index}.categoryId`, suggestion.categoryId);
-                    setValue(`items.${index}.categoryUnconfirmed`, false);
-                  }
-                }}
-              />
+              <>
+                <ItemNameCombobox
+                  id={`items.${index}.name`}
+                  value={field.value}
+                  suggestions={suggestions}
+                  currency={currency}
+                  onChange={(name, suggestion) => {
+                    field.onChange(name);
+                    if (suggestion) {
+                      setValue(`items.${index}.categoryId`, suggestion.categoryId);
+                      setValue(`items.${index}.categoryUnconfirmed`, false);
+                    }
+                  }}
+                />
+                <LastPriceHint name={field.value} suggestions={suggestions} currency={currency} />
+              </>
             )}
           />
 

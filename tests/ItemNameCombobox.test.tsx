@@ -18,11 +18,13 @@ const suggestions: SuggestionEntry[] = [
 function Wrapper({
   initialValue = '',
   sugs = suggestions,
+  currency,
   onChangeSpy = vi.fn(),
   onEnterSpy,
 }: {
   initialValue?: string;
   sugs?: SuggestionEntry[];
+  currency?: string;
   onChangeSpy?: ReturnType<typeof vi.fn>;
   onEnterSpy?: ReturnType<typeof vi.fn>;
 }) {
@@ -31,6 +33,7 @@ function Wrapper({
     <ItemNameCombobox
       value={val}
       suggestions={sugs}
+      currency={currency}
       onChange={(name, s) => { setVal(name); onChangeSpy(name, s); }}
       onEnter={onEnterSpy}
     />
@@ -299,5 +302,37 @@ describe('ItemNameCombobox', () => {
     await u.keyboard('{ArrowDown}');
     const active = screen.getAllByRole('option').find((o) => o.getAttribute('aria-selected') === 'true')!;
     expect(active.className).toContain('bg-accent-soft');
+  });
+});
+
+describe('ItemNameCombobox last prices', () => {
+  const priced: SuggestionEntry[] = [
+    { name: 'Chicken Breast', categoryId: 'cat1', category: 'Groceries', count: 10, last: { unit: 1250, shop: 'Coles', date: '2026-10-12' } },
+    { name: 'Chips', categoryId: 'cat2', category: 'Snacks', count: 1 },
+  ];
+
+  it('shows what each remembered item last cost beside its category', async () => {
+    render(<Wrapper sugs={priced} currency="AUD" />);
+    await userEvent.setup().type(screen.getByRole('combobox'), 'ch');
+    const [chicken, chips] = screen.getAllByRole('option');
+    expect(chicken).toHaveTextContent('A$12.50');
+    expect(chicken).toHaveTextContent('Groceries');
+    expect(chips).not.toHaveTextContent('$');
+  });
+
+  it('shows the newest price when the same name sits in two categories', async () => {
+    const twice: SuggestionEntry[] = [
+      { name: 'Milk', categoryId: 'cat1', category: 'Groceries', count: 9 },
+      { name: 'Milk', categoryId: 'cat2', category: 'Dairy', count: 1, last: { unit: 380, shop: 'Aldi', date: '2026-10-20' } },
+    ];
+    render(<Wrapper sugs={twice} currency="AUD" />);
+    await userEvent.setup().type(screen.getByRole('combobox'), 'mi');
+    expect(screen.getByRole('option')).toHaveTextContent('A$3.80');
+  });
+
+  it('shows no price without a currency', async () => {
+    render(<Wrapper sugs={priced} />);
+    await userEvent.setup().type(screen.getByRole('combobox'), 'ch');
+    expect(screen.getAllByRole('option')[0]).not.toHaveTextContent('$');
   });
 });
