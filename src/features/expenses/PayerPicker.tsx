@@ -1,4 +1,5 @@
 import Avatar from '../../components/ui/Avatar';
+import Select from '../../components/ui/Select';
 import { memberName } from '../../lib/balance';
 import type { GroupDoc } from '../../types/models';
 
@@ -9,10 +10,10 @@ interface Props {
   onChange: (uid: string) => void;
 }
 
-// Above this many people, pills wrap awkwardly; use the native select.
+// Above this many people, pills wrap awkwardly; use a dropdown.
 const MAX_PILLS = 4;
 
-/** "Paid by": member pills (a radio group), or a select for big groups. */
+/** "Paid by": member pills (a radio group), or a dropdown for big groups. */
 export default function PayerPicker({ group, viewerUid, value, onChange }: Props) {
   // Keep a payer who has since left the group, so editing never silently
   // reassigns the expense to someone else.
@@ -23,11 +24,13 @@ export default function PayerPicker({ group, viewerUid, value, onChange }: Props
     return (
       <div>
         <label htmlFor="payerUid" className="mb-1 block text-sm font-medium text-ink">Paid by</label>
-        <select id="payerUid" value={value} onChange={(e) => onChange(e.target.value)} className="field">
-          {uids.map((uid) => (
-            <option key={uid} value={uid}>{label(uid)}</option>
-          ))}
-        </select>
+        <Select
+          id="payerUid"
+          title="Paid by"
+          value={value}
+          onChange={onChange}
+          options={uids.map((uid) => ({ value: uid, label: label(uid) }))}
+        />
       </div>
     );
   }

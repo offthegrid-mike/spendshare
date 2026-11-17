@@ -50,6 +50,10 @@ export default {
           from: { opacity: '0', transform: 'translateY(-8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'sheet-in': {
+          from: { transform: 'translateY(100%)' },
+          to: { transform: 'translateY(0)' },
+        },
         'fade-in': {
           from: { opacity: '0', transform: 'translateY(4px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
@@ -57,6 +61,7 @@ export default {
       },
       animation: {
         'menu-in': 'menu-in 150ms cubic-bezier(.16,1,.3,1)',
+        'sheet-in': 'sheet-in 220ms cubic-bezier(.16,1,.3,1)',
         'fade-in': 'fade-in 180ms cubic-bezier(.16,1,.3,1)',
         expand: 'expand 200ms cubic-bezier(.16,1,.3,1)',
       },

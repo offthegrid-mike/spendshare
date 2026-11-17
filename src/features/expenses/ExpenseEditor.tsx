@@ -34,6 +34,7 @@ import PayerPicker from './PayerPicker';
 import GroupChip from './GroupChip';
 import GroupPicker, { type GroupPickerView } from '../groups/GroupPicker';
 import { schema, parseQty, type FormValues } from './expenseForm';
+import Checkbox from '../../components/ui/Checkbox';
 import LoadingButton from '../../components/LoadingButton';
 import { scanReceipt, receiptToFormPatch, ReceiptOcrError } from '../../lib/receiptOcr';
 import { isSearchReturnState } from '../../lib/routes';
@@ -804,16 +805,14 @@ export default function ExpenseEditor({
               )}
             </div>
             <div>
-              <label htmlFor="applyDiscount" className="flex items-center gap-2 text-sm font-medium text-ink">
-                <input
-                  id="applyDiscount"
-                  type="checkbox"
-                  checked={!!watchedApplyDiscount}
-                  onChange={(e) => handleApplyDiscountToggle(e.target.checked)}
-                  className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
-                />
+              <Checkbox
+                id="applyDiscount"
+                checked={!!watchedApplyDiscount}
+                onChange={(e) => handleApplyDiscountToggle(e.target.checked)}
+                className="font-medium"
+              >
                 Apply card discount
-              </label>
+              </Checkbox>
               {watchedApplyDiscount && (
                 <div className="mt-2">
                   <label htmlFor="discountPercent" className="mb-1 block text-sm font-medium text-ink">

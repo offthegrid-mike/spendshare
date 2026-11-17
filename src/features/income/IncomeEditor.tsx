@@ -145,9 +145,9 @@ export default function IncomeEditor({ group, currentUserUid, selectedMonth, inc
           {entries.map((entry, index) => (
             <div key={index} className="flex gap-2">
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 placeholder="0.00"
                 value={entry.amount}
                 onChange={(e) => updateEntry(index, 'amount', e.target.value)}

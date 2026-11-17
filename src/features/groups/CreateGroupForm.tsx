@@ -2,6 +2,9 @@ import { useId, useState, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
 import { createGroup, CURRENCIES } from '../../lib/createGroup';
 import LoadingButton from '../../components/LoadingButton';
+import Select from '../../components/ui/Select';
+
+const CURRENCY_OPTIONS = CURRENCIES.map((c) => ({ value: c, label: c }));
 
 interface Props {
   user: User;
@@ -67,16 +70,13 @@ export default function CreateGroupForm({ user, defaultCurrency, onCreated, busy
         <label htmlFor={`${id}-currency`} className="mb-1 block text-sm font-medium text-ink">
           Currency
         </label>
-        <select
+        <Select
           id={`${id}-currency`}
+          title="Currency"
           value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-          className="field"
-        >
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+          onChange={setCurrency}
+          options={CURRENCY_OPTIONS}
+        />
       </div>
       {error && <p id={`${id}-error`} className="text-sm text-negative">{error}</p>}
       <LoadingButton type="submit" loading={saving} loadingText="Creating…" disabled={busy} className="btn-primary h-10 w-full">

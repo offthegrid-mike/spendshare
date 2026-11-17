@@ -156,13 +156,15 @@ describe('ItemRow category check', () => {
 
   it('clears the marker once a category is chosen', () => {
     render(<WatchedHarness categoryUnconfirmed />);
-    fireEvent.change(screen.getByDisplayValue('Fruit'), { target: { value: 'c2' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Bakery' }));
     expect(screen.queryByText(/check category/i)).toBeNull();
   });
 
-  it('clears the marker when the select loses focus, so the guess can be accepted as-is', () => {
+  it('clears the marker when the current category is picked again, so the guess can be accepted as-is', () => {
     render(<WatchedHarness categoryUnconfirmed />);
-    fireEvent.blur(screen.getByDisplayValue('Fruit'));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Fruit' }));
     expect(screen.queryByText(/check category/i)).toBeNull();
   });
 });

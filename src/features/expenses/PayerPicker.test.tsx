@@ -22,12 +22,13 @@ describe('PayerPicker', () => {
     expect(onChange).toHaveBeenCalledWith('priya');
   });
 
-  it('falls back to a select above four members', async () => {
+  it('falls back to a dropdown above four members', async () => {
     const onChange = vi.fn();
     render(<PayerPicker group={five} viewerUid="mike" value="mike" onChange={onChange} />);
     expect(screen.queryByRole('radiogroup')).toBeNull();
     const select = screen.getByRole('combobox', { name: 'Paid by' });
-    await userEvent.selectOptions(select, 'sam');
+    await userEvent.click(select);
+    await userEvent.click(screen.getByRole('option', { name: 'Sam' }));
     expect(onChange).toHaveBeenCalledWith('sam');
   });
 

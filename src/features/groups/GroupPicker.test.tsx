@@ -86,7 +86,7 @@ describe('GroupPicker', () => {
 
   it('defaults a new group to the selected group currency', () => {
     renderPicker({ view: 'create', selectedId: 'g2' });
-    expect(screen.getByLabelText('Currency')).toHaveValue('USD');
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveTextContent('USD');
   });
 
   it('picks a newly created group', async () => {

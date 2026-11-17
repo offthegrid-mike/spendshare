@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Select from './ui/Select';
 import { useUIStore } from '../stores/uiStore';
 import { formatMonthLabel, monthRange, nextMonthKey, prevMonthKey, todayMonthKey } from '../lib/month';
 
@@ -31,20 +32,15 @@ export default function MonthControl({ startMonth = null }: Props) {
       >
         <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
       </button>
-      <span className="relative flex items-center gap-1 rounded-full px-1.5 text-sm font-semibold text-ink focus-within:ring-2 focus-within:ring-accent/40">
-        {formatMonthLabel(selectedMonth)}
-        <ChevronDown size={14} strokeWidth={1.75} className="text-ink-faint" aria-hidden="true" />
-        <select
-          aria-label="Month"
-          value={selectedMonth}
-          onChange={(e) => setMonth(e.target.value)}
-          className="absolute inset-0 cursor-pointer appearance-none opacity-0"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>{formatMonthLabel(m)}</option>
-          ))}
-        </select>
-      </span>
+      <Select
+        variant="bare"
+        aria-label="Month"
+        title="Choose month"
+        value={selectedMonth}
+        onChange={setMonth}
+        options={months.map((m) => ({ value: m, label: formatMonthLabel(m) }))}
+        className="rounded-full px-2.5 py-1 text-sm font-semibold text-ink transition-colors hover:bg-recessed focus-visible:ring-2 focus-visible:ring-accent/40"
+      />
       <button
         type="button"
         onClick={() => setMonth(nextMonthKey(selectedMonth))}
