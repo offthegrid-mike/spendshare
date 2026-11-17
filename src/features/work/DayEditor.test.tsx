@@ -106,12 +106,13 @@ afterEach(() => {
 
 describe('DayEditor', () => {
   describe('layout', () => {
-    // At phone widths three columns clip a 12-hour time ("04:45 PM" shows as "04:4"),
-    // so Start and Finish share a row and Hours takes the row below until the sm breakpoint.
+    // At phone widths three columns clip a time, so Start and Finish share a row
+    // and Hours takes the row below until the sm breakpoint.
     it('puts Hours on its own row below Start and Finish on narrow screens', () => {
       renderEditor();
-      const start = field('Start').parentElement!;
-      const finish = field('Finish').parentElement!;
+      // A time field wraps its input (for the picker button), so its cell is one level further up.
+      const start = field('Start').parentElement!.parentElement!;
+      const finish = field('Finish').parentElement!.parentElement!;
       const hours = field('Hours').parentElement!;
       const grid = start.parentElement!;
 
@@ -128,8 +129,11 @@ describe('DayEditor', () => {
   describe('times', () => {
     it('fills the finish and the hours from a typed start', () => {
       renderEditor();
-      expect(field('Start')).toHaveAttribute('type', 'time');
-      expect(field('Finish')).toHaveAttribute('type', 'time');
+      // Themed text fields with their own picker, not the browser's native time input.
+      expect(field('Start')).toHaveAttribute('type', 'text');
+      expect(field('Finish')).toHaveAttribute('type', 'text');
+      expect(screen.getByRole('button', { name: 'Pick start time' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Pick finish time' })).toBeInTheDocument();
       expect(field('Hours')).toHaveAttribute('inputmode', 'decimal');
 
       type('Start', '08:30');

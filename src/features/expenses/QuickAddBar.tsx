@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import type { CategoryDoc, SuggestionEntry } from '../../types/models';
 import ItemNameCombobox from './ItemNameCombobox';
 import LastPriceHint from './LastPriceHint';
+import Select from '../../components/ui/Select';
+import Switch from '../../components/ui/Switch';
 
 interface QuickAddBarProps {
   cats: CategoryDoc[];
@@ -23,6 +25,10 @@ export default function QuickAddBar({ cats, suggestions, currency, onAdd }: Quic
   const [quantity, setQuantity] = useState('1');
   const [categoryId, setCategoryId] = useState(''); // sticky across adds
   const [shared, setShared] = useState(true); // sticky across adds
+  const categoryOptions = [
+    { value: '', label: 'No category' },
+    ...cats.map((cat) => ({ value: cat.id, label: cat.name })),
+  ];
   const [error, setError] = useState('');
 
   function handleAdd() {
@@ -101,32 +107,18 @@ export default function QuickAddBar({ cats, suggestions, currency, onAdd }: Quic
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="qa-category" className="sr-only">Category</label>
-          <select
+          <Select
             id="qa-category"
+            title="Category"
             value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="field flex-1 lg:w-32 lg:flex-none"
-          >
-            <option value="">No category</option>
-            {cats.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+            onChange={setCategoryId}
+            options={categoryOptions}
+            className="flex-1 lg:w-36 lg:flex-none"
+          />
 
-          {/* A checkbox styled as a switch: role and keyboard stay native. */}
-          <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={shared}
-              onChange={(e) => setShared(e.target.checked)}
-              className="peer sr-only"
-            />
-            <span
-              aria-hidden="true"
-              className="relative h-5 w-9 shrink-0 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:shadow-sm after:transition-transform peer-checked:bg-accent peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40"
-            />
+          <Switch checked={shared} onChange={(e) => setShared(e.target.checked)}>
             Shared
-          </label>
+          </Switch>
 
           <button
             type="button"

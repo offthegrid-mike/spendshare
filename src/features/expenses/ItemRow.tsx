@@ -13,6 +13,8 @@ import { parseQty } from './expenseForm';
 import ItemNameCombobox from './ItemNameCombobox';
 import LastPriceHint from './LastPriceHint';
 import TagInput from './TagInput';
+import Select from '../../components/ui/Select';
+import Checkbox from '../../components/ui/Checkbox';
 
 interface ItemRowProps {
   index: number;
@@ -40,6 +42,10 @@ export default function ItemRow({
   summary, currency, expanded, onToggle, onRemove,
 }: ItemRowProps) {
   const catName = cats.find((c) => c.id === summary?.categoryId)?.name ?? '';
+  const categoryOptions = [
+    { value: '', label: 'No category' },
+    ...cats.map((cat) => ({ value: cat.id, label: cat.name })),
+  ];
   const unconfirmed = !!summary?.categoryUnconfirmed;
   const unitCents = toCents(summary?.amount ?? '0');
   const qty = parseQty(summary?.quantity);
@@ -147,20 +153,28 @@ export default function ItemRow({
             )}
           />
 
-          <select
-            {...register(`items.${index}.categoryId`, {
-              onChange: () => setValue(`items.${index}.categoryUnconfirmed`, false),
-              // Re-picking the same option fires no change event, so leaving the
-              // select also counts as the user having checked the category.
-              onBlur: () => setValue(`items.${index}.categoryUnconfirmed`, false),
-            })}
-            className="field"
-          >
-            <option value="">No category</option>
-            {cats.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name={`items.${index}.categoryId`}
+            render={({ field }) => (
+              <div>
+                <span id={`items.${index}.categoryId-label`} className="sr-only">Category</span>
+                <Select
+                  id={`items.${index}.categoryId`}
+                  aria-labelledby={`items.${index}.categoryId-label`}
+                  title="Category"
+                  value={field.value ?? ''}
+                  // Every pick counts as the user checking the category, even
+                  // re-picking the current one.
+                  onChange={(v) => {
+                    field.onChange(v);
+                    setValue(`items.${index}.categoryUnconfirmed`, false);
+                  }}
+                  options={categoryOptions}
+                />
+              </div>
+            )}
+          />
 
           <div className="flex gap-2">
             <div className="flex-1">
@@ -230,14 +244,7 @@ export default function ItemRow({
             )}
           />
 
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              {...register(`items.${index}.shared`)}
-              className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
-            />
-            Shared
-          </label>
+          <Checkbox {...register(`items.${index}.shared`)}>Shared</Checkbox>
 
           <button
             type="button"

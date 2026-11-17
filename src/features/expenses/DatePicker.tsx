@@ -1,36 +1,27 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { format, parse, isValid } from 'date-fns';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import Popover from '../../components/ui/Popover';
 
 const dayPickerClassNames = {
-  root: 'relative p-2',
-  months: 'flex',
-  month: 'space-y-2',
-  month_caption: 'flex items-center justify-center py-1 text-sm font-semibold text-ink',
-  dropdowns: 'relative z-20 flex items-center gap-1',
-  // The native <select> is stretched transparently over its label, so the
-  // styled label is what shows while the OS picker handles the interaction.
-  dropdown_root:
-    'relative inline-flex rounded-lg transition hover:bg-recessed focus-within:ring-2 focus-within:ring-accent/40',
-  dropdown: 'absolute inset-0 w-full cursor-pointer appearance-none opacity-0',
-  caption_label: 'flex items-center gap-1 px-2 py-1 text-sm font-semibold text-ink',
-  nav: 'absolute inset-x-2 top-2 z-10 flex items-center justify-between',
-  button_previous: 'rounded-lg p-1 text-ink-muted transition hover:bg-recessed hover:text-ink',
-  button_next: 'rounded-lg p-1 text-ink-muted transition hover:bg-recessed hover:text-ink',
-  chevron: 'h-4 w-4 fill-current',
+  root: 'p-2',
+  months: 'flex justify-center',
+  month: 'space-y-1',
   month_grid: 'w-full border-collapse',
-  weekdays: '',
-  weekday: 'text-xs font-medium text-ink-muted',
-  week: '',
+  weekday: 'pb-1 text-xs font-medium text-ink-muted',
   day: 'p-0 text-center',
   day_button:
-    'flex h-9 w-9 items-center justify-center rounded-full text-sm text-ink transition hover:bg-recessed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+    'flex h-10 w-10 items-center justify-center rounded-full text-sm text-ink transition hover:bg-recessed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:h-9 sm:w-9',
   selected: '[&>button]:bg-accent [&>button]:font-semibold [&>button]:text-on-accent [&>button]:hover:bg-accent',
   today: '[&>button]:font-semibold [&>button]:text-accent-ink',
   outside: '[&>button]:text-ink-faint',
   disabled: '[&>button]:cursor-not-allowed [&>button]:text-ink-faint [&>button]:hover:bg-transparent',
 };
+
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => format(new Date(2000, i, 1), 'MMM'));
+const navButton =
+  'grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-recessed hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 
 // How far back / ahead the year dropdown reaches, widened to always include
 // the selected date.
@@ -46,61 +37,137 @@ interface Props {
 
 export default function DatePicker({ id, value, onChange, error }: Props) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  // The month shown, and whether the month/year grid replaces the days.
+  const [view, setView] = useState<Date>(() => new Date());
+  const [choosingMonth, setChoosingMonth] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const parsed = value ? parse(value, 'yyyy-MM-dd', new Date()) : undefined;
   const selected = parsed && isValid(parsed) ? parsed : undefined;
 
   const thisYear = new Date().getFullYear();
   const selectedYear = selected?.getFullYear() ?? thisYear;
-  const startMonth = new Date(Math.min(thisYear - YEARS_BACK, selectedYear), 0);
-  const endMonth = new Date(Math.max(thisYear + YEARS_AHEAD, selectedYear), 11);
+  const firstYear = Math.min(thisYear - YEARS_BACK, selectedYear);
+  const lastYear = Math.max(thisYear + YEARS_AHEAD, selectedYear);
+  const startMonth = new Date(firstYear, 0);
+  const endMonth = new Date(lastYear, 11);
 
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+  function toggle() {
+    if (!open) {
+      setView(selected ?? new Date());
+      setChoosingMonth(false);
     }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, []);
+    setOpen((o) => !o);
+  }
+
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
 
   function handleSelect(date: Date | undefined) {
     if (date) {
       onChange(format(date, 'yyyy-MM-dd'));
     }
-    setOpen(false);
+    close();
   }
+
+  const viewYear = view.getFullYear();
+  const viewMonth = view.getMonth();
+  const step = (months: number) => setView(new Date(viewYear, viewMonth + months, 1));
+  const atStart = viewYear === firstYear && viewMonth === 0;
+  const atEnd = viewYear === lastYear && viewMonth === 11;
 
   const label = selected ? format(selected, 'MMM d, yyyy') : 'Pick a date';
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         id={id}
         type="button"
         aria-label={`Date: ${label}`}
-        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={toggle}
         className="field flex w-full items-center justify-between text-left"
       >
         <span>{label}</span>
         <Calendar size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 rounded-[10px] border border-line bg-surface shadow-pop">
+      <Popover open={open} onClose={close} anchorRef={triggerRef} title="Choose a date" minWidth={296}>
+        <div className="flex items-center justify-between px-2 pt-2">
+          <button
+            type="button"
+            aria-label={choosingMonth ? 'Previous year' : 'Previous month'}
+            disabled={choosingMonth ? viewYear <= firstYear : atStart}
+            onClick={() => (choosingMonth ? step(-12) : step(-1))}
+            className={navButton}
+          >
+            <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Choose month and year"
+            aria-expanded={choosingMonth}
+            onClick={() => setChoosingMonth((c) => !c)}
+            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-sm font-semibold text-ink transition hover:bg-recessed"
+          >
+            {choosingMonth ? viewYear : format(view, 'MMMM yyyy')}
+            <ChevronDown
+              size={14}
+              strokeWidth={1.75}
+              className={`text-ink-faint transition-transform ${choosingMonth ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            aria-label={choosingMonth ? 'Next year' : 'Next month'}
+            disabled={choosingMonth ? viewYear >= lastYear : atEnd}
+            onClick={() => (choosingMonth ? step(12) : step(1))}
+            className={navButton}
+          >
+            <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+        {choosingMonth ? (
+          <div role="group" aria-label={`Months of ${viewYear}`} className="grid grid-cols-3 gap-1.5 p-3">
+            {MONTH_NAMES.map((name, m) => {
+              const on = m === viewMonth;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setView(new Date(viewYear, m, 1));
+                    setChoosingMonth(false);
+                  }}
+                  className={`h-11 rounded-xl text-sm font-medium transition-colors ${
+                    on ? 'bg-accent text-on-accent' : 'text-ink hover:bg-recessed'
+                  }`}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
           <DayPicker
             mode="single"
             selected={selected}
             onSelect={handleSelect}
-            defaultMonth={selected}
-            captionLayout="dropdown"
+            month={view}
+            onMonthChange={setView}
+            hideNavigation
             startMonth={startMonth}
             endMonth={endMonth}
+            components={{ MonthCaption: () => <></> }}
             classNames={dayPickerClassNames}
           />
-        </div>
-      )}
+        )}
+      </Popover>
       {error && <p className="mt-1 text-sm text-negative">{error}</p>}
     </div>
   );

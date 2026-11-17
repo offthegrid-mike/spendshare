@@ -19,7 +19,8 @@ describe('CreateGroupForm', () => {
     render(<CreateGroupForm user={user} onCreated={onCreated} />);
 
     await userEvent.type(screen.getByLabelText('Group name'), '  Tasmania trip ');
-    await userEvent.selectOptions(screen.getByLabelText('Currency'), 'USD');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Currency' }));
+    await userEvent.click(screen.getByRole('option', { name: 'USD' }));
     await userEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('g-new', 'Tasmania trip'));
@@ -52,12 +53,12 @@ describe('CreateGroupForm', () => {
 
   it('defaults the currency to defaultCurrency when it is a known currency', () => {
     render(<CreateGroupForm user={user} defaultCurrency="GBP" onCreated={vi.fn()} />);
-    expect(screen.getByLabelText('Currency')).toHaveValue('GBP');
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveTextContent('GBP');
   });
 
   it('falls back to AUD for an unknown defaultCurrency', () => {
     render(<CreateGroupForm user={user} defaultCurrency="JPY" onCreated={vi.fn()} />);
-    expect(screen.getByLabelText('Currency')).toHaveValue('AUD');
+    expect(screen.getByRole('combobox', { name: 'Currency' })).toHaveTextContent('AUD');
   });
 
   it('stays disabled after a successful create so a second tap cannot create it twice', async () => {

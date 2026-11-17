@@ -5,11 +5,12 @@ import { groupsCol } from '../../lib/converters';
 import LoadingButton from '../../components/LoadingButton';
 import Avatar from '../../components/ui/Avatar';
 import Chip from '../../components/ui/Chip';
+import Select from '../../components/ui/Select';
 import { formatVersionLabel } from '../../lib/appVersion';
 import RebuildSuggestions from './RebuildSuggestions';
 import type { GroupDoc } from '../../types/models';
 
-const CURRENCIES = ['AUD', 'USD', 'EUR', 'GBP'];
+const CURRENCY_OPTIONS = ['AUD', 'USD', 'EUR', 'GBP'].map((c) => ({ value: c, label: c }));
 
 interface Props { group: GroupDoc; currentUserUid: string; }
 
@@ -105,14 +106,14 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">Currency</label>
-            <select
+            <label id="group-currency-label" className="mb-1.5 block text-sm font-medium text-ink">Currency</label>
+            <Select
+              aria-labelledby="group-currency-label"
+              title="Currency"
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="field"
-            >
-              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+              onChange={setCurrency}
+              options={CURRENCY_OPTIONS}
+            />
           </div>
           {error && <p className="text-sm text-negative">{error}</p>}
           <button

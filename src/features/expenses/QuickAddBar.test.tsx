@@ -29,7 +29,8 @@ describe('QuickAddBar', () => {
     const { onAdd } = setup();
     fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
     fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '3.00' } });
-    fireEvent.change(screen.getByLabelText(/category/i), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('combobox', { name: /category/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Fruit' }));
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
     expect(onAdd).toHaveBeenCalledWith({
       name: 'Cherry',
@@ -44,11 +45,12 @@ describe('QuickAddBar', () => {
     const { onAdd } = setup();
     fireEvent.change(screen.getByPlaceholderText(/item name/i), { target: { value: 'Cherry' } });
     fireEvent.change(screen.getByLabelText(/unit price/i), { target: { value: '3.00' } });
-    fireEvent.change(screen.getByLabelText(/category/i), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('combobox', { name: /category/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Fruit' }));
     fireEvent.click(screen.getByRole('button', { name: /add item/i }));
     expect((screen.getByPlaceholderText(/item name/i) as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText(/unit price/i) as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText(/category/i) as HTMLSelectElement).value).toBe('c1');
+    expect(screen.getByRole('combobox', { name: /category/i })).toHaveTextContent('Fruit');
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 

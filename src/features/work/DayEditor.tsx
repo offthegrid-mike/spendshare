@@ -8,6 +8,7 @@ import { writeWorkDay } from '../../lib/work/workWrite';
 import { isFinishPassed } from '../../lib/work/workYear';
 import SegmentedControl from '../../components/ui/SegmentedControl';
 import LoadingButton from '../../components/LoadingButton';
+import TimeField from '../../components/ui/TimeField';
 import {
   confirmAction,
   formError,
@@ -171,24 +172,22 @@ export default function DayEditor({ uid, date, existing, settings, settingsLoade
             <label htmlFor={`${id}-start`} className={LABEL}>
               Start
             </label>
-            <input
+            <TimeField
               id={`${id}-start`}
-              type="time"
+              pickerLabel="Pick start time"
               value={form.startTime}
-              onChange={(e) => edit({ kind: 'start', value: e.target.value })}
-              className="field money"
+              onChange={(value) => edit({ kind: 'start', value })}
             />
           </div>
           <div className="min-w-0">
             <label htmlFor={`${id}-finish`} className={LABEL}>
               Finish
             </label>
-            <input
+            <TimeField
               id={`${id}-finish`}
-              type="time"
+              pickerLabel="Pick finish time"
               value={form.finishTime}
-              onChange={(e) => edit({ kind: 'finish', value: e.target.value })}
-              className="field money"
+              onChange={(value) => edit({ kind: 'finish', value })}
             />
           </div>
           <div className="col-span-2 min-w-0 sm:col-span-1">

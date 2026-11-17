@@ -91,6 +91,47 @@
   body {
     @apply bg-canvas font-sans text-ink;
   }
+
+  /* Taps shouldn't flash the browser's grey box, and double-tap shouldn't zoom controls. */
+  button,
+  [role='button'],
+  [role='option'],
+  label,
+  a {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* One keyboard focus style for everything that doesn't draw its own. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.55);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  [role='listbox']:focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.25);
+  }
+
+  /* Amount fields are typed, not nudged: no browser spinners. */
+  input[type='number'] {
+    appearance: textfield;
+  }
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  /* Thin, theme-coloured scrollbars in lists and popovers. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--ink-faint) / 0.4) transparent;
+  }
 }
 
 @layer components {
@@ -120,11 +161,14 @@
       motion-safe:active:scale-[0.98];
   }
 
-  /* Text input / select */
+  /* Text input, and the button-styled dropdown / pickers that sit beside it. */
   .field {
-    @apply w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-sm text-ink
+    @apply min-h-10 w-full appearance-none rounded-[10px] border border-line bg-surface px-3 py-2 text-sm text-ink
       transition placeholder:text-ink-faint
+      hover:border-ink-faint/50
       focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25
+      focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25
+      aria-expanded:border-accent aria-expanded:ring-2 aria-expanded:ring-accent/25
       disabled:cursor-not-allowed disabled:opacity-60;
   }
 

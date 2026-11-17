@@ -50,7 +50,7 @@ describe('TagInput', () => {
     render(<Harness initial={['Holiday']} onChange={onChange} />);
     await userEvent.type(field(), 'holiday{Enter}');
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getAllByText(/holiday/i)).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /remove tag/i })).toHaveLength(1);
   });
 
   it('removes a tag with its × button', async () => {
@@ -74,10 +74,33 @@ describe('TagInput', () => {
     expect(screen.getByText('Renovation')).toBeInTheDocument();
   });
 
-  it('offers earlier tags it does not already have', () => {
+  it('offers earlier tags it does not already have', async () => {
     render(<Harness initial={['Renovation']} />);
-    const options = [...document.querySelectorAll('#tags-suggestions option')].map((o) => o.getAttribute('value'));
+    await userEvent.click(field());
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
     expect(options).toEqual(['Holiday 2026']);
+  });
+
+  it('narrows the suggestions to what is typed, and adds the one clicked', async () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await userEvent.type(field(), 'reno');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Renovation']);
+    await userEvent.click(screen.getByRole('option', { name: 'Renovation' }));
+    expect(onChange).toHaveBeenLastCalledWith(['Renovation']);
+  });
+
+  it('picks a suggestion with the arrow keys and Enter', async () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await userEvent.click(field());
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(onChange).toHaveBeenLastCalledWith(['Renovation']);
+  });
+
+  it('is not a native datalist', () => {
+    render(<Harness />);
+    expect(document.querySelector('datalist')).toBeNull();
   });
 
   it('says when an item is full, and stops taking tags', () => {
