@@ -1,11 +1,12 @@
 import { lazy, Suspense, useState } from 'react';
 import { format } from 'date-fns';
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck, Download } from 'lucide-react';
 import { markSettlementPaid, undoSettlement as removeSettlement } from '../../lib/settle';
 import { computeSummary } from '../../lib/settlement';
 import { formatMoney } from '../../lib/money';
 import { computeMonthBreakdown } from '../../lib/monthSummary';
 import { computeBudgetProgress } from '../../lib/budget';
+import { exportPeriodCsv } from '../../lib/exportActions';
 import { comparablePrevDays, comparisonLabel, daysElapsedInMonth, formatMonthLabel, prevMonthKey } from '../../lib/month';
 import { memberBalanceCopy, memberName } from '../../lib/balance';
 import { useMonthExpenses } from '../../hooks/useMonthExpenses';
@@ -16,6 +17,8 @@ import { useUIStore } from '../../stores/uiStore';
 import Avatar from '../../components/ui/Avatar';
 import SegmentedControl from '../../components/ui/SegmentedControl';
 import { RouteSkeleton } from '../../components/AppSkeletons';
+import ExportMessage from '../export/ExportMessage';
+import { useExportRun } from '../export/useExportRun';
 import MonthOverview from './MonthOverview';
 import BudgetsCard from './BudgetsCard';
 import CategoryBreakdown from './CategoryBreakdown';
@@ -69,6 +72,9 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   const setView = (v: 'month' | 'year') => setYearViewMonth(v === 'year' ? selectedMonth : null);
   const { setMonth } = useUIStore();
   const year = selectedMonth.slice(0, 4);
+  // The export's message is about the month or year on screen, so it goes when that changes.
+  const exportRun = useExportRun(`${view}:${selectedMonth}`);
+  const periodTitle = view === 'year' ? year : formatMonthLabel(selectedMonth);
   const money = (cents: number) => formatMoney(cents, group.currency);
   const nameOf = (uid: string) => (uid === currentUserUid ? 'You' : memberName(group, uid));
 
@@ -78,11 +84,28 @@ export default function Summary({ group, currentUserUid, selectedMonth }: Props)
   }
 
   const header = (
-    <div className="flex items-center justify-between gap-3">
-      <h1 className="text-[22px] font-semibold tracking-tight text-ink">
-        {view === 'year' ? year : formatMonthLabel(selectedMonth)}
-      </h1>
-      <SegmentedControl label="Summary period" options={PERIODS} value={view} onChange={setView} />
+    <div>
+      {/* A long month on a narrow phone drops the controls to their own row rather than wrapping the title. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h1 className="text-[22px] font-semibold tracking-tight text-ink">
+          {periodTitle}
+        </h1>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            disabled={exportRun.busy}
+            onClick={() => void exportRun.run(() =>
+              exportPeriodCsv(group, view === 'year' ? { kind: 'year', year } : { kind: 'month', month: selectedMonth }))}
+            title={`Download ${periodTitle} as a spreadsheet (CSV)`}
+            className="btn-ghost px-2.5"
+          >
+            <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">{exportRun.busy ? 'Exporting…' : 'Export'}</span>
+          </button>
+          <SegmentedControl label="Summary period" options={PERIODS} value={view} onChange={setView} />
+        </div>
+      </div>
+      <ExportMessage result={exportRun.result} className="mt-2" />
     </div>
   );
 
