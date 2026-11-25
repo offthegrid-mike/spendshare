@@ -13,14 +13,15 @@ vi.mock('firebase/firestore', () => ({
   arrayUnion: (v: unknown) => ({ arrayUnion: v }),
   arrayRemove: (v: unknown) => ({ arrayRemove: v }),
   deleteField: () => 'DELETE',
+  Timestamp: { now: () => 'NOW' },
 }));
 vi.mock('../../lib/converters', () => ({ groupsCol: {} }));
 vi.mock('../invites/SendInvite', () => ({
   default: ({ group }: { group: { id: string; kind?: string } }) => <div data-testid="send-invite" data-kind={group.kind} />,
 }));
 vi.mock('../expenses/DatePicker', () => ({
-  default: ({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) => (
-    <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({ id, value, onChange, disabled }: { id: string; value: string; onChange: (v: string) => void; disabled?: boolean }) => (
+    <input id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
   ),
 }));
 
@@ -112,12 +113,27 @@ describe('TripSettings', () => {
     const { unmount } = render(<TripSettings trip={trip} user={owner} />);
     await u.click(screen.getByRole('button', { name: 'Close trip' }));
     await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Close trip' }));
-    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'TS' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'NOW' }));
     unmount();
     render(<TripSettings trip={{ ...trip, tripClosedAt: { toDate: () => new Date(2027, 4, 21) } as never }} user={owner} />);
     expect(screen.getByText('Closed on 21 May 2027. Nothing on the trip can change; settle-up still works.')).toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: 'Reopen trip' }));
     await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'DELETE' }));
+  });
+
+  it('closes at once on this device, with a client time, so nothing can be added while the close waits to sync', async () => {
+    const u = userEvent.setup();
+    render(<TripSettings trip={trip} user={owner} />);
+    await u.click(screen.getByRole('button', { name: 'Close trip' }));
+    await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Close trip' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'NOW' }));
+  });
+
+  it('doesn’t let a closed trip’s name or dates change', () => {
+    render(<TripSettings trip={{ ...trip, tripClosedAt: { toDate: () => new Date(2027, 4, 21) } as never }} user={owner} />);
+    expect(screen.getByLabelText('Trip name')).toBeDisabled();
+    expect(screen.getByLabelText('First day')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
   });
 
   it('offers closing only to the owner', () => {

@@ -1798,6 +1798,14 @@ describe('/groups closing a trip', () => {
     await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan'), { tripClosedAt: deleteField() }));
   });
 
+  it('freezes a closed trip’s name and dates, while members can still join or leave', async () => {
+    await seed(true);
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan'), { name: 'Japan 2' }));
+    await assertFails(updateDoc(doc(fs('userB'), 'groups', 'japan'), { name: 'Japan 2' }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan'), { trip: { startDate: '2027-05-10', endDate: '2027-05-25' } }));
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan'), { tripClosedAt: deleteField(), name: 'Japan 2' }));
+  });
+
   it('keeps an open trip open to changes', async () => {
     await seed(false);
     await assertSucceeds(setDoc(doc(fs(), 'groups', 'japan', 'expenses', 'e2'), expense));

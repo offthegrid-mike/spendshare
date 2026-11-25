@@ -48,6 +48,10 @@ export default function CashHandoverForm({ trip, user, fromUid, toUid, owed, wal
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!(foreignAmount > 0)) { setError('Enter the cash to hand over.'); return; }
+    if (wallet && foreignAmount > wallet.left.foreign) {
+      setError(`Only ${formatMinor(wallet.left.foreign, currency)} is left to hand over.`);
+      return;
+    }
     setSaving(true);
     setError('');
     try {

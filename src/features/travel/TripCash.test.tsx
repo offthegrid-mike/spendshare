@@ -6,7 +6,7 @@ import type { User } from 'firebase/auth';
 import TripCash from './TripCash';
 import { tripCash } from '../../lib/travel/cash';
 import { makeExpense, makeTrip } from '../../test/fixtures';
-import type { TopUpDoc, WalletDoc } from '../../types/models';
+import type { HandoverDoc, TopUpDoc, WalletDoc } from '../../types/models';
 import { useUIStore } from '../../stores/uiStore';
 
 const { addCash, deleteTopUp, setKittyKeeper } = vi.hoisted(() => ({ addCash: vi.fn(), deleteTopUp: vi.fn(), setKittyKeeper: vi.fn() }));
@@ -26,10 +26,10 @@ const topUps: TopUpDoc[] = [
 ];
 const dinner = makeExpense('dinner', { currency: 'JPY', total: 60000, payerUid: 'alex', paidWith: { kind: 'wallet', walletId: 'alex_JPY' } });
 
-function renderCash(wallets = [alexYen], ups = topUps, expenses = [dinner]) {
+function renderCash(wallets = [alexYen], ups = topUps, expenses = [dinner], handovers: HandoverDoc[] = []) {
   return render(
     <MemoryRouter>
-      <TripCash trip={trip} user={alex} cash={tripCash(wallets, ups, expenses)} expenses={expenses} />
+      <TripCash trip={trip} user={alex} cash={tripCash(wallets, ups, expenses, handovers)} expenses={expenses} />
     </MemoryRouter>,
   );
 }
@@ -206,5 +206,14 @@ describe('TripCash', () => {
         foreignAmount: 10000, homeAmount: 10200, date: '2027-05-12', walletExists: true,
       }));
     });
+  });
+});
+
+describe('TripCash hand-overs', () => {
+  it('shows cash handed over apart from what was bought and spent', () => {
+    const h: HandoverDoc = { id: 'h1', fromUid: 'alex', toUid: 'ben', currency: 'JPY', foreignAmount: 10000, date: '2027-05-12', byUid: 'alex', createdAt: null as never };
+    renderCash([alexYen], topUps, [dinner], [h]);
+    const card = screen.getByRole('region', { name: 'Your JPY cash' });
+    expect(card).toHaveTextContent('Bought ¥100,000 for A$1,030.00 · Spent ¥60,000 · Handed over ¥10,000');
   });
 });

@@ -1,6 +1,6 @@
 import { useId, useState, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
-import { deleteField, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, Timestamp, updateDoc } from 'firebase/firestore';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { groupsCol } from '../../lib/converters';
 import { settleWrite } from '../../lib/settleWrite';
@@ -31,7 +31,9 @@ export default function TripSettings({ trip, user }: Props) {
 
   function setClosed(close: boolean) {
     setConfirmingClose(false);
-    settleWrite(updateDoc(doc(groupsCol, trip.id), { tripClosedAt: close ? serverTimestamp() : deleteField() }))
+    // A client time, not serverTimestamp(): a pending server time reads back as null,
+    // so the trip would look open (and take new expenses) until the close synced.
+    settleWrite(updateDoc(doc(groupsCol, trip.id), { tripClosedAt: close ? Timestamp.now() : deleteField() }))
       .catch(() => setError(close ? "Couldn't close the trip. Try again." : "Couldn't reopen the trip. Try again."));
   }
 
@@ -75,6 +77,7 @@ export default function TripSettings({ trip, user }: Props) {
               type="text"
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
+              disabled={closed}
               className="field"
             />
           </div>
@@ -82,11 +85,11 @@ export default function TripSettings({ trip, user }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor={`${id}-start`} className="mb-1.5 block text-sm font-medium text-ink">First day</label>
-                <DatePicker id={`${id}-start`} name="First day" value={startDate} onChange={(v) => { setStartDate(v); setError(''); }} />
+                <DatePicker id={`${id}-start`} name="First day" disabled={closed} value={startDate} onChange={(v) => { setStartDate(v); setError(''); }} />
               </div>
               <div>
                 <label htmlFor={`${id}-end`} className="mb-1.5 block text-sm font-medium text-ink">Last day</label>
-                <DatePicker id={`${id}-end`} name="Last day" value={endDate} onChange={(v) => { setEndDate(v); setError(''); }} />
+                <DatePicker id={`${id}-end`} name="Last day" disabled={closed} value={endDate} onChange={(v) => { setEndDate(v); setError(''); }} />
               </div>
             </div>
           ) : (
@@ -104,9 +107,11 @@ export default function TripSettings({ trip, user }: Props) {
             <p className="mt-1 text-xs text-ink-muted">Balances and settle-up are worked out in this currency.</p>
           </div>
           {error && <p role="alert" className="text-sm text-negative">{error}</p>}
-          <button type="submit" disabled={saving} className="btn-primary">
-            {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
-          </button>
+          {!closed && (
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
+            </button>
+          )}
         </form>
       </section>
 

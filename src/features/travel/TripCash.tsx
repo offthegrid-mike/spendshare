@@ -73,7 +73,12 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
         </p>
       )}
       <p className="text-xs text-ink-muted">
-        {`${isKitty ? 'Put in' : 'Bought'} ${formatMinor(state.paidIn.foreign, currency)} for ${formatMinor(state.paidIn.home, home)} · Spent ${formatMinor(state.spent, currency)}`}
+        {[
+          `${isKitty ? 'Put in' : 'Bought'} ${formatMinor(state.paidIn.foreign, currency)} for ${formatMinor(state.paidIn.home, home)}`,
+          `Spent ${formatMinor(state.spent, currency)}`,
+          ...(state.handedOut > 0 ? [`Handed over ${formatMinor(state.handedOut, currency)}`] : []),
+          ...(state.handedIn > 0 ? [`Received ${formatMinor(state.handedIn, currency)}`] : []),
+        ].join(' · ')}
       </p>
       {state.kitty && state.kitty.contributors.length > 0 && (
         <ul aria-label="Put in" className="space-y-0.5 text-[13px] text-ink">

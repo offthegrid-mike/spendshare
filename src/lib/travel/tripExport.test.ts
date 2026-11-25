@@ -34,6 +34,17 @@ describe('expensesCsv', () => {
       `2027-05-13,"'=HYPERLINK(""x"")",Sake,Food,JPY,20000,cash (Alex),97.09,AUD,206.00,no,Alex,personal`,
     ]);
   });
+
+  it('keeps member names and tab-led text from being read as formulas', () => {
+    const sneaky = { ...trip, members: { ...trip.members, alex: { ...trip.members.alex, displayName: '=HYPERLINK("e")' } } };
+    const tabbed = { ...card, shopName: '\t=1+1' };
+    const csv = expensesCsv(sneaky, [dinner, tabbed], items, cash);
+    expect(csv).not.toMatch(/(^|,)"?=HYPERLINK\(""e""\)/m);
+    expect(csv).toContain(`"'=HYPERLINK(""e"")"`);
+    expect(csv).toContain(`'\t=1+1`);
+    const cashLines = cashCsv(sneaky, cash, [dinner]);
+    expect(cashLines).not.toMatch(/(^|,)"?=HYPERLINK/m);
+  });
 });
 
 describe('cashCsv', () => {
@@ -42,7 +53,7 @@ describe('cashCsv', () => {
     expect(lines).toEqual([
       'wallet,date,what,person,currency,cash,home_currency,cost',
       'Alex JPY,2027-05-09,bought,Alex,JPY,100000,AUD,1030.00',
-      `Alex JPY,2027-05-13,"spent: '=HYPERLINK(""x"")",Alex,JPY,-60000,AUD,-618.00`,
+      `Alex JPY,2027-05-13,"spent: =HYPERLINK(""x"")",Alex,JPY,-60000,AUD,-618.00`,
     ]);
   });
 });

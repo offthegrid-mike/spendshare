@@ -273,7 +273,7 @@ Pure modules with no UI. Everything later depends on these.
 - **Kitty leftover:** the kitty card's **What's left** is **Hand it back** (the default) or **X keeps it** (`keptBy` on the kitty). The keeper is treated as buying the leftover from the kitty at what it cost, so everyone else is credited all they put in. This purchase isn't counted as spending.
 
 ### Task 6.3: Export
-- **Export CSV** on the balances page downloads `<trip>-expenses.csv` and `<trip>-cash.csv`.
+- **Export expenses (CSV)** and **Export cash (CSV)** on the balances page download `<trip>-expenses.csv` and `<trip>-cash.csv`: one file per button, since browsers block a second download from one click. Member names and typed text that a spreadsheet would read as a formula get a leading apostrophe.
   - Expenses: one row per item, with date, place, item, category, currency, amount, paid with, rate, home amount, whether it's estimated, payer and who shared it.
   - Cash: every purchase, hand-over and cash payment, with its cost.
 - Text that starts with `=`, `+`, `-` or `@` gets a leading apostrophe, so a spreadsheet won't run it as a formula.

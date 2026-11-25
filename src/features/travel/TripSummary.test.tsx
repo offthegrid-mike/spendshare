@@ -186,6 +186,10 @@ describe('TripSummary', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('You keep the ¥20,000 left, at what it cost: A$204.00.');
+    const you = within(screen.getByRole('region', { name: 'Per person' })).getByRole('listitem', { name: 'You' });
+    expect(you).toHaveTextContent('Put in the kitty A$420.00, keep ¥20,000');
+    expect(you).toHaveTextContent('Share A$272.00');
+    expect(you).not.toHaveTextContent('back ¥');
   });
 
   it('says when the kitty paid out more than was put in, and who covered it', () => {
@@ -203,11 +207,14 @@ describe('TripSummary', () => {
     expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('The JPY kitty paid out ¥500 more than was put in; whoever handed that cash over is credited for it.');
   });
 
-  it('exports the trip as two CSV files', async () => {
+  it('exports the expenses and the cash, one file per button so the browser never blocks the second', async () => {
+    downloadCsv.mockReset();
     renderSummary();
-    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
-    expect(downloadCsv.mock.calls.map((c) => c[0])).toEqual(['japan-expenses.csv', 'japan-cash.csv']);
+    await userEvent.click(screen.getByRole('button', { name: 'Export expenses (CSV)' }));
+    expect(downloadCsv.mock.calls.map((c) => c[0])).toEqual(['japan-expenses.csv']);
     expect(downloadCsv.mock.calls[0][1]).toContain('Hotel tax');
+    await userEvent.click(screen.getByRole('button', { name: 'Export cash (CSV)' }));
+    expect(downloadCsv.mock.calls.map((c) => c[0])).toEqual(['japan-expenses.csv', 'japan-cash.csv']);
   });
 
   it('says when there is nothing to settle yet', () => {
@@ -250,6 +257,32 @@ describe('TripSummary', () => {
         tripId: 'japan', uid: 'chris', fromUid: 'chris', toUid: 'alex', currency: 'JPY',
         foreignAmount: 20000, date: '2027-05-20', receiverHasWallet: true,
       }));
+    });
+
+    it('won’t hand over more cash than is left', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderD();
+      const row = within(screen.getByRole('region', { name: 'Settle up' })).getByRole('listitem', { name: 'You → Alex' });
+      await u.click(within(row).getByRole('button', { name: 'Pay in cash' }));
+      const amount = screen.getByLabelText('Cash to hand over (JPY)');
+      await u.clear(amount);
+      await u.type(amount, '30000');
+      await u.click(screen.getByRole('button', { name: 'Hand over' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Only ¥20,000 is left to hand over.');
+      expect(handOverCash).not.toHaveBeenCalled();
+    });
+
+    it('removes the receiver’s cash card again when undoing the hand-over that started it', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const h: HandoverDoc = { id: 'h1', fromUid: 'chris', toUid: 'ben', currency: 'JPY', foreignAmount: 20000, date: '2027-05-20', byUid: 'chris', createdAt: null as never };
+      render(
+        <MemoryRouter>
+          <TripSummary trip={trip} user={chris} expenses={[dinner]} itemsByExpense={items} settlements={[]}
+            cash={tripCash([w('alex'), w('chris'), w('ben')], ups, [dinner], [h])} />
+        </MemoryRouter>,
+      );
+      await u.click(within(screen.getByRole('region', { name: 'Settle up' })).getByRole('button', { name: 'Undo cash hand-over' }));
+      await waitFor(() => expect(undoHandover).toHaveBeenCalledWith('japan', 'h1', 'ben_JPY'));
     });
 
     it('suggests the cash that covers the debt, up to the cash left', async () => {

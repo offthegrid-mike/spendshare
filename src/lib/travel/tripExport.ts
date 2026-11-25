@@ -14,9 +14,9 @@ import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 type Cell = string | number | null | undefined;
 
-/** Text a spreadsheet would run as a formula gets a leading apostrophe. */
+/** Text a spreadsheet would run as a formula (led by = + - @, a tab or a return) gets a leading apostrophe. */
 function text(value: string): string {
-  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 function line(cells: Cell[]): string {
@@ -36,7 +36,7 @@ const EXPENSES_HEADER = [
 
 export function expensesCsv(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpense: Record<string, ItemDoc[]>, cash: TripCash): string {
   const home = trip.currency;
-  const name = (uid: string) => tripMemberName(trip, uid, '');
+  const name = (uid: string) => text(tripMemberName(trip, uid, ''));
   const rows = [...expenses]
     .sort((a, b) => expenseDay(a).localeCompare(expenseDay(b)))
     .flatMap((e) => {
@@ -46,7 +46,7 @@ export function expensesCsv(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpen
       const parts = homeTotal === null ? null : spreadInProportion(homeTotal, items.map((it) => it.amount));
       const paid = e.paidWith;
       const kitty = paid?.kind === 'wallet' && isKittyId(paid.walletId);
-      const paidWith = paid?.kind === 'wallet' ? (kitty ? 'kitty' : `cash (${name(e.payerUid)})`) : 'card';
+      const paidWith = paid?.kind === 'wallet' ? (kitty ? 'kitty' : `cash (${tripMemberName(trip, e.payerUid, '')})`) : 'card';
       let rate = '';
       if (paid?.kind === 'card') rate = String(paid.rate);
       else if (homeTotal) rate = readableWalletRate({ foreign: e.total, home: homeTotal }, currency, home);
@@ -62,8 +62,8 @@ export function expensesCsv(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpen
         home,
         parts ? plain(parts[i], home) : '',
         isEstimated(e, home) ? 'yes' : 'no',
-        kitty ? `kitty (handed over by ${name(e.payerUid)})` : name(e.payerUid),
-        it.shared ? (it.sharedWith ?? trip.memberUids).map(name).join('; ') : 'personal',
+        kitty ? `kitty (handed over by ${tripMemberName(trip, e.payerUid, '')})` : name(e.payerUid),
+        it.shared ? text((it.sharedWith ?? trip.memberUids).map((uid) => tripMemberName(trip, uid, '')).join('; ')) : 'personal',
       ]));
     });
   return [line(EXPENSES_HEADER), ...rows].join('');
@@ -73,12 +73,12 @@ const CASH_HEADER = ['wallet', 'date', 'what', 'person', 'currency', 'cash', 'ho
 
 export function cashCsv(trip: GroupDoc, cash: TripCash, expenses: ExpenseDoc[]): string {
   const home = trip.currency;
-  const name = (uid: string) => tripMemberName(trip, uid, '');
+  const name = (uid: string) => text(tripMemberName(trip, uid, ''));
   const byId = new Map(expenses.map((e) => [e.id, e]));
   const rows: { date: string; cells: Cell[] }[] = [];
   for (const w of cash.wallets) {
     const { currency } = w.wallet;
-    const label = w.wallet.kind === 'kitty' ? `Kitty ${currency}` : `${name(w.wallet.ownerUid ?? '')} ${currency}`;
+    const label = w.wallet.kind === 'kitty' ? `Kitty ${currency}` : text(`${tripMemberName(trip, w.wallet.ownerUid ?? '', '')} ${currency}`);
     for (const t of w.topUps) {
       const who = w.wallet.kind === 'kitty' ? t.fromUid ?? t.byUid : w.wallet.ownerUid ?? '';
       rows.push({ date: t.date, cells: [label, t.date, w.wallet.kind === 'kitty' ? 'put in' : 'bought', name(who), currency, plain(t.foreignAmount, currency), home, plain(t.homeAmount, home)] });
@@ -88,7 +88,7 @@ export function cashCsv(trip: GroupDoc, cash: TripCash, expenses: ExpenseDoc[]):
       const value = cash.handoverValues[h.id];
       const sign = out ? -1 : 1;
       rows.push({ date: h.date, cells: [
-        label, h.date, out ? `handed to ${name(h.toUid)}` : `received from ${name(h.fromUid)}`, name(out ? h.fromUid : h.toUid),
+        label, h.date, out ? `handed to ${tripMemberName(trip, h.toUid, '')}` : `received from ${tripMemberName(trip, h.fromUid, '')}`, name(out ? h.fromUid : h.toUid),
         currency, plain(sign * h.foreignAmount, currency), home, value == null ? '' : plain(sign * value, home),
       ] });
     }
@@ -96,7 +96,7 @@ export function cashCsv(trip: GroupDoc, cash: TripCash, expenses: ExpenseDoc[]):
       const e = byId.get(p.id) ?? p;
       const value = cash.values[p.id];
       rows.push({ date: expenseDay(e), cells: [
-        label, expenseDay(e), `spent: ${text(e.shopName ?? '')}`, name(e.payerUid), currency,
+        label, expenseDay(e), `spent: ${e.shopName ?? ''}`, name(e.payerUid), currency,
         plain(-e.total, currency), home, value == null ? '' : plain(-value, home),
       ] });
     }

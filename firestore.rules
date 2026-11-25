@@ -109,6 +109,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/groups/$(groupId)).data.get('tripClosedAt', null) == null;
     }
 
+    // A closed trip's name and dates stay as they were, unless the same write reopens it.
+    function closedTripRenamed() {
+      return resource.data.get('tripClosedAt', null) != null
+        && request.resource.data.get('tripClosedAt', null) != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny(['name', 'trip']);
+    }
+
     function tripCurrencyChanged() {
       return resource.data.get('kind', null) == 'trip'
         && request.resource.data.currency != resource.data.currency;
@@ -126,6 +133,7 @@ service cloud.firestore {
       allow update: if isMember(groupId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
           && !tripCurrencyChanged()
+          && !closedTripRenamed()
         // Owners can edit any group-level field (name, currency, ownerUid, members, memberUids),
         // and a trip's dates
         || ( isOwner(groupId)
@@ -134,7 +142,8 @@ service cloud.firestore {
              && validKind(request.resource.data)
              && (!('tripClosedAt' in request.resource.data)
                  || (request.resource.data.get('kind', null) == 'trip' && request.resource.data.tripClosedAt is timestamp))
-             && !tripCurrencyChanged() )
+             && !tripCurrencyChanged()
+             && !closedTripRenamed() )
         // Invite acceptance: a verified user with a pending invite can add ONLY themselves
         // to members/memberUids. The join must be strictly additive (existing members/memberUids
         // preserved) AND the single added principal must be the accepting user.

@@ -358,6 +358,16 @@ describe('cash hand-overs — worked example D', () => {
     expect(alex.left).toEqual({ foreign: 60000, home: 61600 });
   });
 
+  it('keeps what was bought and spent to cash bought and real spending, apart from hand-overs', () => {
+    const cash = tripCash([alexYen, benYen], ups, [dinner], [handover()]);
+    const alex = cash.wallets.find((w) => w.wallet.id === alexYen.id)!;
+    const ben = cash.wallets.find((w) => w.wallet.id === benYen.id)!;
+    expect(ben.paidIn).toEqual({ foreign: 20000, home: 20400 });
+    expect(ben.spent).toBe(0);
+    expect(alex.paidIn).toEqual({ foreign: 100000, home: 103000 });
+    expect(alex.spent).toBe(60000);
+  });
+
   it('values a chain of hand-overs, each at the cost to the one before', () => {
     const chrisYen = wallet('chris');
     const cash = tripCash([alexYen, benYen, chrisYen], ups, [], [

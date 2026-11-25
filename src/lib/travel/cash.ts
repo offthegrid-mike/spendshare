@@ -270,14 +270,21 @@ function valueWallets(
       if (e.id.startsWith(HANDOVER)) handoverValues[e.id.slice(HANDOVER.length)] = valued[i];
       else values[e.id] = valued[i];
     });
-    const paidIn = {
-      foreign: pool.reduce((s, t) => s + t.foreignAmount, 0),
-      home: pool.reduce((s, t) => s + t.homeAmount, 0),
-    };
-    const spent = payments.reduce((s, e) => s + e.total, 0);
-    const spentValue = valued.reduce<number>((s, v) => s + (v ?? 0), 0);
-    const left = { foreign: paidIn.foreign - spent, home: rate ? paidIn.home - spentValue : null };
+    // What's left counts hand-overs; what was bought and spent doesn't, so cash
+    // received isn't shown as bought, nor cash handed over as spent.
+    const sum = (list: { foreignAmount: number; homeAmount: number }[]) => ({
+      foreign: list.reduce((s, t) => s + t.foreignAmount, 0),
+      home: list.reduce((s, t) => s + t.homeAmount, 0),
+    });
+    const inPool = sum(pool);
+    const paidIn = sum(own);
     const realPayments = payments.filter((e) => !e.id.startsWith(HANDOVER));
+    const spent = realPayments.reduce((s, e) => s + e.total, 0);
+    const spentValue = valued.reduce<number>((s, v) => s + (v ?? 0), 0);
+    const left = {
+      foreign: inPool.foreign - payments.reduce((s, e) => s + e.total, 0),
+      home: rate ? inPool.home - spentValue : null,
+    };
     const state: WalletState = {
       wallet,
       topUps: [...own].sort((a, b) => a.date.localeCompare(b.date) || addedAt(a) - addedAt(b)),

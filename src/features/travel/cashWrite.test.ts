@@ -6,6 +6,7 @@ const fs = vi.hoisted(() => {
     ops,
     writeBatch: vi.fn(() => ({
       set: (ref: unknown, data: unknown) => ops.push(['set', ref, data]),
+      delete: (ref: unknown) => ops.push(['delete', ref]),
       commit: vi.fn(() => Promise.resolve()),
     })),
     doc: vi.fn((col: { path: string }, id?: string) => ({ path: `${col.path}/${id ?? 'new'}`, id: id ?? 'new' })),
@@ -74,6 +75,14 @@ describe('handOverCash', () => {
         { id: 'alex_JPY', kind: 'personal', ownerUid: 'alex', currency: 'JPY', createdByUid: 'ben', createdAt: 'TS' }],
       ['set', { path: 'groups/japan/handovers/new', id: 'new' },
         { id: 'new', fromUid: 'ben', toUid: 'alex', currency: 'JPY', foreignAmount: 20000, date: '2027-05-20', byUid: 'ben', createdAt: 'TS' }],
+    ]);
+  });
+
+  it('undoes a hand-over and the receiver’s wallet it started, together', async () => {
+    await undoHandover('japan', 'h1', 'alex_JPY');
+    expect(fs.ops).toEqual([
+      ['delete', { path: 'groups/japan/handovers/h1', id: 'h1' }],
+      ['delete', { path: 'groups/japan/wallets/alex_JPY', id: 'alex_JPY' }],
     ]);
   });
 

@@ -15,11 +15,11 @@ import {
   TRIP_SETTLEMENT_MONTH, tripBalanceCopy, tripBreakdown, tripMemberName, tripSummary, valueTrip,
 } from '../../lib/travel/valueTrip';
 import { settleWrite } from '../../lib/settleWrite';
-import { tripCash, type TripCash } from '../../lib/travel/cash';
+import { tripCash, walletIdFor, type TripCash } from '../../lib/travel/cash';
 import { isTripClosed } from '../../lib/travel/trips';
 import CashHandoverForm from './CashHandoverForm';
 import { undoHandover } from './cashWrite';
-import type { ExpenseDoc, GroupDoc, ItemDoc, SettlementDoc } from '../../types/models';
+import type { ExpenseDoc, GroupDoc, HandoverDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
 const TONE = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' } as const;
 const SYNC_FAILED = "Couldn't sync a trip change. Check your connection and try again.";
@@ -55,9 +55,20 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   const kitties = (cash?.kitties ?? []).filter((k) => k.contributors.length > 0);
   const putIn = (uid: string) => kitties.flatMap((k) => {
     const c = k.contributors.find((x) => x.uid === uid);
-    return c ? [`Put in the kitty ${money(c.home)}, back ${formatMinor(c.handBack, k.currency)}`] : [];
+    if (!c) return [];
+    const keeps = k.keptBy === uid ? (uid === user.uid ? 'keep' : 'keeps') : 'back';
+    return [`Put in the kitty ${money(c.home)}, ${keeps} ${formatMinor(c.handBack, k.currency)}`];
   });
+  // A keeper's share leaves out the kitty cash they bought: it isn't spending.
+  const keptCost = (uid: string) => valuation.items
+    .filter((it) => it.kept && it.sharedWith?.[0] === uid)
+    .reduce((s, it) => s + it.amount, 0);
+  // The receiver's wallet goes with the hand-over when that hand-over is all that's in it.
+  const emptyAfterUndo = (h: HandoverDoc) => (cash?.wallets ?? []).find((w) =>
+    w.wallet.id === walletIdFor(h.toUid, h.currency)
+    && w.topUps.length === 0 && w.payments.length === 0 && w.handovers.every((x) => x.id === h.id))?.wallet.id;
   const summary = tripSummary(valuation, settlements);
+  const fullCash: TripCash = { ...tripCash([], [], []), ...cash } as TripCash;
   const { all: categories } = useCategories(trip.id);
   const breakdown = tripBreakdown(valuation, expenses, home, Object.fromEntries(categories.map((c) => [c.id, c.name])));
   const paid = settlements.filter((s) => s.paid);
@@ -186,7 +197,10 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
                     type="button"
                     disabled={pending}
                     aria-label="Undo cash hand-over"
-                    onClick={() => void run(() => undoHandover(trip.id, h.id))}
+                    onClick={() => {
+                      const walletId = emptyAfterUndo(h);
+                      void run(() => (walletId ? undoHandover(trip.id, h.id, walletId) : undoHandover(trip.id, h.id)));
+                    }}
                     className="btn-ghost h-8 px-2.5 text-xs"
                   >
                     Undo
@@ -266,7 +280,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
                     </span>
                   </span>
                   <span className="mt-0.5 block text-xs text-ink-muted">
-                    {[`Paid for shared ${money(summary.paidShared[uid] ?? 0)}`, `Share ${money(summary.shareOf[uid] ?? 0)}`, ...putIn(uid)].join(' · ')}
+                    {[`Paid for shared ${money(summary.paidShared[uid] ?? 0)}`, `Share ${money((summary.shareOf[uid] ?? 0) - keptCost(uid))}`, ...putIn(uid)].join(' · ')}
                   </span>
                 </span>
               </li>
@@ -300,19 +314,25 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
         </ul>
       </section>
 
-      <button
-        type="button"
-        onClick={() => {
-          const full: TripCash = { ...tripCash([], [], []), ...cash } as TripCash;
-          const names = exportFileNames(trip);
-          downloadCsv(names.expenses, expensesCsv(trip, expenses, itemsByExpense, full));
-          downloadCsv(names.cash, cashCsv(trip, full, expenses));
-        }}
-        className="btn-outline"
-      >
-        <Download size={14} aria-hidden="true" />
-        Export CSV
-      </button>
+      {/* One file per button: browsers block or prompt for a second download from one click. */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => downloadCsv(exportFileNames(trip).expenses, expensesCsv(trip, expenses, itemsByExpense, fullCash))}
+          className="btn-outline"
+        >
+          <Download size={14} aria-hidden="true" />
+          Export expenses (CSV)
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadCsv(exportFileNames(trip).cash, cashCsv(trip, fullCash, expenses))}
+          className="btn-outline"
+        >
+          <Download size={14} aria-hidden="true" />
+          Export cash (CSV)
+        </button>
+      </div>
     </div>
   );
 }

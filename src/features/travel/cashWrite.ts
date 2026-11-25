@@ -85,8 +85,16 @@ export function handOverCash(a: HandOverArgs): Promise<void> {
   return settleWrite(batch.commit(), SYNC_FAILED);
 }
 
-export function undoHandover(tripId: string, handoverId: string): Promise<void> {
-  return settleWrite(deleteDoc(doc(handoversCol(tripId), handoverId)), SYNC_FAILED);
+/**
+ * Undoes a hand-over. `emptyWalletId` is the receiver's wallet when this
+ * hand-over started it and nothing else is in it, so it goes too.
+ */
+export function undoHandover(tripId: string, handoverId: string, emptyWalletId?: string): Promise<void> {
+  if (!emptyWalletId) return settleWrite(deleteDoc(doc(handoversCol(tripId), handoverId)), SYNC_FAILED);
+  const batch = writeBatch(db);
+  batch.delete(doc(handoversCol(tripId), handoverId));
+  batch.delete(doc(walletsCol(tripId), emptyWalletId));
+  return settleWrite(batch.commit(), SYNC_FAILED);
 }
 
 /** One member keeps the kitty's leftover cash, or (null) it's handed back by what each put in. */
