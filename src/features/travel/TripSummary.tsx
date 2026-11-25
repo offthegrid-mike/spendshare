@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
-import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { CircleCheck, Download, TriangleAlert } from 'lucide-react';
+import { downloadCsv } from '../../lib/work/downloadCsv';
+import { cashCsv, expensesCsv, exportFileNames } from '../../lib/travel/tripExport';
 import Avatar from '../../components/ui/Avatar';
 import { useCategories } from '../../hooks/useCategories';
 import { markSettlementPaid, undoSettlement } from '../../lib/settle';
@@ -13,7 +15,10 @@ import {
   TRIP_SETTLEMENT_MONTH, tripBalanceCopy, tripBreakdown, tripMemberName, tripSummary, valueTrip,
 } from '../../lib/travel/valueTrip';
 import { settleWrite } from '../../lib/settleWrite';
-import type { TripCash } from '../../lib/travel/cash';
+import { tripCash, type TripCash } from '../../lib/travel/cash';
+import { isTripClosed } from '../../lib/travel/trips';
+import CashHandoverForm from './CashHandoverForm';
+import { undoHandover } from './cashWrite';
 import type { ExpenseDoc, GroupDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
 const TONE = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' } as const;
@@ -26,7 +31,7 @@ interface Props {
   itemsByExpense: Record<string, ItemDoc[]>;
   settlements: SettlementDoc[];
   /** The trip's cash: its payments' values, and the kitties to settle and hand back. */
-  cash?: Pick<TripCash, 'values' | 'kitties'> & Partial<Pick<TripCash, 'wallets'>>;
+  cash?: Pick<TripCash, 'values' | 'kitties'> & Partial<Pick<TripCash, 'wallets' | 'handoverCredits' | 'handoverValues'>>;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -42,7 +47,11 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   const nameOf = (uid: string) => tripMemberName(trip, uid, user.uid);
   const avatarName = (uid: string) => trip.members[uid]?.displayName || '?';
 
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cash?.values ?? {}, cash?.kitties ?? []);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cash?.values ?? {}, cash?.kitties ?? [], cash?.handoverCredits ?? []);
+  const [payingInCash, setPayingInCash] = useState<string | null>(null);
+  const cashOf = (uid: string) => (cash?.wallets ?? []).filter((w) => w.wallet.kind === 'personal' && w.wallet.ownerUid === uid && w.left.foreign > 0);
+  const walletIds = (cash?.wallets ?? []).map((w) => w.wallet.id);
+  const handovers = [...new Map((cash?.wallets ?? []).flatMap((w) => w.handovers).map((h) => [h.id, h])).values()];
   const kitties = (cash?.kitties ?? []).filter((k) => k.contributors.length > 0);
   const putIn = (uid: string) => kitties.flatMap((k) => {
     const c = k.contributors.find((x) => x.uid === uid);
@@ -67,7 +76,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   }
 
   // A paid settlement keeps the page useful after its expenses are deleted: it can be undone or paid back.
-  if (expenses.length === 0 && paid.length === 0) {
+  if (expenses.length === 0 && paid.length === 0 && handovers.length === 0) {
     return (
       <div className="card mx-auto max-w-lg p-6 text-center">
         <p className="text-sm text-ink-muted">No expenses yet, so nothing to settle.</p>
@@ -113,8 +122,13 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
           </p>
         ) : (
           <ul className="divide-y divide-line">
-            {summary.transactions.map((txn) => (
-              <li key={`${txn.fromUid}-${txn.toUid}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            {summary.transactions.map((txn) => {
+              const key = `${txn.fromUid}-${txn.toUid}`;
+              // Cash can't move on a closed trip; settle-up by other means still can.
+              const giverCash = isTripClosed(trip) ? [] : cashOf(txn.fromUid);
+              return (
+              <li key={key} aria-label={`${nameOf(txn.fromUid)} → ${nameOf(txn.toUid)}`} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="flex items-center gap-3">
                 <span className="flex items-center">
                   <Avatar name={avatarName(txn.fromUid)} tone={txn.fromUid === user.uid ? 'me' : 'them'} />
                   <span className="-ml-2">
@@ -131,8 +145,55 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
                 >
                   Mark paid
                 </button>
+              </div>
+              {giverCash.length > 0 && payingInCash !== key && (
+                <button
+                  type="button"
+                  onClick={() => setPayingInCash(key)}
+                  className="mt-1 text-[13px] font-medium text-accent-ink hover:underline"
+                >
+                  Pay in cash
+                </button>
+              )}
+              {payingInCash === key && (
+                <CashHandoverForm
+                  trip={trip}
+                  user={user}
+                  fromUid={txn.fromUid}
+                  toUid={txn.toUid}
+                  owed={txn.amount}
+                  wallets={giverCash}
+                  walletIds={walletIds}
+                  onDone={() => setPayingInCash(null)}
+                />
+              )}
               </li>
-            ))}
+              );
+            })}
+          </ul>
+        )}
+        {handovers.length > 0 && (
+          <ul aria-label="Paid in cash" className="mt-3 space-y-1.5 border-t border-line pt-3">
+            {handovers.map((h) => {
+              const value = cash?.handoverValues?.[h.id];
+              return (
+                <li key={h.id} className="flex items-center gap-3 text-sm text-ink-muted">
+                  <span className="min-w-0 flex-1">
+                    {`${nameOf(h.fromUid)} → ${nameOf(h.toUid)} ${formatMinor(h.foreignAmount, h.currency)} in cash${
+                      value != null ? ` (≈ ${money(value)})` : ' (not valued yet)'}`}
+                  </span>
+                  {!isTripClosed(trip) && <button
+                    type="button"
+                    disabled={pending}
+                    aria-label="Undo cash hand-over"
+                    onClick={() => void run(() => undoHandover(trip.id, h.id))}
+                    className="btn-ghost h-8 px-2.5 text-xs"
+                  >
+                    Undo
+                  </button>}
+                </li>
+              );
+            })}
           </ul>
         )}
         {paid.length > 0 && (
@@ -169,7 +230,10 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
             const { currency } = k;
             const back = k.contributors.filter((c) => c.handBack > 0);
             let text: string;
-            if (k.left.foreign > 0) {
+            if (k.left.foreign > 0 && k.keptBy) {
+              const keeper = k.keptBy === user.uid ? 'You keep' : `${tripMemberName(trip, k.keptBy, user.uid)} keeps`;
+              text = `${keeper} the ${formatMinor(k.left.foreign, currency)} left, at what it cost: ${money(k.left.home ?? 0)}.`;
+            } else if (k.left.foreign > 0) {
               text = `Hand back the ${formatMinor(k.left.foreign, currency)} left: ${back
                 .map((c) => `${c.uid === user.uid ? 'you' : tripMemberName(trip, c.uid, user.uid)} ${formatMinor(c.handBack, currency)}`)
                 .join(', ')}.`;
@@ -235,6 +299,20 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
           ))}
         </ul>
       </section>
+
+      <button
+        type="button"
+        onClick={() => {
+          const full: TripCash = { ...tripCash([], [], []), ...cash } as TripCash;
+          const names = exportFileNames(trip);
+          downloadCsv(names.expenses, expensesCsv(trip, expenses, itemsByExpense, full));
+          downloadCsv(names.cash, cashCsv(trip, full, expenses));
+        }}
+        className="btn-outline"
+      >
+        <Download size={14} aria-hidden="true" />
+        Export CSV
+      </button>
     </div>
   );
 }

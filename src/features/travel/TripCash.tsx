@@ -10,9 +10,10 @@ import { useWorkClock } from '../../hooks/useWorkClock';
 import { kittyIdFor, readableWalletRate, walletIdFor, type TripCash as TripCashState, type WalletState } from '../../lib/travel/cash';
 import { currencyOptions, formatMinor, toMinor } from '../../lib/travel/currency';
 import { lastRates } from '../../lib/travel/tripExpense';
+import { isTripClosed } from '../../lib/travel/trips';
 import { tripMemberName } from '../../lib/travel/valueTrip';
 import DatePicker from '../expenses/DatePicker';
-import { addCash, deleteTopUp } from './cashWrite';
+import { addCash, deleteTopUp, setKittyKeeper } from './cashWrite';
 import type { ExpenseDoc, GroupDoc } from '../../types/models';
 
 interface Props {
@@ -33,6 +34,7 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
   const home = trip.currency;
   const { currency } = state.wallet;
   const isKitty = state.wallet.kind === 'kitty';
+  const closed = isTripClosed(trip);
   const who = isKitty ? { name: 'the kitty', possessive: 'The kitty’s' } : owner(trip, state.wallet.ownerUid ?? '', user.uid);
   const title = isKitty ? `Kitty · ${currency}` : `${who.possessive} ${currency} cash`;
   const nameOf = (uid: string) => (uid === user.uid ? 'You' : tripMemberName(trip, uid, user.uid));
@@ -78,9 +80,43 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
           {state.kitty.contributors.map((c) => (
             <li key={c.uid}>
               {`${nameOf(c.uid)} put in ${formatMinor(c.foreign, currency)} for ${formatMinor(c.home, home)} · ${
-                c.uid === user.uid ? 'get' : 'gets'} back ${formatMinor(c.handBack, currency)}`}
+                state.wallet.keptBy === c.uid
+                  ? `${c.uid === user.uid ? 'keep' : 'keeps'} ${formatMinor(c.handBack, currency)}`
+                  : `${c.uid === user.uid ? 'get' : 'gets'} back ${formatMinor(c.handBack, currency)}`}`}
             </li>
           ))}
+        </ul>
+      )}
+      {isKitty && !closed && (
+        <div>
+          <p id={`${state.wallet.id}-left`} className="mb-1 text-xs font-medium text-ink-muted">What’s left</p>
+          <Select
+            aria-labelledby={`${state.wallet.id}-left`}
+            title="What’s left"
+            value={state.wallet.keptBy ?? ''}
+            onChange={(uid) => {
+              setKittyKeeper(trip.id, state.wallet.id, uid || null)
+                .catch(() => useUIStore.getState().showNotice({ message: "Couldn't save that. Try again." }));
+            }}
+            options={[
+              { value: '', label: 'Hand it back' },
+              ...trip.memberUids.map((uid) => ({ value: uid, label: `${tripMemberName(trip, uid, user.uid)} ${uid === user.uid ? 'keep' : 'keeps'} it` })),
+            ]}
+          />
+        </div>
+      )}
+      {state.handovers.length > 0 && (
+        <ul aria-label="Handed over" className="space-y-0.5 text-[13px] text-ink">
+          {state.handovers.map((h) => {
+            const when = format(parseISO(h.date), 'd MMM');
+            const amount = formatMinor(h.foreignAmount, currency);
+            const other = (uid: string) => (uid === user.uid ? 'you' : tripMemberName(trip, uid, user.uid));
+            return (
+              <li key={h.id}>
+                {h.fromUid === state.wallet.ownerUid ? `${when} · gave ${amount} to ${other(h.toUid)}` : `${when} · got ${amount} from ${other(h.fromUid)}`}
+              </li>
+            );
+          })}
         </ul>
       )}
       {state.topUps.length > 0 && (
@@ -92,7 +128,7 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
             return (
               <li key={t.id} className="flex items-center justify-between gap-3 py-1.5 text-[13px] text-ink">
                 <span>{`${when} · ${label}`}</span>
-                <button
+                {!closed && <button
                   type="button"
                   aria-label={`Remove ${formatMinor(t.foreignAmount, currency)} added on ${when}`}
                   disabled={removing === t.id}
@@ -100,7 +136,7 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
                   className="grid h-8 w-8 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink disabled:opacity-50"
                 >
                   <X size={14} aria-hidden="true" />
-                </button>
+                </button>}
               </li>
             );
           })}
@@ -263,7 +299,7 @@ export default function TripCash(props: Props) {
       ) : (
         cash.wallets.map((state) => <WalletCard key={state.wallet.id} trip={trip} user={user} state={state} />)
       )}
-      <AddCashForm {...props} />
+      {!isTripClosed(trip) && <AddCashForm {...props} />}
     </div>
   );
 }

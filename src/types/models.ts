@@ -18,6 +18,7 @@ export interface GroupDoc {
   members: Record<Uid, GroupMember>; memberUids: Uid[]; createdAt: Timestamp;
   kind?: 'trip';    // missing = a household; set at creation and never changed (see lib/travel/trips.ts)
   trip?: TripDates; // trips only
+  tripClosedAt?: Timestamp; // a closed trip is read-only (the owner can reopen it); settle-up still works
 }
 export interface InviteDoc {
   email: string; invitedByUid: Uid; invitedByName: string; groupName: string;
@@ -70,6 +71,7 @@ export interface ItemDoc {
 export interface WalletDoc {
   id: string; kind: 'personal' | 'kitty';
   ownerUid?: Uid; // personal only
+  keptBy?: Uid;   // kitty only: the member who keeps the cash left, instead of handing it back
   currency: string;
   createdByUid: Uid; createdAt: Timestamp;
 }
@@ -81,6 +83,17 @@ export interface TopUpDoc {
   foreignAmount: number; // of the wallet's currency received, > 0
   homeAmount: number;    // of the trip's home currency paid for it, >= 0
   createdAt: Timestamp;
+}
+/**
+ * Foreign cash one member hands another to settle up: groups/{tripId}/handovers/{id}.
+ * It leaves the giver's wallet at its running average and arrives in the
+ * receiver's at that cost, and counts as a payment of that value. See lib/travel/cash.ts.
+ */
+export interface HandoverDoc {
+  id: string; fromUid: Uid; toUid: Uid; currency: string;
+  foreignAmount: number; // minor units, > 0
+  date: string;          // 'YYYY-MM-DD'
+  byUid: Uid; createdAt: Timestamp;
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {

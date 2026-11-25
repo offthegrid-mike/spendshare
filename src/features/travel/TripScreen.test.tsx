@@ -104,4 +104,17 @@ describe('TripScreen', () => {
     renderAt('/travel/japan');
     expect(screen.getByRole('link', { name: 'Cash' })).toHaveAttribute('href', '/travel/japan/cash');
   });
+
+  it('marks a closed trip and offers no new expenses', () => {
+    const closed = { ...japan, tripClosedAt: { toDate: () => new Date(2026, 9, 28) } as never };
+    render(
+      <MemoryRouter initialEntries={['/travel/japan']}>
+        <Routes>
+          <Route path="/travel/:tripId" element={<TripScreen trips={[closed]} viewerUid="mike" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Closed on 28 Oct 2026. Nothing on the trip can change; settle-up still works.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Add expense' })).not.toBeInTheDocument();
+  });
 });

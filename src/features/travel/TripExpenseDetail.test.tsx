@@ -138,6 +138,20 @@ describe('TripExpenseDetail', () => {
     expect(screen.queryByLabelText('Amount charged (AUD)')).not.toBeInTheDocument();
   });
 
+  it('offers no changes on a closed trip', () => {
+    const closed = { ...trip, tripClosedAt: { toDate: () => new Date() } as never };
+    render(
+      <MemoryRouter initialEntries={['/travel/japan/expense/e1']}>
+        <Routes>
+          <Route path="/travel/:tripId/expense/:expenseId" element={<TripExpenseDetail trip={closed} user={alex} expenses={[estimated]} itemsByExpense={{ e1: items }} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Amount charged (AUD)')).not.toBeInTheDocument();
+  });
+
   it('says so for an expense that is not on the trip', () => {
     render(
       <MemoryRouter initialEntries={['/travel/japan/expense/nope']}>

@@ -20,7 +20,7 @@
 | **T3** — Trip summary and settle-up | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T4** — Personal cash wallets | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T5** — Shared kitty | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
-| **T6** — Cash hand-overs, closing a trip, export | ⬜ | `travel/T6-close` | |
+| **T6** — Cash hand-overs, closing a trip, export | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T7** — Extras (live rates, budgets, foreign receipts) | ⬜ optional | `travel/T7-extras` | |
 
 ---
@@ -78,7 +78,7 @@ All in A$ for a trip to Japan with Alex, Ben and Chris.
 - Ben pays ¥15,000 for a hotel tax by card, shared by Ben and Chris. Estimate at 1 A$ = ¥99: A$151.52.
 - Ben's statement later shows A$155.10. Ben enters it, the rate becomes actual (1 A$ = ¥96.71), and Chris's share becomes A$77.55.
 
-**D. Paying back in leftover yen (T6)**
+**D. Paying back in leftover yen (T6, met)**
 - Ben owes Alex A$206. Ben hands Alex ¥20,000 from his own wallet, whose average rate is 0.0102. That counts as A$204, so Ben still owes A$2.00. Alex's wallet gains ¥20,000 at a cost of A$204.
 
 ---
@@ -213,7 +213,7 @@ Pure modules with no UI. Everything later depends on these.
 
 ### Task 4.2: Paying from a wallet — done
 - The editor's **Paid with** is Card or Cash. Cash offers the wallets in the expense's currency (yours first); the wallet's owner becomes the payer, and there's no rate to enter. A warning shows when the payment is more than the cash left (it's still saved).
-- `tripCash` values every cash payment at a running average: top-ups and payments in date order (top-ups first on a day, payments by when they were added), each payment drawing from the cash bought up to then. A payment beyond that cash (made before the cash was recorded, or overspent) is valued at the wallet's overall average for that part. Each value comes out of the pool, so spending plus what's left always equals what the cash cost. A payment in a different currency from its wallet is left unvalued. The list ("Cash" chip), detail, summary, trip page and Home tile all use these values. A payment from a wallet with no cash added stays out of the balances, and says so.
+- `tripCash` values every cash payment at a running average: top-ups and payments in date order (top-ups first on a day, payments by when they were added; cash handed over counts from when it was handed over, so paying back a debt in cash never changes what that day's spending was worth), each payment drawing from the cash bought up to then. A payment beyond that cash (made before the cash was recorded, or overspent) is valued at the wallet's overall average for that part. Each value comes out of the pool, so spending plus what's left always equals what the cash cost. A payment in a different currency from its wallet is left unvalued. The list ("Cash" chip), detail, summary, trip page and Home tile all use these values. A payment from a wallet with no cash added stays out of the balances, and says so.
 - `useTripData` combines a trip's expenses and wallets for every screen.
 - **Not in T4:** refunds (trips have none yet).
 
@@ -257,17 +257,26 @@ Pure modules with no UI. Everything later depends on these.
 
 ---
 
-# T6 — Cash hand-overs, closing a trip, export
+# T6 — Cash hand-overs, closing a trip, export — done
 
 ### Task 6.1: Settle up in foreign cash
-- On a settle-up line, **Pay in cash (¥)** moves cash from the payer's wallet to the receiver's (creating the receiver's wallet if needed). It's valued at the payer's average rate and recorded as a top-up with `source: 'handover'` (example D).
+- **Pay in cash** on a settle-up line, for anyone with foreign cash left, suggests the cash that covers the debt (up to what's left). It records a hand-over: `groups/{gid}/handovers/{id}` with `fromUid`, `toUid`, `currency`, `foreignAmount`, `date`. The receiver's wallet is created in the same batch if they have none.
+- `tripCash` treats a hand-over as leaving the giver's wallet like a payment (running average) and arriving in the receiver's like a top-up at that cost. When wallets depend on each other, it values them again until the values settle. A hand-over counts as a payment of that value (`handoverCredits` in `valueTrip`). Example D gives Ben → Alex ¥20,000 ≈ A$204, leaving A$2.00 to settle.
+- Spending before any cash was in a wallet is valued at the cash its owner bought, never at cash handed to them.
+- Hand-overs show in settle-up (with Undo) and on each person's cash card.
+- **Rules:** written by their author; giver and receiver are different trip members; the giver has a wallet in that currency; the receiver's wallet exists once the batch lands; no other keys.
 
 ### Task 6.2: Close the trip
-- **Close trip** (owner only) freezes all valuations into `homeTotal` on each expense, sets `tripClosedAt`, and makes the trip read-only in the app and in the rules. The owner can reopen it.
-- Kitty leftover: choose **share out** (the default) or **one person keeps it** (decision 5).
+- **Close trip** (owner, after confirming) sets `tripClosedAt`, and **Reopen trip** clears it. The rules then refuse writes to a closed trip's expenses, items, wallets, top-ups and hand-overs; settle-up can still be marked.
+- **No frozen copies (decided in T6):** the plan said to copy every value into `homeTotal` when closing. Once nothing can change, the values can't move, so no copies are stored.
+- The trip page and settings say it's closed. Adding, editing and deleting expenses, cash changes, hand-overs and the kitty choice are all hidden.
+- **Kitty leftover:** the kitty card's **What's left** is **Hand it back** (the default) or **X keeps it** (`keptBy` on the kitty). The keeper is treated as buying the leftover from the kitty at what it cost, so everyone else is credited all they put in. This purchase isn't counted as spending.
 
 ### Task 6.3: Export
-- CSV with one row per item: date, shop, item, category, currency, original amount, rate, home amount, paid with, payer, and who shared it. A second file with wallets and top-ups.
+- **Export CSV** on the balances page downloads `<trip>-expenses.csv` and `<trip>-cash.csv`.
+  - Expenses: one row per item, with date, place, item, category, currency, amount, paid with, rate, home amount, whether it's estimated, payer and who shared it.
+  - Cash: every purchase, hand-over and cash payment, with its cost.
+- Text that starts with `=`, `+`, `-` or `@` gets a leading apostrophe, so a spreadsheet won't run it as a formula.
 
 ---
 

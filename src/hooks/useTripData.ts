@@ -22,7 +22,10 @@ export function useTripData(tripId: string | null): {
 } {
   const exp = useTripExpenses(tripId);
   const w = useTripWallets(tripId);
-  const cash = useMemo(() => tripCash(w.wallets, w.topUps, exp.expenses), [w.wallets, w.topUps, exp.expenses]);
+  const cash = useMemo(
+    () => tripCash(w.wallets, w.topUps, exp.expenses, w.handovers ?? []),
+    [w.wallets, w.topUps, exp.expenses, w.handovers],
+  );
   return {
     expenses: exp.expenses,
     itemsByExpense: exp.itemsByExpense,

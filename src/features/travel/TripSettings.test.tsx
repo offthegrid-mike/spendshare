@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { User } from 'firebase/auth';
 import TripSettings from './TripSettings';
@@ -105,5 +105,23 @@ describe('TripSettings', () => {
     await u.click(screen.getByRole('button', { name: 'Add member' }));
     await waitFor(() => expect(screen.getByPlaceholderText('e.g. Jane Smith')).toHaveValue(''));
     vi.restoreAllMocks();
+  });
+
+  it('lets the owner close the trip after confirming, and reopen it', async () => {
+    const u = userEvent.setup();
+    const { unmount } = render(<TripSettings trip={trip} user={owner} />);
+    await u.click(screen.getByRole('button', { name: 'Close trip' }));
+    await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Close trip' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'TS' }));
+    unmount();
+    render(<TripSettings trip={{ ...trip, tripClosedAt: { toDate: () => new Date(2027, 4, 21) } as never }} user={owner} />);
+    expect(screen.getByText('Closed on 21 May 2027. Nothing on the trip can change; settle-up still works.')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Reopen trip' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { tripClosedAt: 'DELETE' }));
+  });
+
+  it('offers closing only to the owner', () => {
+    render(<TripSettings trip={trip} user={member} />);
+    expect(screen.queryByRole('button', { name: 'Close trip' })).not.toBeInTheDocument();
   });
 });

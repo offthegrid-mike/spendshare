@@ -103,6 +103,12 @@ service cloud.firestore {
       return ('kind' in d) ? (d.kind == 'trip' && ('trip' in d) && validTrip(d.trip)) : !('trip' in d);
     }
 
+    // A closed trip (tripClosedAt set, owner only) can't change: no expenses, items,
+    // cash, top-ups or hand-overs are written or deleted. Settle-up still works.
+    function tripOpen(groupId) {
+      return get(/databases/$(database)/documents/groups/$(groupId)).data.get('tripClosedAt', null) == null;
+    }
+
     function tripCurrencyChanged() {
       return resource.data.get('kind', null) == 'trip'
         && request.resource.data.currency != resource.data.currency;
@@ -124,8 +130,10 @@ service cloud.firestore {
         // and a trip's dates
         || ( isOwner(groupId)
              && request.resource.data.diff(resource.data).affectedKeys()
-                  .hasOnly(['name', 'currency', 'ownerUid', 'members', 'memberUids', 'trip'])
+                  .hasOnly(['name', 'currency', 'ownerUid', 'members', 'memberUids', 'trip', 'tripClosedAt'])
              && validKind(request.resource.data)
+             && (!('tripClosedAt' in request.resource.data)
+                 || (request.resource.data.get('kind', null) == 'trip' && request.resource.data.tripClosedAt is timestamp))
              && !tripCurrencyChanged() )
         // Invite acceptance: a verified user with a pending invite can add ONLY themselves
         // to members/memberUids. The join must be strictly additive (existing members/memberUids
@@ -168,7 +176,8 @@ service cloud.firestore {
               || (request.resource.data.monthlyBudget is int && request.resource.data.monthlyBudget >= 0));
       }
       match /expenses/{expenseId} {
-        allow read, delete: if isMember(groupId);
+        allow read: if isMember(groupId);
+        allow delete: if isMember(groupId) && tripOpen(groupId);
         // Bind the author and require a non-negative numeric total on create/update.
         // A refund (kind 'refund') names its original and has no gift card or
         // discount; its amounts stay positive and the app counts them against
@@ -197,7 +206,7 @@ service cloud.firestore {
                      && d.payerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids)
                     || getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.get('ownerUid', null) == d.payerUid))));
         }
-        allow create, update: if isMember(groupId)
+        allow create, update: if isMember(groupId) && tripOpen(groupId)
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.total is number
           && request.resource.data.total >= 0
@@ -217,10 +226,11 @@ service cloud.firestore {
               || (isRefundDoc(request.resource.data) == isRefundDoc(resource.data)
                   && request.resource.data.get('refundOf', null) == resource.data.get('refundOf', null)));
         match /items/{itemId} {
-          allow read, delete: if isMember(groupId);
+          allow read: if isMember(groupId);
+          allow delete: if isMember(groupId) && tripOpen(groupId);
           // An item is a refund item exactly when its expense is a refund. getAfter
           // sees the expense when both are saved in one batch, as the app does.
-          allow create, update: if isMember(groupId)
+          allow create, update: if isMember(groupId) && tripOpen(groupId)
             && request.resource.data.amount is number
             && request.resource.data.amount >= 0
             && (!('refund' in request.resource.data) || request.resource.data.refund is bool)
@@ -260,8 +270,9 @@ service cloud.firestore {
       // or the trip's shared kitty (id kitty_CUR, no owner). Kind, owner and
       // currency never change.
       match /wallets/{walletId} {
-        allow read, delete: if isMember(groupId);
-        allow create, update: if isMember(groupId)
+        allow read: if isMember(groupId);
+        allow delete: if isMember(groupId) && tripOpen(groupId);
+        allow create, update: if isMember(groupId) && tripOpen(groupId)
           && request.resource.data.currency is string
           && request.resource.data.currency.matches('[A-Z]{3}')
           && (request.resource.data.kind == 'kitty'
@@ -271,6 +282,10 @@ service cloud.firestore {
                  && request.resource.data.ownerUid is string
                  && walletId == request.resource.data.ownerUid + '_' + request.resource.data.currency
                  && request.resource.data.ownerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids))
+          // A kitty's leftover may be kept by one member instead of being handed back.
+          && (!('keptBy' in request.resource.data)
+              || (request.resource.data.kind == 'kitty'
+                  && request.resource.data.keptBy in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids))
           && (resource == null
               || (request.resource.data.kind == resource.data.kind
                   && request.resource.data.get('ownerUid', null) == resource.data.get('ownerUid', null)
@@ -279,8 +294,9 @@ service cloud.firestore {
       // Cash put into a wallet: whole minor units received (> 0) and paid (>= 0), on a day,
       // by the member writing it, into a wallet that exists once the write lands.
       match /topUps/{topUpId} {
-        allow read, delete: if isMember(groupId);
-        allow create, update: if isMember(groupId)
+        allow read: if isMember(groupId);
+        allow delete: if isMember(groupId) && tripOpen(groupId);
+        allow create, update: if isMember(groupId) && tripOpen(groupId)
           && request.resource.data.keys().hasOnly(['id', 'walletId', 'byUid', 'fromUid', 'date', 'foreignAmount', 'homeAmount', 'createdAt'])
           && request.resource.data.byUid == request.auth.uid
           && request.resource.data.walletId is string
@@ -293,6 +309,23 @@ service cloud.firestore {
               ? (request.resource.data.get('fromUid', null) is string
                  && request.resource.data.fromUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids)
               : !('fromUid' in request.resource.data));
+      }
+      // Trips: foreign cash one member hands another to settle up, out of the giver's
+      // own wallet in that currency into the receiver's (created in the same batch if new).
+      match /handovers/{handoverId} {
+        allow read: if isMember(groupId);
+        allow delete: if isMember(groupId) && tripOpen(groupId);
+        allow create, update: if isMember(groupId) && tripOpen(groupId)
+          && request.resource.data.keys().hasOnly(['id', 'fromUid', 'toUid', 'currency', 'foreignAmount', 'date', 'byUid', 'createdAt'])
+          && request.resource.data.byUid == request.auth.uid
+          && request.resource.data.currency is string && request.resource.data.currency.matches('[A-Z]{3}')
+          && request.resource.data.foreignAmount is int && request.resource.data.foreignAmount > 0
+          && isIsoDate(request.resource.data.date)
+          && request.resource.data.fromUid != request.resource.data.toUid
+          && request.resource.data.fromUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids
+          && request.resource.data.toUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids
+          && exists(/databases/$(database)/documents/groups/$(groupId)/wallets/$(request.resource.data.fromUid + '_' + request.resource.data.currency))
+          && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(request.resource.data.toUid + '_' + request.resource.data.currency));
       }
       match /suggestions/{doc} {
         allow read: if isMember(groupId);

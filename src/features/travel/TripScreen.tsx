@@ -6,7 +6,7 @@ import { useTripData } from '../../hooks/useTripData';
 import { TRIP_SETTLEMENT_MONTH, viewerTripFigures } from '../../lib/travel/valueTrip';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { paths } from '../../lib/paths';
-import { formatTripDates, tripProgress } from '../../lib/travel/trips';
+import { closedText, formatTripDates, isTripClosed, tripProgress } from '../../lib/travel/trips';
 import { progressText } from './tripText';
 import TripExpenseList from './TripExpenseList';
 import type { GroupDoc } from '../../types/models';
@@ -36,6 +36,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
     <div className="mx-auto max-w-lg space-y-4">
       <section className="card p-4 sm:p-5">
         <h2 className="text-xl font-semibold tracking-tight text-ink">{trip.name}</h2>
+        {closedText(trip) && <p className="mt-1 rounded-[10px] bg-recessed px-3 py-2 text-[13px] text-ink-muted">{closedText(trip)}</p>}
         <p className="mt-0.5 text-[13px] text-ink-muted">{formatTripDates(trip.trip)}</p>
         <p className="mt-2 text-sm font-medium text-ink">{progressText(tripProgress(trip.trip, today))}</p>
         <p className="mt-0.5 text-xs text-ink-muted">{`Home currency: ${trip.currency}`}</p>
@@ -66,7 +67,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
       </section>
 
       {!loading && !itemsLoading && !settlementsLoading && (() => {
-        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values, cash.kitties);
+        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values, cash.kitties, cash.handoverCredits);
         if (!figures) return null;
         const { balance } = figures;
         const tone = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' }[balance.tone];
@@ -92,7 +93,10 @@ export default function TripScreen({ trips, viewerUid }: Props) {
       ) : loading ? (
         <div role="status" aria-label="Loading expenses" className="card h-24 animate-pulse" />
       ) : (
-        <TripExpenseList trip={trip} expenses={expenses} itemsByExpense={itemsByExpense} viewerUid={viewerUid} cashValues={cash.values} />
+        <TripExpenseList
+          trip={trip} expenses={expenses} itemsByExpense={itemsByExpense} viewerUid={viewerUid} cashValues={cash.values}
+          readOnly={isTripClosed(trip)}
+        />
       )}
     </div>
   );

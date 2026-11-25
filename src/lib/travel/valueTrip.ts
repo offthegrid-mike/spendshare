@@ -4,7 +4,7 @@ import { expenseHomeTotal, isEstimated } from './tripExpense';
 import { isKittyId, type KittyInfo } from './cash';
 import { signedAmount } from '../refund';
 
-/** A credit that moves value from a person to a kitty's party, applied like a paid settlement. */
+/** A credit applied like a paid settlement: into a kitty's party, or cash handed from one member to another. */
 export interface KittyCredit { fromUid: string; toUid: string; amount: number; paid: true; }
 import { spreadInProportion } from './spread';
 
@@ -23,6 +23,8 @@ export const TRIP_SETTLEMENT_MONTH = 'trip';
 
 export interface ValuedItem extends SummaryItem {
   expenseId: string;
+  /** The kitty's leftover cash bought by the one person who keeps it: settled, but not spending. */
+  kept?: boolean;
   categoryId: string;
   category: string;
 }
@@ -49,6 +51,8 @@ export function valueTrip(
   cashValues: Record<string, number | null> = {},
   /** The trip's kitties, from tripCash. */
   kitties: KittyInfo[] = [],
+  /** Cash handed over to settle up, from tripCash: payments between members. */
+  handoverCredits: KittyCredit[] = [],
 ): TripValuation {
   const home = trip.currency;
   const items: ValuedItem[] = [];
@@ -96,7 +100,17 @@ export function valueTrip(
       });
     });
   }
-  const credits = kitties.flatMap((k) => kittyCredits(k, items, expenses));
+  // Whoever keeps a kitty's leftover cash buys it from the kitty at what it cost.
+  for (const k of kitties) {
+    if (k.keptBy && k.left.foreign > 0 && k.left.home !== null && k.left.home > 0) {
+      addParty(k.keptBy);
+      items.push({
+        amount: k.left.home, shared: true, sharedWith: [k.keptBy], payerUid: k.walletId,
+        expenseId: `kept:${k.walletId}`, categoryId: '', category: 'Kitty cash kept', kept: true,
+      });
+    }
+  }
+  const credits = [...kitties.flatMap((k) => kittyCredits(k, items, expenses)), ...handoverCredits];
   for (const c of credits) {
     addParty(c.fromUid);
     addParty(c.toUid);
@@ -157,8 +171,9 @@ export function tripBreakdown(
   home: string,
   categoryNames: Record<string, string> = {},
 ): TripBreakdown {
+  const spending = valuation.items.filter((it) => !it.kept);
   const byCategory = new Map<string, { name: string; amount: number }>();
-  for (const it of valuation.items) {
+  for (const it of spending) {
     const key = it.categoryId || `name:${it.category}`;
     const name = categoryNames[it.categoryId] || it.category || 'Uncategorised';
     const entry = byCategory.get(key) ?? { name, amount: 0 };
@@ -171,7 +186,7 @@ export function tripBreakdown(
     byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + e.total);
   }
   return {
-    spent: valuation.items.reduce((s, it) => s + it.amount, 0),
+    spent: spending.reduce((s, it) => s + it.amount, 0),
     byCategory: [...byCategory.values()].sort((a, b) => b.amount - a.amount),
     byCurrency: [...byCurrency.entries()].map(([currency, amount]) => ({ currency, amount })),
   };
@@ -203,13 +218,14 @@ export function viewerTripFigures(
   settlements: PaidSettlement[],
   cashValues: Record<string, number | null> = {},
   kitties: KittyInfo[] = [],
+  handoverCredits: KittyCredit[] = [],
 ): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } | null {
   // Nothing to show until something was spent or paid back; a paid settlement alone still leaves a balance.
-  if (expenses.length === 0 && !settlements.some((s) => s.paid)) return null;
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues, kitties);
+  if (expenses.length === 0 && !settlements.some((s) => s.paid) && handoverCredits.length === 0) return null;
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues, kitties, handoverCredits);
   const summary = tripSummary(valuation, settlements);
   return {
-    spent: valuation.items.reduce((s, it) => s + it.amount, 0),
+    spent: valuation.items.filter((it) => !it.kept).reduce((s, it) => s + it.amount, 0),
     // Cash values move as wallets change, so a total with cash in it is approximate, as in the expense list.
     estimated: valuation.estimated.length > 0 || valuation.items.some((it) => expenses.find((e) => e.id === it.expenseId)?.paidWith?.kind === 'wallet'),
     balance: tripBalanceCopy(summary.balance[viewerUid] ?? 0, true, trip.currency),

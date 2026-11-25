@@ -9,6 +9,7 @@ import { memberName } from '../../lib/balance';
 import { paths } from '../../lib/paths';
 import { formatMinor, minorDigits, toMinor } from '../../lib/travel/currency';
 import { expenseDay, expenseHomeTotal, isEstimated } from '../../lib/travel/tripExpense';
+import { isTripClosed } from '../../lib/travel/trips';
 import { isKittyId, readableWalletRate, type TripCash } from '../../lib/travel/cash';
 import { useUIStore } from '../../stores/uiStore';
 import { deleteTripExpense, recordCharge } from './tripWrite';
@@ -116,7 +117,8 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
   const homeTotal = expenseHomeTotal(expense, home, cash?.values);
   const wallet = paid?.kind === 'wallet' ? cash?.wallets.find((w) => w.wallet.id === paid.walletId) : undefined;
   const payer = expense.payerUid === user.uid ? 'You' : memberName(trip, expense.payerUid);
-  const showChargeForm = foreign && paid?.kind === 'card' && (isEstimated(expense, home) || changingCharge);
+  const closed = isTripClosed(trip);
+  const showChargeForm = !closed && foreign && paid?.kind === 'card' && (isEstimated(expense, home) || changingCharge);
 
   function handleDelete() {
     setConfirming(false);
@@ -163,7 +165,7 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
             onCancel={changingCharge ? () => setChangingCharge(false) : undefined}
           />
         ) : (
-          foreign && paid?.kind === 'card' && (
+          !closed && foreign && paid?.kind === 'card' && (
             <button type="button" onClick={() => setChangingCharge(true)} className="text-[13px] font-medium text-accent-ink hover:underline">
               Change
             </button>
@@ -187,7 +189,7 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
         ))}
       </ul>
 
-      <div className="flex gap-2">
+      {!closed && <div className="flex gap-2">
         <Link to={paths.editTripExpense(trip.id, expense.id)} className="btn-outline">
           <Pencil size={14} aria-hidden="true" />
           Edit
@@ -196,7 +198,7 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
           <Trash2 size={14} aria-hidden="true" />
           Delete
         </button>
-      </div>
+      </div>}
 
       <ConfirmDialog
         open={confirming}

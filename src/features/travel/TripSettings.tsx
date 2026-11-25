@@ -1,9 +1,10 @@
 import { useId, useState, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { groupsCol } from '../../lib/converters';
 import { settleWrite } from '../../lib/settleWrite';
-import { formatTripDates, validateTripInput } from '../../lib/travel/trips';
+import { closedText, formatTripDates, isTripClosed, validateTripInput } from '../../lib/travel/trips';
 import DatePicker from '../expenses/DatePicker';
 import MembersSection from '../groups/MembersSection';
 import SendInvite from '../invites/SendInvite';
@@ -25,6 +26,14 @@ export default function TripSettings({ trip, user }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const closed = isTripClosed(trip);
+
+  function setClosed(close: boolean) {
+    setConfirmingClose(false);
+    settleWrite(updateDoc(doc(groupsCol, trip.id), { tripClosedAt: close ? serverTimestamp() : deleteField() }))
+      .catch(() => setError(close ? "Couldn't close the trip. Try again." : "Couldn't reopen the trip. Try again."));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +109,29 @@ export default function TripSettings({ trip, user }: Props) {
           </button>
         </form>
       </section>
+
+      {(isOwner || closed) && (
+        <section aria-labelledby="close-trip" className="card space-y-2 p-4 sm:p-5">
+          <h2 id="close-trip" className="text-base font-semibold text-ink">{closed ? 'Closed' : 'Close the trip'}</h2>
+          <p className="text-[13px] text-ink-muted">
+            {closedText(trip) ?? 'Once everything is in, close the trip so nothing changes by accident. Settle-up still works, and you can reopen it.'}
+          </p>
+          {isOwner && (closed ? (
+            <button type="button" onClick={() => setClosed(false)} className="btn-outline">Reopen trip</button>
+          ) : (
+            <button type="button" onClick={() => setConfirmingClose(true)} className="btn-outline">Close trip</button>
+          ))}
+        </section>
+      )}
+      <ConfirmDialog
+        open={confirmingClose}
+        title="Close this trip?"
+        message="No one can add, change or delete its expenses or cash until you reopen it. Settle-up still works."
+        confirmLabel="Close trip"
+        tone="primary"
+        onConfirm={() => setClosed(true)}
+        onCancel={() => setConfirmingClose(false)}
+      />
 
       <MembersSection group={trip} currentUserUid={user.uid} />
 

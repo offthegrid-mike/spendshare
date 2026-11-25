@@ -83,3 +83,15 @@ export function formatTripDates(trip: TripDates): string {
   if (format(start, 'yyyy') === format(end, 'yyyy')) return `${format(start, 'd MMM')} – ${format(end, 'd MMM yyyy')}`;
   return `${format(start, 'd MMM yyyy')} – ${format(end, 'd MMM yyyy')}`;
 }
+
+/** Whether the trip is closed: read-only until its owner reopens it. */
+export function isTripClosed(trip: Pick<GroupDoc, 'tripClosedAt'>): boolean {
+  return trip.tripClosedAt != null;
+}
+
+/** "Closed on 21 May 2027. …", or null for an open trip. */
+export function closedText(trip: Pick<GroupDoc, 'tripClosedAt'>): string | null {
+  const at = (trip.tripClosedAt as { toDate?: () => Date } | undefined)?.toDate?.();
+  if (!isTripClosed(trip)) return null;
+  return `Closed${at ? ` on ${format(at, 'd MMM yyyy')}` : ''}. Nothing on the trip can change; settle-up still works.`;
+}

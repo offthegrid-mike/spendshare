@@ -9,8 +9,8 @@ import { makeExpense, makeTrip } from '../../test/fixtures';
 import type { TopUpDoc, WalletDoc } from '../../types/models';
 import { useUIStore } from '../../stores/uiStore';
 
-const { addCash, deleteTopUp } = vi.hoisted(() => ({ addCash: vi.fn(), deleteTopUp: vi.fn() }));
-vi.mock('./cashWrite', () => ({ addCash, deleteTopUp }));
+const { addCash, deleteTopUp, setKittyKeeper } = vi.hoisted(() => ({ addCash: vi.fn(), deleteTopUp: vi.fn(), setKittyKeeper: vi.fn() }));
+vi.mock('./cashWrite', () => ({ addCash, deleteTopUp, setKittyKeeper }));
 vi.mock('../expenses/DatePicker', () => ({
   default: ({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) => (
     <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -118,6 +118,31 @@ describe('TripCash', () => {
     await waitFor(() => expect(useUIStore.getState().notice?.message).toBe("Couldn't remove that cash. Try again."));
   });
 
+  it('offers no changes on a closed trip', () => {
+    const closed = { ...trip, tripClosedAt: { toDate: () => new Date() } as never };
+    render(
+      <MemoryRouter>
+        <TripCash trip={closed} user={alex} cash={tripCash([alexYen], topUps, [dinner])} expenses={[dinner]} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('form', { name: 'Add cash' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+  });
+
+  it('lists cash handed to or received from others', () => {
+    const ben: WalletDoc = { ...alexYen, id: 'ben_JPY', ownerUid: 'ben' };
+    render(
+      <MemoryRouter>
+        <TripCash trip={trip} user={alex} expenses={[dinner]}
+          cash={tripCash([alexYen, ben], topUps, [dinner], [
+            { id: 'h1', fromUid: 'alex', toUid: 'ben', currency: 'JPY', foreignAmount: 5000, date: '2027-05-13', byUid: 'alex', createdAt: null as never },
+          ])} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('region', { name: 'Your JPY cash' })).toHaveTextContent('13 May · gave ¥5,000 to Ben');
+    expect(screen.getByRole('region', { name: 'Ben’s JPY cash' })).toHaveTextContent('13 May · got ¥5,000 from you');
+  });
+
   it('flags a wallet that has paid out more than was put in, or has no cash added', () => {
     renderCash([alexYen], [topUps[0]], [{ ...dinner }]);
     expect(screen.getByRole('region', { name: 'Your JPY cash' })).toHaveTextContent('¥10,000 more spent than added');
@@ -147,6 +172,23 @@ describe('TripCash', () => {
         'Ben put in ¥30,000 for A$300.00 · gets back ¥6,000',
         'Chris put in ¥40,000 for A$420.00 · gets back ¥8,000',
       ]);
+    });
+
+    it('lets one person keep what’s left instead of handing it back', async () => {
+      setKittyKeeper.mockResolvedValue(undefined);
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderCash([kitty], ups, spent);
+      const card = within(screen.getByRole('region', { name: 'Kitty · JPY' }));
+      expect(card.getByRole('combobox', { name: 'What’s left' })).toHaveTextContent('Hand it back');
+      await u.click(card.getByRole('combobox', { name: 'What’s left' }));
+      await u.click(screen.getByRole('option', { name: 'Chris keeps it' }));
+      await waitFor(() => expect(setKittyKeeper).toHaveBeenCalledWith('japan', 'kitty_JPY', 'chris'));
+    });
+
+    it('shows who keeps what’s left', () => {
+      renderCash([{ ...kitty, keptBy: 'chris' }], ups, spent);
+      const card = screen.getByRole('region', { name: 'Kitty · JPY' });
+      expect(card).toHaveTextContent('Chris put in ¥40,000 for A$420.00 · keeps ¥20,000');
     });
 
     it('puts money into the kitty for someone', async () => {

@@ -11,6 +11,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('../lib/converters', () => ({
   walletsCol: (gid: string) => ({ path: `groups/${gid}/wallets` }),
   topUpsCol: (gid: string) => ({ path: `groups/${gid}/topUps` }),
+  handoversCol: (gid: string) => ({ path: `groups/${gid}/handovers` }),
 }));
 
 import { useTripWallets } from './useTripWallets';
@@ -20,21 +21,25 @@ const snap = (docs: Record<string, unknown>[]) => ({ docs: docs.map((d) => ({ id
 beforeEach(() => { listeners.length = 0; });
 
 describe('useTripWallets', () => {
-  it('loads the trip’s wallets and top-ups', () => {
+  it('loads the trip’s wallets, top-ups and hand-overs', () => {
     const { result } = renderHook(() => useTripWallets('japan'));
     expect(result.current.loading).toBe(true);
-    expect(listeners.map((l) => l.q)).toEqual([{ path: 'groups/japan/wallets' }, { path: 'groups/japan/topUps' }]);
+    expect(listeners.map((l) => l.q)).toEqual([
+      { path: 'groups/japan/wallets' }, { path: 'groups/japan/topUps' }, { path: 'groups/japan/handovers' },
+    ]);
     act(() => listeners[0].next(snap([{ id: 'alex_JPY' }])));
-    expect(result.current.loading).toBe(true);
     act(() => listeners[1].next(snap([{ id: 't1', walletId: 'alex_JPY' }])));
+    expect(result.current.loading).toBe(true);
+    act(() => listeners[2].next(snap([{ id: 'h1' }])));
     expect(result.current.loading).toBe(false);
+    expect(result.current.handovers.map((h) => h.id)).toEqual(['h1']);
     expect(result.current.wallets.map((w) => w.id)).toEqual(['alex_JPY']);
     expect(result.current.topUps.map((t) => t.id)).toEqual(['t1']);
   });
 
   it('stops loading on an error', () => {
     const { result } = renderHook(() => useTripWallets('japan'));
-    act(() => { listeners[0].error(); listeners[1].error(); });
+    act(() => { listeners[0].error(); listeners[1].error(); listeners[2].error(); });
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe(true);
   });
@@ -47,9 +52,9 @@ describe('useTripWallets', () => {
 
   it('listens again on retry after an error', () => {
     const { result } = renderHook(() => useTripWallets('japan'));
-    act(() => { listeners[0].error(); listeners[1].error(); });
+    act(() => { listeners[0].error(); listeners[1].error(); listeners[2].error(); });
     act(() => result.current.retry());
-    expect(listeners).toHaveLength(4);
+    expect(listeners).toHaveLength(6);
     expect(result.current.error).toBe(false);
     expect(result.current.loading).toBe(true);
   });

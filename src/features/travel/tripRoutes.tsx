@@ -4,6 +4,7 @@ import { RouteSkeleton } from '../../components/AppSkeletons';
 import { useSettlements } from '../../hooks/useSettlements';
 import { useTripData } from '../../hooks/useTripData';
 import { TRIP_SETTLEMENT_MONTH } from '../../lib/travel/valueTrip';
+import { isTripClosed } from '../../lib/travel/trips';
 import TripSummary from './TripSummary';
 import TripCash from './TripCash';
 import { paths } from '../../lib/paths';
@@ -25,6 +26,7 @@ export function NewTripExpenseRoute({ trips, user }: Props) {
   // Waits for the trip's expenses, so the last currency and rate can be offered.
   const { expenses, cash, loading } = useTripData(trip?.id ?? null);
   if (!trip) return <Navigate to={paths.travel} replace />;
+  if (isTripClosed(trip)) return <Navigate to={paths.trip(trip.id)} replace />;
   if (loading) return <RouteSkeleton />;
   return (
     <div className="mx-auto max-w-lg space-y-3">
@@ -55,6 +57,7 @@ export function EditTripExpenseRoute({ trips, user }: Props) {
   const navigate = useNavigate();
   const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   if (!trip) return <Navigate to={paths.travel} replace />;
+  if (isTripClosed(trip)) return <Navigate to={paths.tripExpense(trip.id, expenseId ?? '')} replace />;
   // The form takes its starting values once, so it waits for the items too.
   if (loading || itemsLoading) return <RouteSkeleton />;
   const expense = expenses.find((e) => e.id === expenseId);

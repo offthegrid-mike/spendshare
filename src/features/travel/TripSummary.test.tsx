@@ -1,17 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import TripSummary from './TripSummary';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
-import type { ExpenseDoc, ItemDoc, SettlementDoc, TopUpDoc, WalletDoc } from '../../types/models';
+import type { ExpenseDoc, HandoverDoc, ItemDoc, SettlementDoc, TopUpDoc, WalletDoc } from '../../types/models';
 import { tripCash } from '../../lib/travel/cash';
 
 const { markSettlementPaid, undoSettlement } = vi.hoisted(() => ({
   markSettlementPaid: vi.fn(), undoSettlement: vi.fn(),
 }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid, undoSettlement }));
+const { handOverCash, undoHandover } = vi.hoisted(() => ({ handOverCash: vi.fn(), undoHandover: vi.fn() }));
+vi.mock('./cashWrite', () => ({ handOverCash, undoHandover }));
+const { downloadCsv } = vi.hoisted(() => ({ downloadCsv: vi.fn() }));
+vi.mock('../../lib/work/downloadCsv', () => ({ downloadCsv }));
 vi.mock('../../hooks/useCategories', () => ({ useCategories: () => ({ active: [], all: [], loading: false }) }));
 
 const trip = makeTrip('japan', 'Japan', '2027-05-10', '2027-05-20', ['Alex', 'Ben', 'Chris']);
@@ -35,6 +39,8 @@ function renderSummary(
 }
 
 beforeEach(() => {
+  handOverCash.mockReset().mockResolvedValue(undefined);
+  undoHandover.mockReset().mockResolvedValue(undefined);
   markSettlementPaid.mockReset().mockResolvedValue(undefined);
   undoSettlement.mockReset().mockResolvedValue(undefined);
 });
@@ -166,6 +172,22 @@ describe('TripSummary', () => {
     expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('Hand back the ¥20,000 left: Alex ¥6,000, Ben ¥6,000, you ¥8,000.');
   });
 
+  it('says who keeps the kitty’s leftover, and what it cost them', () => {
+    const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never, keptBy: 'chris' };
+    const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+      id, walletId: 'kitty_JPY', byUid: 'alex', fromUid, date: '2027-05-09', foreignAmount, homeAmount, createdAt: null as never,
+    });
+    const d = makeExpense('d', { currency: 'JPY', total: 80000, payerUid: 'ben', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } });
+    const cash = tripCash([kitty], [put('a', 'alex', 30000, 30000), put('b', 'ben', 30000, 30000), put('c', 'chris', 40000, 42000)], [d]);
+    render(
+      <MemoryRouter>
+        <TripSummary trip={trip} user={chris} expenses={[d]} settlements={[]} cash={cash}
+          itemsByExpense={{ d: [makeItem('di', 'd', { amount: 80000, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('You keep the ¥20,000 left, at what it cost: A$204.00.');
+  });
+
   it('says when the kitty paid out more than was put in, and who covered it', () => {
     const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
     const e = makeExpense('o', { currency: 'JPY', total: 1500, payerUid: 'ben', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } });
@@ -181,8 +203,89 @@ describe('TripSummary', () => {
     expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('The JPY kitty paid out ¥500 more than was put in; whoever handed that cash over is credited for it.');
   });
 
+  it('exports the trip as two CSV files', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    expect(downloadCsv.mock.calls.map((c) => c[0])).toEqual(['japan-expenses.csv', 'japan-cash.csv']);
+    expect(downloadCsv.mock.calls[0][1]).toContain('Hotel tax');
+  });
+
   it('says when there is nothing to settle yet', () => {
     renderSummary({ expenses: [], items: {} });
     expect(screen.getByText('No expenses yet, so nothing to settle.')).toBeInTheDocument();
+  });
+
+  describe('paying back in cash (example D)', () => {
+    const w = (ownerUid: string): WalletDoc => ({ id: `${ownerUid}_JPY`, kind: 'personal', ownerUid, currency: 'JPY', createdByUid: ownerUid, createdAt: null as never });
+    const up = (id: string, walletId: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+      id, walletId, byUid: 'alex', date: '2027-05-09', foreignAmount, homeAmount, createdAt: null as never,
+    });
+    const ups = [up('a1', 'alex_JPY', 50000, 50000), up('a2', 'alex_JPY', 50000, 53000), up('c1', 'chris_JPY', 20000, 20400)];
+    const dinner = makeExpense('dinner', { currency: 'JPY', total: 60000, payerUid: 'alex', tripDay: '2027-05-12', paidWith: { kind: 'wallet', walletId: 'alex_JPY' } });
+    const items = { dinner: [makeItem('d', 'dinner', { amount: 60000, payerUid: 'alex', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] };
+    const renderD = (handovers: HandoverDoc[] = []) => render(
+      <MemoryRouter>
+        <TripSummary trip={trip} user={chris} expenses={[dinner]} itemsByExpense={items} settlements={[]}
+          cash={tripCash([w('alex'), w('chris')], ups, [dinner], handovers)} />
+      </MemoryRouter>,
+    );
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2027, 4, 20, 9));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('offers to pay back in cash, showing what it covers, and records the hand-over', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderD();
+      const row = within(screen.getByRole('region', { name: 'Settle up' })).getByRole('listitem', { name: 'You → Alex' });
+      await u.click(within(row).getByRole('button', { name: 'Pay in cash' }));
+      const amount = screen.getByLabelText('Cash to hand over (JPY)');
+      await u.clear(amount);
+      await u.type(amount, '20000');
+      expect(screen.getByText('≈ A$204.00 of the A$206.00 owed')).toBeInTheDocument();
+      await u.click(screen.getByRole('button', { name: 'Hand over' }));
+      await waitFor(() => expect(handOverCash).toHaveBeenCalledWith({
+        tripId: 'japan', uid: 'chris', fromUid: 'chris', toUid: 'alex', currency: 'JPY',
+        foreignAmount: 20000, date: '2027-05-20', receiverHasWallet: true,
+      }));
+    });
+
+    it('suggests the cash that covers the debt, up to the cash left', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderD();
+      const row = within(screen.getByRole('region', { name: 'Settle up' })).getByRole('listitem', { name: 'You → Alex' });
+      await u.click(within(row).getByRole('button', { name: 'Pay in cash' }));
+      expect(screen.getByLabelText('Cash to hand over (JPY)')).toHaveValue('20000');
+    });
+
+    it('shows a hand-over as paid, leaving A$2.00 to settle, and can undo it', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderD([{ id: 'h1', fromUid: 'chris', toUid: 'alex', currency: 'JPY', foreignAmount: 20000, date: '2027-05-20', byUid: 'chris', createdAt: null as never }]);
+      const settle = within(screen.getByRole('region', { name: 'Settle up' }));
+      expect(settle.getByRole('listitem', { name: 'You → Alex' })).toHaveTextContent('A$2.00');
+      expect(settle.getByText('You → Alex ¥20,000 in cash (≈ A$204.00)')).toBeInTheDocument();
+      await u.click(settle.getByRole('button', { name: 'Undo cash hand-over' }));
+      await waitFor(() => expect(undoHandover).toHaveBeenCalledWith('japan', 'h1'));
+    });
+
+    it('still settles up on a closed trip, but offers no cash hand-over', () => {
+      render(
+        <MemoryRouter>
+          <TripSummary trip={{ ...trip, tripClosedAt: { toDate: () => new Date() } as never }} user={chris} expenses={[dinner]}
+            itemsByExpense={items} settlements={[]} cash={tripCash([w('alex'), w('chris')], ups, [dinner])} />
+        </MemoryRouter>,
+      );
+      const row = within(screen.getByRole('region', { name: 'Settle up' })).getByRole('listitem', { name: 'You → Alex' });
+      expect(within(row).getByRole('button', { name: 'Mark paid' })).toBeInTheDocument();
+      expect(within(row).queryByRole('button', { name: 'Pay in cash' })).not.toBeInTheDocument();
+    });
+
+    it('offers no cash option to someone without foreign cash', () => {
+      renderD();
+      const row = within(screen.getByRole('region', { name: 'Settle up' })).getByRole('listitem', { name: 'Ben → Alex' });
+      expect(within(row).queryByRole('button', { name: 'Pay in cash' })).not.toBeInTheDocument();
+    });
   });
 });

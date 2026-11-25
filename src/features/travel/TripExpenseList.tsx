@@ -14,6 +14,8 @@ interface Props {
   viewerUid: string;
   /** Cash payments' home values, from tripCash. */
   cashValues?: Record<string, number | null>;
+  /** A closed trip: no adding. */
+  readOnly?: boolean;
 }
 
 function title(expense: ExpenseDoc, items: ItemDoc[] | undefined): string {
@@ -59,7 +61,7 @@ function ExpenseRow({ trip, expense, items, viewerUid, cashValues }: {
 }
 
 /** A trip's expenses by day, each in its own currency with its home value, and the trip's total so far. */
-export default function TripExpenseList({ trip, expenses, itemsByExpense, viewerUid, cashValues = {} }: Props) {
+export default function TripExpenseList({ trip, expenses, itemsByExpense, viewerUid, cashValues = {}, readOnly = false }: Props) {
   const home = trip.currency;
   const days = trip.trip ? tripDayGroups(expenses, trip.trip) : [];
   const totals = expenses.map((e) => expenseHomeTotal(e, home, cashValues));
@@ -71,10 +73,12 @@ export default function TripExpenseList({ trip, expenses, itemsByExpense, viewer
     <section aria-labelledby="trip-expenses" className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h3 id="trip-expenses" className="text-base font-semibold text-ink">Expenses</h3>
-        <Link to={paths.newTripExpense(trip.id)} className="btn-primary">
-          <Plus size={14} aria-hidden="true" />
-          Add expense
-        </Link>
+        {!readOnly && (
+          <Link to={paths.newTripExpense(trip.id)} className="btn-primary">
+            <Plus size={14} aria-hidden="true" />
+            Add expense
+          </Link>
+        )}
       </div>
 
       {expenses.length === 0 ? (

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { tripCash, walletIdFor, kittyIdFor, readableWalletRate, cashLeftFor } from './cash';
-import { valueTrip, tripSummary } from './valueTrip';
+import { valueTrip, tripSummary, tripBreakdown } from './valueTrip';
 import { expenseHomeTotal } from './tripExpense';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
-import type { ExpenseDoc, TopUpDoc, WalletDoc } from '../../types/models';
+import type { ExpenseDoc, HandoverDoc, TopUpDoc, WalletDoc } from '../../types/models';
 
 const trip = makeTrip('japan', 'Japan', '2027-05-10', '2027-05-20', ['Alex', 'Ben', 'Chris']);
 const wallet = (ownerUid: string, currency = 'JPY'): WalletDoc => ({
@@ -219,6 +219,41 @@ describe('the kitty — worked example B', () => {
   });
 });
 
+describe('the kitty kept by one person (example B, Chris keeps what’s left)', () => {
+  const kitty: WalletDoc = { id: kittyIdFor('JPY'), kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never, keptBy: 'chris' };
+  const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+    ...topUp(id, kitty.id, foreignAmount, homeAmount), fromUid,
+  });
+  const ups = [put('a', 'alex', 30000, 30000), put('b', 'ben', 30000, 30000), put('c', 'chris', 40000, 42000)];
+  const dinner = cashPayment('dinner', kitty.id, 50000, { payerUid: 'ben' });
+  const museum = cashPayment('museum', kitty.id, 30000, { payerUid: 'ben', created: 5 });
+  const items = {
+    dinner: [makeItem('d', 'dinner', { amount: 50000, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben', 'chris'] })],
+    museum: [makeItem('m', 'museum', { amount: 30000, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben'] })],
+  };
+  const cash = tripCash([kitty], ups, [dinner, museum]);
+
+  it('hands all the cash left to the keeper', () => {
+    expect(cash.kitties[0].contributors.map((c) => [c.uid, c.handBack])).toEqual([['alex', 0], ['ben', 0], ['chris', 20000]]);
+  });
+
+  it('charges the keeper what the cash left cost, A$204, and credits everyone their whole contribution', () => {
+    const v = valueTrip(trip, [dinner, museum], items, cash.values, cash.kitties);
+    expect(v.credits).toEqual([
+      { fromUid: 'alex', toUid: kitty.id, amount: 30000, paid: true },
+      { fromUid: 'ben', toUid: kitty.id, amount: 30000, paid: true },
+      { fromUid: 'chris', toUid: kitty.id, amount: 42000, paid: true },
+    ]);
+    const s = tripSummary(v, []);
+    expect(s.balance).toEqual({ alex: -2300, ben: -2300, chris: 4600, [kitty.id]: 0 });
+  });
+
+  it('keeps the cash kept out of what was spent', () => {
+    const v = valueTrip(trip, [dinner, museum], items, cash.values, cash.kitties);
+    expect(tripBreakdown(v, [dinner, museum], 'AUD').spent).toBe(81600);
+  });
+});
+
 describe('the kitty', () => {
   const kitty: WalletDoc = { id: kittyIdFor('JPY'), kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
   const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number, date = '2027-05-09'): TopUpDoc => ({
@@ -286,5 +321,89 @@ describe('the kitty', () => {
     const v = valueTrip(trip, [e], { e: [shared('i', 'e', 1000)] }, { e: 1000 }, []);
     expect(v.unvalued.map((x) => x.id)).toEqual(['e']);
     expect(v.items).toEqual([]);
+  });
+});
+
+describe('cash hand-overs — worked example D', () => {
+  // Example A: Alex's ¥ cash (average 0.0103) pays a ¥60,000 dinner for three, so Ben and Chris each owe Alex A$206.
+  // Ben bought ¥20,000 for A$204 (0.0102) and hands it to Alex to pay him back.
+  const alexYen = wallet('alex');
+  const benYen = wallet('ben');
+  const ups = [...exampleA, topUp('b1', benYen.id, 20000, 20400)];
+  const dinner = cashPayment('dinner', alexYen.id, 60000);
+  const items = { dinner: [makeItem('d', 'dinner', { amount: 60000, payerUid: 'alex', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] };
+  const handover = (over: Partial<HandoverDoc> = {}): HandoverDoc => ({
+    id: 'h1', fromUid: 'ben', toUid: 'alex', currency: 'JPY', foreignAmount: 20000, date: '2027-05-20',
+    byUid: 'ben', createdAt: null as never, ...over,
+  });
+
+  it('values the cash handed over at the giver’s cost, A$204, and credits it as a payment', () => {
+    const cash = tripCash([alexYen, benYen], ups, [dinner], [handover()]);
+    expect(cash.handoverCredits).toEqual([{ fromUid: 'ben', toUid: 'alex', amount: 20400, paid: true }]);
+    const v = valueTrip(trip, [dinner], items, cash.values, cash.kitties, cash.handoverCredits);
+    const s = tripSummary(v, []);
+    expect(s.transactions).toEqual(expect.arrayContaining([
+      { fromUid: 'ben', toUid: 'alex', amount: 200 },
+      { fromUid: 'chris', toUid: 'alex', amount: 20600 },
+    ]));
+  });
+
+  it('moves the cash: it leaves Ben’s wallet and arrives in Alex’s at what it cost Ben', () => {
+    const cash = tripCash([alexYen, benYen], ups, [dinner], [handover()]);
+    const alex = cash.wallets.find((w) => w.wallet.id === alexYen.id)!;
+    const ben = cash.wallets.find((w) => w.wallet.id === benYen.id)!;
+    expect(ben.left).toEqual({ foreign: 0, home: 0 });
+    expect(ben.handedOut).toBe(20000);
+    expect(alex.handedIn).toBe(20000);
+    expect(alex.left).toEqual({ foreign: 60000, home: 61600 });
+  });
+
+  it('values a chain of hand-overs, each at the cost to the one before', () => {
+    const chrisYen = wallet('chris');
+    const cash = tripCash([alexYen, benYen, chrisYen], ups, [], [
+      handover({ id: 'h1', fromUid: 'ben', toUid: 'chris', date: '2027-05-20' }),
+      handover({ id: 'h2', fromUid: 'chris', toUid: 'alex', foreignAmount: 10000, date: '2027-05-21' }),
+    ]);
+    expect(cash.handoverCredits).toEqual([
+      { fromUid: 'ben', toUid: 'chris', amount: 20400, paid: true },
+      { fromUid: 'chris', toUid: 'alex', amount: 10200, paid: true },
+    ]);
+  });
+
+  it('doesn’t revalue spending by cash handed over later the same day (paying a debt leaves the debt as it was)', () => {
+    const sameDay = cashPayment('dinner', alexYen.id, 60000, { created: 1000 });
+    const later = handover({ date: '2027-05-12', createdAt: { toMillis: () => 2000 } as never });
+    const cash = tripCash([alexYen, benYen], ups, [sameDay], [later]);
+    expect(cash.values.dinner).toBe(61800);
+    const v = valueTrip(trip, [sameDay], items, cash.values, cash.kitties, cash.handoverCredits);
+    expect(tripSummary(v, []).transactions).toEqual(expect.arrayContaining([
+      { fromUid: 'ben', toUid: 'alex', amount: 200 },
+      { fromUid: 'chris', toUid: 'alex', amount: 20600 },
+    ]));
+  });
+
+  it('counts a hand-over saved but not yet confirmed as after that day’s spending', () => {
+    const sameDay = cashPayment('dinner', alexYen.id, 60000, { created: 1000 });
+    const cash = tripCash([alexYen, benYen], ups, [sameDay], [handover({ date: '2027-05-12' })]);
+    expect(cash.values.dinner).toBe(61800);
+  });
+
+  it('lets cash handed over earlier the same day pay for that day’s spending', () => {
+    const empty = wallet('chris');
+    const given = handover({ fromUid: 'ben', toUid: 'chris', date: '2027-05-12', createdAt: { toMillis: () => 500 } as never });
+    const spend = cashPayment('snack', empty.id, 10000, { created: 1000, payerUid: 'chris' });
+    const cash = tripCash([alexYen, benYen, empty], ups, [spend], [given]);
+    expect(cash.values.snack).toBe(10200); // from Ben’s cash at A$204 for ¥20,000
+  });
+
+  it('values spending before any cash was bought at the cash the owner bought, not cash handed to them', () => {
+    const early = cashPayment('early', alexYen.id, 1000, { tripDay: '2027-05-01' });
+    const cash = tripCash([alexYen, benYen], ups, [early], [handover({ date: '2027-05-02' })]);
+    expect(cash.values).toEqual({ early: 1030 }); // Alex's own average, 0.0103, not mixed with Ben's 0.0102
+  });
+
+  it('leaves a hand-over from someone with no cash in that currency out of the balances', () => {
+    const cash = tripCash([alexYen], exampleA, [], [handover({ fromUid: 'chris' })]);
+    expect(cash.handoverCredits).toEqual([]);
   });
 });
