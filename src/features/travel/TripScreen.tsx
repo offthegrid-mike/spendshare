@@ -1,19 +1,22 @@
 import { Link, useParams } from 'react-router-dom';
-import { ReceiptText, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
+import { useTripExpenses } from '../../hooks/useTripExpenses';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { paths } from '../../lib/paths';
 import { formatTripDates, tripProgress } from '../../lib/travel/trips';
 import { progressText } from './tripText';
+import TripExpenseList from './TripExpenseList';
 import type { GroupDoc } from '../../types/models';
 
 interface Props { trips: GroupDoc[]; viewerUid: string; }
 
-/** One trip's overview: dates, who's going, and (from T2) its expenses. */
+/** One trip's overview: dates, who's going, and its expenses. */
 export default function TripScreen({ trips, viewerUid }: Props) {
   const { tripId } = useParams<{ tripId: string }>();
   const { today } = useWorkClock();
   const trip = trips.find((t) => t.id === tripId);
+  const { expenses, itemsByExpense, loading, error } = useTripExpenses(trip?.trip ? trip.id : null);
 
   if (!trip?.trip) {
     return (
@@ -52,17 +55,13 @@ export default function TripScreen({ trips, viewerUid }: Props) {
         </Link>
       </section>
 
-      <section className="card flex items-start gap-3 p-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-recessed text-ink-muted">
-          <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" />
-        </span>
-        <div>
-          <p className="text-sm font-semibold text-ink">Expenses</p>
-          <p className="mt-0.5 text-[13px] text-ink-muted">
-            Recording what you spend, in any currency, comes in the next update.
-          </p>
-        </div>
-      </section>
+      {error ? (
+        <p role="alert" className="text-sm text-negative">Couldn't load the trip's expenses.</p>
+      ) : loading ? (
+        <div role="status" aria-label="Loading expenses" className="card h-24 animate-pulse" />
+      ) : (
+        <TripExpenseList trip={trip} expenses={expenses} itemsByExpense={itemsByExpense} viewerUid={viewerUid} />
+      )}
     </div>
   );
 }

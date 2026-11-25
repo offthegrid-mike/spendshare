@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import TripScreen from './TripScreen';
+
+const hook = vi.hoisted(() => ({ calls: [] as (string | null)[] }));
+vi.mock('../../hooks/useTripExpenses', () => ({
+  useTripExpenses: (id: string | null) => {
+    hook.calls.push(id);
+    return { expenses: [], itemsByExpense: {}, loading: false, itemsLoading: false, error: false };
+  },
+}));
 import { makeTrip } from '../../test/fixtures';
 
 const japan = makeTrip('japan', 'Japan', '2026-10-17', '2026-10-27', ['Mike', 'Priya', 'Sam']);
@@ -44,5 +52,11 @@ describe('TripScreen', () => {
     renderAt('/travel/nope');
     expect(screen.getByText('Trip not found')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'All trips' })).toHaveAttribute('href', '/travel');
+  });
+
+  it('lists the trip’s expenses, with a way to add one', () => {
+    renderAt('/travel/japan');
+    expect(hook.calls).toContain('japan');
+    expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/travel/japan/expense/new');
   });
 });

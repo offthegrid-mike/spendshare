@@ -36,7 +36,20 @@ export interface ExpenseDoc {
   discountPercent?: number; // percent (e.g. 2 or 2.5) — see computeDiscountCents in lib/discount.ts
   kind?: 'refund';          // missing for a purchase; amounts stay positive (see lib/refund.ts)
   refundOf?: string;        // a refund's original expense id
+  // Trips only (see lib/travel/tripExpense.ts). On a trip, total and item amounts
+  // are minor units of `currency`, not of the group's (home) currency.
+  currency?: string;        // missing = the group's currency
+  paidWith?: TripPayment;
 }
+
+/**
+ * How a trip expense was paid. A card payment carries its rate as "1 home =
+ * rate foreign", estimated until the amount actually charged (homeTotal, in
+ * home minor units) is entered. A wallet payment (T4) is valued at the wallet's rate.
+ */
+export type TripPayment =
+  | { kind: 'card'; rate: number; rateStatus: 'estimated' | 'actual'; homeTotal?: number }
+  | { kind: 'wallet'; walletId: string };
 export interface ItemDoc {
   id: string; groupId: string; expenseId: string; month: string;
   name: string; categoryId: string; category: string; amount: number; shared: boolean;
@@ -46,6 +59,7 @@ export interface ItemDoc {
   unitAmount?: number; // per-item price in cents (default: same as amount when quantity is 1)
   refund?: boolean;    // denormalized from the expense's kind, so item-only sums can subtract it
   tags?: string[];     // as typed; matched by lib/tags tagKey; at most MAX_TAGS
+  sharedWith?: Uid[];  // trips: who shares a shared item; missing = every member (see lib/settlement)
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
@@ -123,4 +137,5 @@ export const itemSchema = z.object({
   unitAmount: z.number().int().nonnegative().optional(),
   refund: z.boolean().optional(),
   tags: z.array(z.string()).max(10).optional(), // MAX_TAGS in lib/tags (kept literal: models must not import lib)
+  sharedWith: z.array(z.string()).min(1).max(20).optional(),
 });

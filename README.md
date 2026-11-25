@@ -38,7 +38,9 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 - A **trip** is its own group, with a name, first and last days, and a home currency that balances are worked out in. Trips never appear in the household switcher.
 - Trips are listed under **Now**, **Upcoming** and **Past** at `/travel`. A Home tile shows the trip under way ("Day 3 of 11") or the next one.
 - Invite people by email, or add members without an account, as in a household. Accepting a trip invite leaves your household selection alone.
-- Recording expenses, cash wallets, the kitty and settle-up come in later milestones.
+- **Expenses in any currency:** record where, when, who paid, and each item with who shares it (everyone at first; tap people to leave them out). A foreign-currency card payment takes an estimated rate ("1 AUD = 99 JPY", remembered per currency), shows its value in the home currency, and is marked Estimated until you enter what the card was actually charged.
+- Expenses are listed by day of the trip, with what's been spent so far. Saving works offline.
+- Cash wallets, the kitty and settle-up come in later milestones.
 
 ### Expenses
 

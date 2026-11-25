@@ -23,6 +23,9 @@ export const paths = {
   newTrip: '/travel/new',
   trip: (id: string): string => `/travel/${id}`,
   tripSettings: (id: string): string => `/travel/${id}/settings`,
+  newTripExpense: (id: string): string => `/travel/${id}/expense/new`,
+  tripExpense: (id: string, expenseId: string): string => `/travel/${id}/expense/${expenseId}`,
+  editTripExpense: (id: string, expenseId: string): string => `/travel/${id}/expense/${expenseId}/edit`,
 };
 
 // The pre-/spend URLs, kept so old bookmarks and shared links still land.

@@ -16,7 +16,7 @@
 |-----------|--------|--------|--------|
 | **T0** — Money foundations (minor units, split among chosen people) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 (open) |
 | **T1** — Trip groups and the Travel shell | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
-| **T2** — Trip expenses in foreign currency (card) | ⬜ | `travel/T2-expenses` | |
+| **T2** — Trip expenses in foreign currency (card) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T3** — Trip summary and settle-up | ⬜ | `travel/T3-settle` | |
 | **T4** — Personal cash wallets | ⬜ | `travel/T4-wallets` | |
 | **T5** — Shared kitty | ⬜ | `travel/T5-kitty` | |
@@ -75,8 +75,8 @@ All in A$ for a trip to Japan with Alex, Ben and Chris.
 - Settle up: Alex pays Chris A$84.20 and Ben pays Chris A$84.20.
 
 **C. Card with an estimated rate, corrected later**
-- Ben pays ¥15,000 for a hotel tax by card, shared by Ben and Chris. Estimate at 0.0101: A$151.50.
-- Ben's statement later shows A$155.10. Ben enters it, the rate is marked actual, and Chris's share becomes A$77.55.
+- Ben pays ¥15,000 for a hotel tax by card, shared by Ben and Chris. Estimate at 1 A$ = ¥99: A$151.52.
+- Ben's statement later shows A$155.10. Ben enters it, the rate becomes actual (1 A$ = ¥96.71), and Chris's share becomes A$77.55.
 
 **D. Paying back in leftover yen (T6)**
 - Ben owes Alex A$206. Ben hands Alex ¥20,000 from his own wallet, whose average rate is 0.0102. That counts as A$204, so Ben still owes A$2.00. Alex's wallet gains ¥20,000 at a cost of A$204.
@@ -96,6 +96,7 @@ tripClosedAt?: Timestamp;          // T6: set when the trip is closed (a top-lev
 currency?: string;                 // the expense's own currency; missing = group currency
 paidWith?:
   | { kind: 'card'; rate: number; rateStatus: 'estimated' | 'actual'; homeTotal?: number }
+  //   rate is "1 home = rate foreign" (1 A$ = ¥99), as exchange boards show it
   | { kind: 'wallet'; walletId: string };   // a personal wallet or the kitty
 // payerUid: for a kitty payment, whoever carried the cash; the kitty is the one credited
 
@@ -165,21 +166,24 @@ Pure modules with no UI. Everything later depends on these.
 # T2 — Trip expenses in foreign currency (card)
 
 ### Task 2.1: Editor
-- Reuse `ExpenseEditor` and `ItemRow` through a trip mode, not a copy:
-  - a **currency** picker on the expense (defaults to the last currency used on this trip);
-  - **Paid with**: Card (rate field prefilled from the last rate for that currency, marked *estimated*) or a wallet (from T4);
-  - **Who shares this** on each shared item: member chips, all on by default; an expense-wide default you can change per item;
-  - a live preview of the home-currency value, and each person's share.
-- Quick-add, autocomplete, tags, drafts and remarks all work. Price history is left out on trips (prices in different currencies don't compare).
+- **Built as its own `TripExpenseEditor`**, not a trip mode of `ExpenseEditor` (decided in T2). The household editor is 967 lines of cents-only logic, drafts, refunds, group switching, receipt scanning, gift cards and discounts, and a trip mode would have put currency checks through all of it. The trip editor reuses `DatePicker`, `PayerPicker`, `Select`, `Checkbox` and `useCategories`.
+  - a **currency** picker on the expense, defaulting to the last currency used on this trip;
+  - for a foreign currency, an **exchange rate** typed as "1 AUD = 99 JPY", prefilled from the last rate for that currency and marked *estimated*;
+  - **Who shares this** on each shared item: member chips, all on at first; a new item starts with the item before it's people. A shared item always stores its sharers, so someone who joins later isn't added to what was already split.
+  - a live total in the expense's currency and its estimate in the home currency.
+- Saves don't wait for the server while offline (`settleWrite`), unlike the household editor.
+- Every write records its editor as `createdByUid`, because the expense rules bind each write to its author.
+- **Not in T2:** autocomplete, tags, drafts, remarks and quantities. Price history is left out on trips (prices in different currencies don't compare). Paying from a wallet comes with T4.
 
 ### Task 2.2: List and detail
-- Trip list grouped by **day of the trip** ("Day 3 · Tue 12 May") instead of the month rail.
-- Each row shows the original amount, with the home value below it. An estimated rate shows a small "estimated" chip.
-- Detail pane: **Enter amount charged** turns an estimated card rate into the actual one (example C).
+- Trip list grouped by **day of the trip** ("Day 3 · Wed 12 May"; days outside the trip say before or after it), with **Spent so far** in the home currency.
+- Each row shows the original amount, with the home value below it. An estimated rate shows an "Estimated" chip.
+- Detail page: items with who shares them, and **Amount charged** turns an estimated card rate into the actual one (example C). It can be changed later. Edit and Delete (with a confirmation).
+- An edit that keeps the currency and total keeps the amount charged; one that changes either goes back to an estimate.
 
 ### Task 2.3: Rules
-- Expense: `currency` is a 3-letter string; `paidWith.kind` is `card` or `wallet`; a card `rate` is a number > 0.
-- Item: `sharedWith`, when present, is a non-empty list of at most 20 entries.
+- Expense: `currency` is a 3-letter upper-case code; `paidWith` is a card (`rate` > 0, `rateStatus` estimated or actual, optional `homeTotal` >= 0, no other keys) or a wallet (`walletId`, no other keys).
+- Item: `sharedWith`, when present, is a list of 1 to 20 entries.
 
 ---
 

@@ -39,6 +39,7 @@ import TripList from './features/travel/TripList';
 import TripScreen from './features/travel/TripScreen';
 import TripSettings from './features/travel/TripSettings';
 import NewTripScreen from './features/travel/NewTripScreen';
+import { EditTripExpenseRoute, NewTripExpenseRoute, TripExpenseRoute } from './features/travel/tripRoutes';
 import { paths } from './lib/paths';
 import { TRAVEL_ENABLED, WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
@@ -170,6 +171,9 @@ function App() {
           <Route path="new" element={<NewTripScreen user={user} defaultCurrency={(groups.find((g) => g.id === selectedGroupId) ?? groups[0])?.currency ?? 'AUD'} />} />
           <Route path=":tripId" element={<TripScreen trips={trips} viewerUid={user.uid} />} />
           <Route path=":tripId/settings" element={<TripSettingsRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/new" element={<NewTripExpenseRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/:expenseId" element={<TripExpenseRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/:expenseId/edit" element={<EditTripExpenseRoute trips={trips} user={user} />} />
         </Route>
       )}
       <Route path={paths.spend} element={<SpendGate groups={groups} user={user} />}>

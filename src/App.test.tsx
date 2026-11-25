@@ -105,6 +105,11 @@ vi.mock('./features/travel/TripScreen', () => ({ default: () => <div data-testid
 vi.mock('./features/travel/NewTripScreen', () => ({
   default: ({ defaultCurrency }: { defaultCurrency: string }) => <div data-testid="new-trip" data-currency={defaultCurrency} />,
 }));
+vi.mock('./features/travel/tripRoutes', () => ({
+  NewTripExpenseRoute: () => <div data-testid="new-trip-expense" />,
+  TripExpenseRoute: () => <div data-testid="trip-expense" />,
+  EditTripExpenseRoute: () => <div data-testid="edit-trip-expense" />,
+}));
 vi.mock('./features/travel/TripSettings', () => ({
   default: ({ trip }: { trip: { id: string } }) => <div data-testid="trip-settings" data-trip={trip.id} />,
 }));
@@ -481,6 +486,17 @@ describe('App with trips', () => {
     useUIStore.setState({ selectedGroupId: 'g2' });
     renderApp('/travel/new');
     expect(screen.getByTestId('new-trip')).toHaveAttribute('data-currency', 'USD');
+  });
+
+  it('serves adding, viewing and editing a trip expense', () => {
+    const first = renderApp('/travel/japan/expense/new');
+    expect(screen.getByTestId('new-trip-expense')).toBeInTheDocument();
+    first.unmount();
+    const second = renderApp('/travel/japan/expense/e1');
+    expect(screen.getByTestId('trip-expense')).toBeInTheDocument();
+    second.unmount();
+    renderApp('/travel/japan/expense/e1/edit');
+    expect(screen.getByTestId('edit-trip-expense')).toBeInTheDocument();
   });
 
   it('sends the settings of an unknown trip back to the trip list', () => {

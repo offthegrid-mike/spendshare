@@ -1396,3 +1396,84 @@ describe('/groups trips (kind: trip)', () => {
     }));
   });
 });
+
+describe('/groups trip expenses (currency, paidWith, sharedWith)', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: { userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' } },
+        memberUids: ['userA'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const db = () => testEnv.authenticatedContext('userA').firestore();
+  const expense = (extra: Record<string, unknown> = {}) => ({
+    groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Ichiran', payerUid: 'userA',
+    total: 4500, itemCount: 1, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+    currency: 'JPY', paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' },
+    ...extra,
+  });
+  const item = (extra: Record<string, unknown> = {}) => ({
+    groupId: 'japan', expenseId: 'e1', month: '2027-05', name: 'Ramen', categoryId: 'food', category: 'Food',
+    amount: 4500, shared: true, payerUid: 'userA', sharedWith: ['userA'],
+    ...extra,
+  });
+
+  async function save(exp: Record<string, unknown>, it: Record<string, unknown> = item()) {
+    const fs = db();
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'groups', 'japan', 'expenses', 'e1'), exp);
+    batch.set(doc(fs, 'groups', 'japan', 'expenses', 'e1', 'items', 'i1'), it);
+    return batch.commit();
+  }
+
+  it('allows a card payment in a foreign currency with an estimated rate, and its sharers', async () => {
+    await assertSucceeds(save(expense()));
+  });
+
+  it('allows recording what the card was actually charged', async () => {
+    await assertSucceeds(save(expense({ paidWith: { kind: 'card', rate: 96.7, rateStatus: 'actual', homeTotal: 15510 } })));
+  });
+
+  it('allows a wallet payment', async () => {
+    await assertSucceeds(save(expense({ paidWith: { kind: 'wallet', walletId: 'w1' } })));
+  });
+
+  it('denies a malformed currency', async () => {
+    await assertFails(save(expense({ currency: 'yen' })));
+    await assertFails(save(expense({ currency: 5 })));
+  });
+
+  it('denies a card payment without a positive rate, with a bad status, or with extra keys', async () => {
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 0, rateStatus: 'estimated' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rateStatus: 'estimated' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'guessed' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'actual', homeTotal: -1 } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated', note: 'x' } })));
+  });
+
+  it('denies any other way of paying', async () => {
+    await assertFails(save(expense({ paidWith: { kind: 'cheque' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet' } })));
+  });
+
+  it('denies an empty or oversized list of sharers', async () => {
+    await assertFails(save(expense(), item({ sharedWith: [] })));
+    await assertFails(save(expense(), item({ sharedWith: Array.from({ length: 21 }, (_, i) => `u${i}`) })));
+    await assertFails(save(expense(), item({ sharedWith: 'userA' })));
+  });
+});

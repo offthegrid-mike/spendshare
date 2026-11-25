@@ -175,10 +175,28 @@ service cloud.firestore {
         // spending. A saved expense never switches between purchase and refund,
         // and a refund stays with the original it was made from.
         function isRefundDoc(data) { return data.get('kind', null) == 'refund'; }
+        // Trips: an expense may name its currency (an ISO code) and how it was paid —
+        // by card at "1 home = rate foreign", estimated until the amount charged
+        // (homeTotal, home minor units) is entered, or from a cash wallet.
+        function validCurrency(d) { return !('currency' in d) || (d.currency is string && d.currency.matches('[A-Z]{3}')); }
+        function validCard(p) {
+          return p.keys().hasOnly(['kind', 'rate', 'rateStatus', 'homeTotal'])
+            && p.get('rate', 0) is number && p.get('rate', 0) > 0
+            && p.get('rateStatus', null) in ['estimated', 'actual']
+            && (!('homeTotal' in p) || (p.homeTotal is number && p.homeTotal >= 0));
+        }
+        function validPayment(d) {
+          return !('paidWith' in d) || (d.paidWith is map && (
+            (d.paidWith.get('kind', null) == 'card' && validCard(d.paidWith))
+            || (d.paidWith.get('kind', null) == 'wallet' && d.paidWith.keys().hasOnly(['kind', 'walletId'])
+                && d.paidWith.get('walletId', null) is string)));
+        }
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
           && request.resource.data.total is number
           && request.resource.data.total >= 0
+          && validCurrency(request.resource.data)
+          && validPayment(request.resource.data)
           && (!('giftCardAmount' in request.resource.data)
               || (request.resource.data.giftCardAmount is number
                   && request.resource.data.giftCardAmount >= 0
@@ -203,6 +221,11 @@ service cloud.firestore {
             // Tags: a list of at most 10 (the app also caps each at 40 characters).
             && (!('tags' in request.resource.data)
                 || (request.resource.data.tags is list && request.resource.data.tags.size() <= 10))
+            // Trips: who shares a shared item, one to twenty people.
+            && (!('sharedWith' in request.resource.data)
+                || (request.resource.data.sharedWith is list
+                    && request.resource.data.sharedWith.size() >= 1
+                    && request.resource.data.sharedWith.size() <= 20))
             && request.resource.data.get('refund', false)
                == isRefundDoc(getAfter(/databases/$(database)/documents/groups/$(groupId)/expenses/$(expenseId)).data);
         }

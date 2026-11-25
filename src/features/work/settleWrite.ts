@@ -9,11 +9,14 @@ import { useUIStore } from '../../stores/uiStore';
 
 const SYNC_FAILED = "Couldn't sync a Work change. Check your connection and try again.";
 
-/** The promise to await for a Work write: the write itself online, an already-resolved one offline. */
-export function settleWrite(write: Promise<void>): Promise<void> {
+/**
+ * The promise to await for a write: the write itself online, an already-resolved
+ * one offline. Travel uses it too, with its own message for a rejected write.
+ */
+export function settleWrite(write: Promise<void>, failedMessage = SYNC_FAILED): Promise<void> {
   if (navigator.onLine !== false) return write;
   write.catch(() => {
-    useUIStore.getState().showNotice({ message: SYNC_FAILED });
+    useUIStore.getState().showNotice({ message: failedMessage });
   });
   return Promise.resolve();
 }
