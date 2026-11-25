@@ -1376,10 +1376,47 @@ describe('/groups trips (kind: trip)', () => {
       }));
     });
 
-    it('never lets anyone change a trip’s home currency, though a household’s can change', async () => {
-      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'USD' }));
-      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), { currency: 'USD' }));
+    it('lets only the owner change a trip’s home currency, though any member may change a household’s', async () => {
+      await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'USD' }));
+      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), { currency: 'EUR' }));
       await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'home'), { currency: 'USD' }));
+    });
+
+    it('denies a malformed home currency, or changing a closed trip’s', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'usd' }));
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await updateDoc(doc(ctx.firestore(), 'groups', 'japan'), { tripClosedAt: new Date() });
+      });
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'USD' }));
+    });
+  });
+
+  describe('delete', () => {
+    it('lets only the owner delete a trip', async () => {
+      await assertFails(deleteDoc(doc(as('userB'), 'groups', 'japan')));
+      await assertSucceeds(deleteDoc(doc(as('userA'), 'groups', 'japan')));
+    });
+
+    it('lets the owner clear out an open trip’s expenses, cash and settle-up before deleting it', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, 'groups', 'japan', 'expenses', 'e1'), { groupId: 'japan', total: 100 });
+        await setDoc(doc(db, 'groups', 'japan', 'expenses', 'e1', 'items', 'i1'), { groupId: 'japan', amount: 100 });
+        await setDoc(doc(db, 'groups', 'japan', 'wallets', 'userA_JPY'), { kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+        await setDoc(doc(db, 'groups', 'japan', 'topUps', 't1'), { walletId: 'userA_JPY' });
+        await setDoc(doc(db, 'groups', 'japan', 'handovers', 'h1'), { fromUid: 'userA', toUid: 'userB' });
+        await setDoc(doc(db, 'groups', 'japan', 'settlements', 's1'), { amount: 5 });
+        await setDoc(doc(db, 'groups', 'japan', 'categories', 'c1'), { name: 'Food' });
+        await setDoc(doc(db, 'groups', 'japan', 'suggestions', 'index'), {});
+      });
+      const db = as('userA');
+      const batch = writeBatch(db);
+      for (const path of [
+        ['expenses', 'e1', 'items', 'i1'], ['expenses', 'e1'], ['wallets', 'userA_JPY'], ['topUps', 't1'],
+        ['handovers', 'h1'], ['settlements', 's1'], ['categories', 'c1'], ['suggestions', 'index'],
+      ]) batch.delete(doc(db, 'groups', 'japan', ...path));
+      await assertSucceeds(batch.commit());
+      await assertSucceeds(deleteDoc(doc(db, 'groups', 'japan')));
     });
 
     it('denies adding trip dates to a household', async () => {

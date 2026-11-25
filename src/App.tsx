@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Navigate, Routes, Route, useParams } from 'react-router-dom';
+import { Navigate, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useAllowlist } from './hooks/useAllowlist';
 import { useGroups } from './hooks/useGroups';
@@ -38,6 +38,7 @@ import TravelLayout from './features/travel/TravelLayout';
 import TripList from './features/travel/TripList';
 import TripScreen from './features/travel/TripScreen';
 import TripSettings from './features/travel/TripSettings';
+import { useTripRecords } from './hooks/useTripRecords';
 import NewTripScreen from './features/travel/NewTripScreen';
 import {
   EditTripExpenseRoute, NewTripExpenseRoute, TripCashRoute, TripExpenseRoute, TripSummaryRoute,
@@ -120,9 +121,13 @@ function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
 function TripSettingsRoute({ trips, user }: { trips: GroupDoc[]; user: User }) {
   const { tripId } = useParams<{ tripId: string }>();
   const trip = trips.find((t) => t.id === tripId);
+  const records = useTripRecords(trip?.id ?? null);
+  const navigate = useNavigate();
   if (!trip) return <Navigate to={paths.travel} replace />;
   // The key starts each trip's form fresh.
-  return <TripSettings key={trip.id} trip={trip} user={user} />;
+  return (
+    <TripSettings key={trip.id} trip={trip} user={user} records={records} onDeleted={() => navigate(paths.travel, { replace: true })} />
+  );
 }
 
 function App() {

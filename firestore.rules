@@ -121,6 +121,17 @@ service cloud.firestore {
         && request.resource.data.currency != resource.data.currency;
     }
 
+    // Only the owner changes a trip's home currency, and only while it's open, to
+    // another ISO code. The app offers it only while nothing is on the trip yet,
+    // since every amount on a trip is valued in it; rules can't count records.
+    function tripCurrencyChangeAllowed() {
+      return !tripCurrencyChanged()
+        || (resource.data.get('tripClosedAt', null) == null
+            && request.resource.data.get('tripClosedAt', null) == null
+            && request.resource.data.currency is string
+            && request.resource.data.currency.matches('[A-Z]{3}'));
+    }
+
     match /groups/{groupId} {
       allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
       allow create: if signedIn()
@@ -129,7 +140,7 @@ service cloud.firestore {
         && request.resource.data.memberUids.hasOnly([request.auth.uid])
         && validKind(request.resource.data);
       // Members can only edit non-privileged fields. A trip's currency is its home
-      // currency, which every balance is worked out in, so nobody changes it.
+      // currency, which every balance is worked out in, so only its owner changes it.
       allow update: if isMember(groupId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
           && !tripCurrencyChanged()
@@ -142,7 +153,7 @@ service cloud.firestore {
              && validKind(request.resource.data)
              && (!('tripClosedAt' in request.resource.data)
                  || (request.resource.data.get('kind', null) == 'trip' && request.resource.data.tripClosedAt is timestamp))
-             && !tripCurrencyChanged()
+             && tripCurrencyChangeAllowed()
              && !closedTripRenamed() )
         // Invite acceptance: a verified user with a pending invite can add ONLY themselves
         // to members/memberUids. The join must be strictly additive (existing members/memberUids
