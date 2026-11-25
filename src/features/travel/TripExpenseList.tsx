@@ -4,6 +4,7 @@ import { memberName } from '../../lib/balance';
 import { paths } from '../../lib/paths';
 import { formatMinor } from '../../lib/travel/currency';
 import { expenseHomeTotal, isEstimated, tripDayGroups } from '../../lib/travel/tripExpense';
+import { isKittyId } from '../../lib/travel/cash';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 interface Props {
@@ -26,6 +27,7 @@ function ExpenseRow({ trip, expense, items, viewerUid, cashValues }: {
   const currency = expense.currency ?? home;
   const homeTotal = expenseHomeTotal(expense, home, cashValues);
   const isCash = expense.paidWith?.kind === 'wallet';
+  const fromKitty = expense.paidWith?.kind === 'wallet' && isKittyId(expense.paidWith.walletId);
   const payer = expense.payerUid === viewerUid ? 'You' : memberName(trip, expense.payerUid);
   return (
     <li>
@@ -35,7 +37,7 @@ function ExpenseRow({ trip, expense, items, viewerUid, cashValues }: {
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-ink">{title(expense, items)}</span>
-          <span className="block text-xs text-ink-muted">{`${payer} paid`}</span>
+          <span className="block text-xs text-ink-muted">{fromKitty ? 'From the kitty' : `${payer} paid`}</span>
         </span>
         <span className="shrink-0 text-right">
           <span className="block text-sm font-semibold tabular-nums text-ink">{formatMinor(expense.total, currency)}</span>
@@ -45,7 +47,7 @@ function ExpenseRow({ trip, expense, items, viewerUid, cashValues }: {
                 <span className="rounded-full bg-warning-soft px-1.5 py-px text-[10px] font-medium text-warning">Estimated</span>
               )}
               {isCash && (
-                <span className="rounded-full bg-recessed px-1.5 py-px text-[10px] font-medium text-ink-muted">Cash</span>
+                <span className="rounded-full bg-recessed px-1.5 py-px text-[10px] font-medium text-ink-muted">{fromKitty ? 'Kitty' : 'Cash'}</span>
               )}
               <span>{homeTotal !== null ? `≈ ${formatMinor(homeTotal, home)}` : 'Not valued yet'}</span>
             </span>

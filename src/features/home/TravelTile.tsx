@@ -21,7 +21,7 @@ export default function TravelTile({ trips, viewerUid }: { trips: GroupDoc[]; vi
   const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
   const figures = trip && !loading && !itemsLoading && !settlementsLoading
-    ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values)
+    ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values, cash.kittyCredits)
     : null;
 
   return (

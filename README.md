@@ -42,7 +42,7 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 - Expenses are listed by day of the trip, with what's been spent so far. Saving works offline.
 - **Balances and settle-up** in the home currency: who pays whom, with Mark paid and Undo, each person's balance, and spending by category and by currency. Card payments still at an estimated rate are flagged, and someone who has left the trip is still paid back. The trip page and the Home tile show your balance.
 - **Cash wallets:** record foreign cash when you buy it ("¥50,000 for A$500"), for yourself or anyone on the trip. Pay for things "with cash", and each payment is valued at what that cash cost: your wallet's average rate, not the rate on the day. The Cash page shows what's left and what it cost.
-- The shared kitty comes in a later milestone.
+- **A shared kitty:** everyone puts money into one pot of foreign cash, recording who put in what. The kitty pays for shared things, and whoever hands the cash over is noted. The balances work out who owes whom. What's left is handed back in proportion to the cash each person put in, and the app tells you how much each person gets.
 
 ### Expenses
 

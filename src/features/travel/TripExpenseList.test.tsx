@@ -73,4 +73,16 @@ describe('TripExpenseList', () => {
     expect(within(row).getByText('≈ A$618.00')).toBeInTheDocument();
     expect(within(screen.getByRole('link', { name: /Lunch/ })).getByText('Not valued yet')).toBeInTheDocument();
   });
+
+  it('marks a payment from the kitty', () => {
+    const e = makeExpense('k', { day: '2027-05-12', shopName: 'Museum', payerUid: 'ben', currency: 'JPY', total: 30000, paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } });
+    render(
+      <MemoryRouter>
+        <TripExpenseList trip={trip} expenses={[e]} itemsByExpense={{}} viewerUid="alex" cashValues={{ k: 30600 }} />
+      </MemoryRouter>,
+    );
+    const row = screen.getByRole('link', { name: /Museum/ });
+    expect(within(row).getByText('Kitty')).toBeInTheDocument();
+    expect(within(row).getByText('From the kitty')).toBeInTheDocument();
+  });
 });

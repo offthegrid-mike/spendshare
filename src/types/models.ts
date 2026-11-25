@@ -63,16 +63,20 @@ export interface ItemDoc {
   sharedWith?: Uid[];  // trips: who shares a shared item; missing = every member (see lib/settlement)
 }
 /**
- * A trip member's cash in one foreign currency: groups/{tripId}/wallets/{ownerUid_CUR}.
- * The id makes it one wallet per person per currency. See lib/travel/cash.ts.
+ * Cash in one foreign currency (lib/travel/cash.ts): a member's own
+ * (groups/{tripId}/wallets/{ownerUid_CUR}, one per person per currency) or the
+ * trip's shared kitty (wallets/{kitty_CUR}, no owner; everyone puts money in).
  */
 export interface WalletDoc {
-  id: string; kind: 'personal'; ownerUid: Uid; currency: string;
+  id: string; kind: 'personal' | 'kitty';
+  ownerUid?: Uid; // personal only
+  currency: string;
   createdByUid: Uid; createdAt: Timestamp;
 }
 /** Cash put into a wallet: groups/{tripId}/topUps/{id}. Amounts are minor units. */
 export interface TopUpDoc {
   id: string; walletId: string; byUid: Uid;
+  fromUid?: Uid;         // kitty only: who put the money in (byUid is who recorded it)
   date: string;          // 'YYYY-MM-DD'
   foreignAmount: number; // of the wallet's currency received, > 0
   homeAmount: number;    // of the trip's home currency paid for it, >= 0

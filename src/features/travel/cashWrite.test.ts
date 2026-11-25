@@ -44,6 +44,18 @@ describe('addCash', () => {
   });
 });
 
+describe('addCash to the kitty', () => {
+  it('starts the kitty for that currency and records who put the money in', async () => {
+    await addCash({ tripId: 'japan', uid: 'alex', kitty: true, fromUid: 'ben', currency: 'JPY', foreignAmount: 30000, homeAmount: 30000, date: '2027-05-09', walletExists: false });
+    expect(fs.ops).toEqual([
+      ['set', { path: 'groups/japan/wallets/kitty_JPY', id: 'kitty_JPY' },
+        { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: 'TS' }],
+      ['set', { path: 'groups/japan/topUps/new', id: 'new' },
+        { id: 'new', walletId: 'kitty_JPY', byUid: 'alex', fromUid: 'ben', date: '2027-05-09', foreignAmount: 30000, homeAmount: 30000, createdAt: 'TS' }],
+    ]);
+  });
+});
+
 describe('deleteTopUp', () => {
   it('deletes the top-up', async () => {
     await deleteTopUp('japan', 't1');

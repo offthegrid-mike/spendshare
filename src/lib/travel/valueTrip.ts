@@ -1,6 +1,10 @@
 import { computeSummary, type PaidSettlement, type Summary, type SummaryItem } from '../settlement';
 import { formatMinor } from './currency';
 import { expenseHomeTotal, isEstimated } from './tripExpense';
+import { isKittyId, type KittyCredit } from './cash';
+import { spreadInProportion } from './spread';
+
+export { spreadInProportion };
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
 
 /**
@@ -21,30 +25,16 @@ export interface ValuedItem extends SummaryItem {
 
 export interface TripValuation {
   items: ValuedItem[];
-  /** Members, plus anyone who paid or shares an item and has since left the trip. */
+  /** Members, anyone who paid or shares an item and has since left the trip, and any kitty (as its own party). */
   parties: string[];
+  /** `parties` without kitties: the people to show. */
+  people: string[];
+  /** The kitties' credits, applied like paid settlements. */
+  credits: KittyCredit[];
   /** Card payments still on an estimated rate. */
   estimated: ExpenseDoc[];
   /** Cash payments that can't be valued yet: their wallet has no cash in it, or is gone. */
   unvalued: ExpenseDoc[];
-}
-
-/** `total` split in proportion to `amounts`, rounded so the parts add up to it; ties go to the earlier part. */
-export function spreadInProportion(total: number, amounts: number[]): number[] {
-  const sum = amounts.reduce((s, a) => s + a, 0);
-  if (sum <= 0) return amounts.map(() => 0);
-  const exact = amounts.map((a) => (total * a) / sum);
-  const parts = exact.map(Math.floor);
-  let left = total - parts.reduce((s, p) => s + p, 0);
-  const byFraction = exact
-    .map((x, i) => ({ i, frac: x - Math.floor(x) }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
-  for (const { i } of byFraction) {
-    if (left <= 0) break;
-    parts[i] += 1;
-    left -= 1;
-  }
-  return parts;
 }
 
 export function valueTrip(
@@ -53,6 +43,8 @@ export function valueTrip(
   itemsByExpense: Record<string, ItemDoc[]>,
   /** Cash payments' home values, from tripCash. */
   cashValues: Record<string, number | null> = {},
+  /** The kitties' credits, from tripCash. */
+  kittyCredits: KittyCredit[] = [],
 ): TripValuation {
   const home = trip.currency;
   const items: ValuedItem[] = [];
@@ -73,8 +65,11 @@ export function valueTrip(
     }
     if (isEstimated(expense, home)) estimated.push(expense);
     const parts = spreadInProportion(homeTotal, expenseItems.map((it) => it.amount));
+    // A kitty payment is paid by the kitty, not by whoever handed the cash over.
+    const paidWith = expense.paidWith;
+    const payer = paidWith?.kind === 'wallet' && isKittyId(paidWith.walletId) ? paidWith.walletId : expense.payerUid;
     expenseItems.forEach((it, i) => {
-      addParty(expense.payerUid);
+      addParty(payer);
       // A shared item without a list (written before T2) is shared by the current members,
       // never by everyone in `parties`, which also holds people who have left.
       const sharedWith = it.shared ? (it.sharedWith?.length ? it.sharedWith : trip.memberUids) : it.sharedWith;
@@ -82,7 +77,7 @@ export function valueTrip(
       items.push({
         amount: parts[i],
         shared: it.shared,
-        payerUid: expense.payerUid,
+        payerUid: payer,
         ...(it.refund ? { refund: true } : {}),
         ...(sharedWith ? { sharedWith } : {}),
         expenseId: expense.id,
@@ -91,12 +86,16 @@ export function valueTrip(
       });
     });
   }
-  return { items, parties, estimated, unvalued };
+  for (const c of kittyCredits) {
+    addParty(c.fromUid);
+    addParty(c.toUid);
+  }
+  return { items, parties, people: parties.filter((uid) => !isKittyId(uid)), credits: kittyCredits, estimated, unvalued };
 }
 
 /** Balances and the fewest payments to settle, in home minor units, after any settle-up already paid. */
 export function tripSummary(valuation: TripValuation, settlements: PaidSettlement[]): Summary {
-  return computeSummary(valuation.parties, valuation.items, settlements);
+  return computeSummary(valuation.parties, valuation.items, [...settlements, ...valuation.credits]);
 }
 
 export interface TripBreakdown {
@@ -162,10 +161,11 @@ export function viewerTripFigures(
   itemsByExpense: Record<string, ItemDoc[]>,
   settlements: PaidSettlement[],
   cashValues: Record<string, number | null> = {},
+  kittyCredits: KittyCredit[] = [],
 ): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } | null {
   // Nothing to show until something was spent or paid back; a paid settlement alone still leaves a balance.
   if (expenses.length === 0 && !settlements.some((s) => s.paid)) return null;
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues, kittyCredits);
   const summary = tripSummary(valuation, settlements);
   return {
     spent: valuation.items.reduce((s, it) => s + it.amount, 0),

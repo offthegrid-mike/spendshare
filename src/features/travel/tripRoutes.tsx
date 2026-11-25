@@ -85,7 +85,7 @@ export function TripSummaryRoute({ trips, user }: Props) {
     <div className="mx-auto max-w-lg space-y-3">
       <h2 className="text-lg font-semibold text-ink">{`Balances · ${trip.name}`}</h2>
       <TripSummary
-        trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} settlements={settlements} cashValues={cash.values}
+        trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} settlements={settlements} cash={cash}
       />
     </div>
   );

@@ -19,7 +19,7 @@
 | **T2** — Trip expenses in foreign currency (card) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T3** — Trip summary and settle-up | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T4** — Personal cash wallets | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
-| **T5** — Shared kitty | ⬜ | `travel/T5-kitty` | |
+| **T5** — Shared kitty | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T6** — Cash hand-overs, closing a trip, export | ⬜ | `travel/T6-close` | |
 | **T7** — Extras (live rates, budgets, foreign receipts) | ⬜ optional | `travel/T7-extras` | |
 
@@ -105,15 +105,15 @@ paidWith?:
 sharedWith?: Uid[];                // missing = every member; only meaningful when shared
 // amount: on a trip item it's in the expense's currency (minor units)
 
-// groups/{gid}/wallets/{ownerUid_CUR}: one wallet per person per currency (T4).
-// T5 adds kind 'kitty'; the rules allow only 'personal' until then.
+// groups/{gid}/wallets/{ownerUid_CUR} (personal, T4) or {kitty_CUR} (the kitty, T5, no owner).
 interface WalletDoc {
-  id: string; kind: 'personal';
-  ownerUid: Uid; currency: string; createdByUid: Uid; createdAt: Timestamp;
+  id: string; kind: 'personal' | 'kitty';
+  ownerUid?: Uid; currency: string; createdByUid: Uid; createdAt: Timestamp;
 }
 // groups/{gid}/topUps/{id}: a flat collection, so a trip loads all its cash in one query.
 interface TopUpDoc {
   id: string; walletId: string; byUid: Uid; date: string; createdAt: Timestamp;
+  fromUid?: Uid;                   // kitty only: who put the money in
   foreignAmount: number;           // minor units of the wallet's currency (> 0, whole)
   homeAmount: number;              // minor units of the home currency (>= 0, whole)
   // T6 may add source ('exchange' | 'handover' | 'returned') and fromWalletId; the rules allow no other keys yet.
@@ -227,22 +227,31 @@ Pure modules with no UI. Everything later depends on these.
 
 ---
 
-# T5 — Shared kitty
+# T5 — Shared kitty — done
 
 ### Task 5.1: Kitty wallet
-- One kitty per currency per trip, created from the Wallets screen. **Put in** records a contribution (a top-up with `byUid`).
-- Kitty card: cash left, average rate, and each person's contribution in both currencies.
+- A kitty is a wallet with `kind: 'kitty'`, id `kitty_CUR`, and no owner: one per currency per trip. It starts the first time money is put in.
+- **Add cash → Whose cash: The kitty (shared)** asks **Put in by** (any member). The top-up records that person as `fromUid`; `byUid` stays whoever recorded it.
+- The kitty card shows cash left, what it cost, the average rate, and each person's money in and what they get back.
 
-### Task 5.2: Kitty in the settlement (`src/lib/travel/kitty.ts`, pure)
-- Each contributor is credited with what they put in, minus their share of the leftover cash (decision 5). The kitty's spending is shared among each item's `sharedWith`.
-- `valueTrip()` returns the kitty credits as extra paid amounts per member, so `computeSummary` still produces balances that add up to zero.
-- Tests: example B exactly; a kitty with nothing left; a member who put nothing in but shares costs; two kitties in different currencies.
+### Task 5.2: Kitty in the settlement (`src/lib/travel/cash.ts`, pure)
+- The kitty's payments are valued like any wallet's: a running average in date order.
+- **Contributors:** what's left is handed back in proportion to the foreign cash each person put in, along with its cost. Each person's credit is what they put in, less what they get back.
+- **The kitty as a party:** in `valueTrip`, kitty payments are paid by the kitty itself, a party named after its id and shown to no one. The contributors' credits move value from each of them to the kitty (`kittyCredits`, applied like paid settlements). Its spending equals the credits exactly, so the kitty nets to zero and never appears in settle-up.
+- **Overspent kitty:** whatever it paid beyond the cash put in is credited to whoever handed that cash over.
+- Tests cover example B exactly, contributions adding up, an overspent kitty, and a kitty payment never credited to the person who carried it.
 
 ### Task 5.3: UI
-- **Paid with → Kitty (¥)** in the editor, and the person carrying the cash is recorded.
-- Summary shows a "Kitty" line: put in, spent, and left over with each person's cash to hand back.
+- The editor's **Cash** option lists the kitty after your own cash, and asks **Who handed the kitty's cash over**.
+- **List and detail:** a kitty payment shows "From the kitty" with a Kitty chip, and the detail says who handed it over.
+- **Summary:** each person shows what they put in and get back, and a **Kitty** card tells you how to hand back what's left ("¥6,000, ¥6,000, ¥8,000").
 
-**Acceptance:** example B gives two payments of A$84.20 to Chris, and the kitty screen shows the ¥6,000 / ¥6,000 / ¥8,000 hand-back.
+### Rules
+- A kitty wallet has id `kitty_CUR` and no `ownerUid`; its kind never changes.
+- A top-up into a kitty must name a trip member as `fromUid`. A personal wallet's top-up may not have `fromUid`.
+- Anyone on the trip may pay from the kitty.
+
+**Acceptance (met):** example B gives two payments of A$84.20 to Chris, and the kitty hands back ¥6,000 / ¥6,000 / ¥8,000.
 
 ---
 

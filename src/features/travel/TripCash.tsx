@@ -7,7 +7,7 @@ import LoadingButton from '../../components/LoadingButton';
 import { useUIStore } from '../../stores/uiStore';
 import Select from '../../components/ui/Select';
 import { useWorkClock } from '../../hooks/useWorkClock';
-import { readableWalletRate, walletIdFor, type TripCash as TripCashState, type WalletState } from '../../lib/travel/cash';
+import { kittyIdFor, readableWalletRate, walletIdFor, type TripCash as TripCashState, type WalletState } from '../../lib/travel/cash';
 import { currencyOptions, formatMinor, toMinor } from '../../lib/travel/currency';
 import { lastRates } from '../../lib/travel/tripExpense';
 import { tripMemberName } from '../../lib/travel/valueTrip';
@@ -32,8 +32,10 @@ function owner(trip: GroupDoc, uid: string, viewerUid: string): { name: string; 
 function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: WalletState }) {
   const home = trip.currency;
   const { currency } = state.wallet;
-  const who = owner(trip, state.wallet.ownerUid, user.uid);
-  const title = `${who.possessive} ${currency} cash`;
+  const isKitty = state.wallet.kind === 'kitty';
+  const who = isKitty ? { name: 'the kitty', possessive: 'The kitty’s' } : owner(trip, state.wallet.ownerUid ?? '', user.uid);
+  const title = isKitty ? `Kitty · ${currency}` : `${who.possessive} ${currency} cash`;
+  const nameOf = (uid: string) => (uid === user.uid ? 'You' : tripMemberName(trip, uid, user.uid));
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<{ id: string; label: string } | null>(null);
 
@@ -62,15 +64,30 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
           {`Average 1 ${home} = ${readableWalletRate(state.leftRate, currency, home)} ${currency}`}
         </p>
       ) : (
-        <p className="text-[13px] text-warning">{`Add the cash ${who.name === 'You' ? 'you' : who.name} bought, so its payments can be valued.`}</p>
+        <p className="text-[13px] text-warning">
+          {isKitty
+            ? 'Add what everyone put into the kitty, so its payments can be valued.'
+            : `Add the cash ${who.name === 'You' ? 'you' : who.name} bought, so its payments can be valued.`}
+        </p>
       )}
       <p className="text-xs text-ink-muted">
-        {`Bought ${formatMinor(state.paidIn.foreign, currency)} for ${formatMinor(state.paidIn.home, home)} · Spent ${formatMinor(state.spent, currency)}`}
+        {`${isKitty ? 'Put in' : 'Bought'} ${formatMinor(state.paidIn.foreign, currency)} for ${formatMinor(state.paidIn.home, home)} · Spent ${formatMinor(state.spent, currency)}`}
       </p>
+      {state.kitty && state.kitty.contributors.length > 0 && (
+        <ul aria-label="Put in" className="space-y-0.5 text-[13px] text-ink">
+          {state.kitty.contributors.map((c) => (
+            <li key={c.uid}>
+              {`${nameOf(c.uid)} put in ${formatMinor(c.foreign, currency)} for ${formatMinor(c.home, home)} · ${
+                c.uid === user.uid ? 'get' : 'gets'} back ${formatMinor(c.handBack, currency)}`}
+            </li>
+          ))}
+        </ul>
+      )}
       {state.topUps.length > 0 && (
         <ul className="divide-y divide-line border-t border-line">
           {state.topUps.map((t) => {
-            const label = `${formatMinor(t.foreignAmount, currency)} for ${formatMinor(t.homeAmount, home)}`;
+            const from = isKitty && t.fromUid ? ` from ${t.fromUid === user.uid ? 'you' : nameOf(t.fromUid)}` : '';
+            const label = `${formatMinor(t.foreignAmount, currency)} for ${formatMinor(t.homeAmount, home)}${from}`;
             const when = format(parseISO(t.date), 'd MMM');
             return (
               <li key={t.id} className="flex items-center justify-between gap-3 py-1.5 text-[13px] text-ink">
@@ -92,7 +109,7 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
       <ConfirmDialog
         open={confirming !== null}
         title="Remove this cash?"
-        message={`${confirming?.label ?? ''} comes out of ${who.possessive === 'Your' ? 'your' : who.possessive} ${currency} cash, and its payments are valued again without it.`}
+        message={`${confirming?.label ?? ''} comes out of ${who.possessive === 'Your' ? 'your' : isKitty ? 'the kitty’s' : who.possessive} ${currency} cash, and its payments are valued again without it.`}
         confirmLabel="Remove"
         onConfirm={() => confirming && remove(confirming.id)}
         onCancel={() => setConfirming(null)}
@@ -101,14 +118,19 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
   );
 }
 
+const KITTY = '__kitty';
+
 function AddCashForm({ trip, user, cash, expenses }: Props) {
   const id = useId();
   const home = trip.currency;
   const { today } = useWorkClock();
   const options = currencyOptions().filter((c) => c.code !== home);
-  const mine = cash.wallets.find((w) => w.wallet.ownerUid === user.uid);
+  const mine = cash.wallets.find((w) => w.wallet.kind === 'personal' && w.wallet.ownerUid === user.uid);
   const last = lastRates(expenses, home).currency;
+  // A member's uid, or KITTY for the shared kitty.
   const [ownerUid, setOwnerUid] = useState(user.uid);
+  const [fromUid, setFromUid] = useState(user.uid);
+  const toKitty = ownerUid === KITTY;
   const [currency, setCurrency] = useState(
     mine?.wallet.currency ?? (last !== home ? last : options[0]?.code ?? 'USD'),
   );
@@ -123,7 +145,8 @@ function AddCashForm({ trip, user, cash, expenses }: Props) {
   const preview = foreignAmount > 0 && homeAmount > 0
     ? `1 ${home} = ${readableWalletRate({ foreign: foreignAmount, home: homeAmount }, currency, home)} ${currency}`
     : null;
-  const payer = ownerUid === user.uid ? 'You' : tripMemberName(trip, ownerUid, user.uid);
+  const payerUid = toKitty ? fromUid : ownerUid;
+  const payer = payerUid === user.uid ? 'You' : tripMemberName(trip, payerUid, user.uid);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -133,8 +156,10 @@ function AddCashForm({ trip, user, cash, expenses }: Props) {
     setSaving(true);
     setError('');
     try {
-      const walletExists = cash.wallets.some((w) => w.wallet.id === walletIdFor(ownerUid, currency));
-      await addCash({ tripId: trip.id, uid: user.uid, ownerUid, currency, foreignAmount, homeAmount, date, walletExists });
+      const walletId = toKitty ? kittyIdFor(currency) : walletIdFor(ownerUid, currency);
+      const walletExists = cash.wallets.some((w) => w.wallet.id === walletId);
+      const common = { tripId: trip.id, uid: user.uid, currency, foreignAmount, homeAmount, date, walletExists };
+      await addCash(toKitty ? { ...common, kitty: true, fromUid } : { ...common, ownerUid });
       setReceived('');
       setPaid('');
     } catch {
@@ -161,9 +186,24 @@ function AddCashForm({ trip, user, cash, expenses }: Props) {
             title="Whose cash"
             value={ownerUid}
             onChange={setOwnerUid}
-            options={trip.memberUids.map((uid) => ({ value: uid, label: tripMemberName(trip, uid, user.uid) }))}
+            options={[
+              ...trip.memberUids.map((uid) => ({ value: uid, label: tripMemberName(trip, uid, user.uid) })),
+              { value: KITTY, label: 'The kitty (shared)' },
+            ]}
           />
         </div>
+        {toKitty && (
+          <div>
+            <p id={`${id}-from`} className="mb-1 text-sm font-medium text-ink">Put in by</p>
+            <Select
+              aria-labelledby={`${id}-from`}
+              title="Put in by"
+              value={fromUid}
+              onChange={setFromUid}
+              options={trip.memberUids.map((uid) => ({ value: uid, label: tripMemberName(trip, uid, user.uid) }))}
+            />
+          </div>
+        )}
         <div>
           <p id={`${id}-currency`} className="mb-1 text-sm font-medium text-ink">Currency</p>
           <Select

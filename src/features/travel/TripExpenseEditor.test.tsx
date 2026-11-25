@@ -226,4 +226,27 @@ describe('TripExpenseEditor', () => {
       expect(screen.queryByText(/more than the/)).not.toBeInTheDocument();
     });
   });
+
+  describe('paying from the kitty', () => {
+    const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
+    const cash = tripCash([kitty], [
+      { id: 't', walletId: 'kitty_JPY', byUid: 'alex', fromUid: 'ben', date: '2027-05-09', foreignAmount: 100000, homeAmount: 102000, createdAt: null as never },
+    ], []);
+
+    it('offers the kitty, asks who handed the cash over, and saves it as paid from the kitty', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<TripExpenseEditor trip={trip} user={alex} expenses={[lastJpy]} cash={cash} onSaved={onSaved} />);
+      await u.click(screen.getByRole('button', { name: 'Cash' }));
+      expect(screen.getByRole('combobox', { name: 'Whose cash' })).toHaveTextContent('The kitty');
+      expect(screen.getByText('Who handed the kitty’s cash over')).toBeInTheDocument();
+      await u.click(screen.getByRole('radio', { name: /Ben/ }));
+      await u.type(screen.getByLabelText('Item 1 name'), 'Dinner');
+      await u.type(screen.getByLabelText('Item 1 amount'), '50000');
+      expect(screen.getByText('≈ A$510.00')).toBeInTheDocument();
+      await u.click(screen.getByRole('button', { name: 'Save expense' }));
+      await waitFor(() => expect(saveTripExpense).toHaveBeenCalledWith(expect.objectContaining({
+        built: expect.objectContaining({ payerUid: 'ben', payment: { kind: 'wallet', walletId: 'kitty_JPY' } }),
+      })));
+    });
+  });
 });

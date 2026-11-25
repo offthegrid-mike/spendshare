@@ -9,7 +9,7 @@ import { memberName } from '../../lib/balance';
 import { paths } from '../../lib/paths';
 import { formatMinor, minorDigits, toMinor } from '../../lib/travel/currency';
 import { expenseDay, expenseHomeTotal, isEstimated } from '../../lib/travel/tripExpense';
-import { readableWalletRate, type TripCash } from '../../lib/travel/cash';
+import { isKittyId, readableWalletRate, type TripCash } from '../../lib/travel/cash';
 import { useUIStore } from '../../stores/uiStore';
 import { deleteTripExpense, recordCharge } from './tripWrite';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
@@ -146,7 +146,9 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
         </div>
         {paid?.kind === 'wallet' && (
           <p className="text-[13px] tabular-nums text-ink-muted">
-            {`Paid in cash from ${expense.payerUid === user.uid ? 'your' : `${memberName(trip, expense.payerUid)}’s`} ${currency} cash · `}
+            {isKittyId(paid.walletId)
+              ? `Paid from the kitty, handed over by ${expense.payerUid === user.uid ? 'you' : memberName(trip, expense.payerUid)} · `
+              : `Paid in cash from ${expense.payerUid === user.uid ? 'your' : `${memberName(trip, expense.payerUid)}’s`} ${currency} cash · `}
             {homeTotal !== null && wallet?.rate && homeTotal > 0
               ? `≈ ${formatMinor(homeTotal, home)} at its average rate (1 ${home} = ${readableWalletRate({ foreign: expense.total, home: homeTotal }, currency, home)} ${currency})`
               : 'not valued yet: add the cash that was bought on the Cash page'}

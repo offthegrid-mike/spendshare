@@ -190,9 +190,10 @@ service cloud.firestore {
             (d.paidWith.get('kind', null) == 'card' && validCard(d.paidWith))
             || (d.paidWith.get('kind', null) == 'wallet' && d.paidWith.keys().hasOnly(['kind', 'walletId'])
                 && d.paidWith.get('walletId', null) is string
-                // Cash comes out of the payer's own wallet, which must exist.
+                // Cash comes out of the kitty or the payer's own wallet, which must exist.
                 && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId))
-                && getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.ownerUid == d.payerUid)));
+                && (getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.kind == 'kitty'
+                    || getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.get('ownerUid', null) == d.payerUid))));
         }
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid
@@ -252,19 +253,25 @@ service cloud.firestore {
           && (!('amount' in request.resource.data)
               || (request.resource.data.amount is number && request.resource.data.amount >= 0));
       }
-      // Trips: cash wallets, one per person per foreign currency (id = ownerUid_CUR),
-      // for any member including one without an account. Owner and currency never change.
+      // Trips: cash wallets. A member's own, one per person per foreign currency
+      // (id ownerUid_CUR, the owner on the trip, any member may keep it for them),
+      // or the trip's shared kitty (id kitty_CUR, no owner). Kind, owner and
+      // currency never change.
       match /wallets/{walletId} {
         allow read, delete: if isMember(groupId);
         allow create, update: if isMember(groupId)
-          && request.resource.data.kind == 'personal'
-          && request.resource.data.ownerUid is string
           && request.resource.data.currency is string
           && request.resource.data.currency.matches('[A-Z]{3}')
-          && walletId == request.resource.data.ownerUid + '_' + request.resource.data.currency
-          && request.resource.data.ownerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids
+          && (request.resource.data.kind == 'kitty'
+              ? (walletId == 'kitty_' + request.resource.data.currency
+                 && !('ownerUid' in request.resource.data))
+              : (request.resource.data.kind == 'personal'
+                 && request.resource.data.ownerUid is string
+                 && walletId == request.resource.data.ownerUid + '_' + request.resource.data.currency
+                 && request.resource.data.ownerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids))
           && (resource == null
-              || (request.resource.data.ownerUid == resource.data.ownerUid
+              || (request.resource.data.kind == resource.data.kind
+                  && request.resource.data.get('ownerUid', null) == resource.data.get('ownerUid', null)
                   && request.resource.data.currency == resource.data.currency));
       }
       // Cash put into a wallet: whole minor units received (> 0) and paid (>= 0), on a day,
@@ -272,13 +279,18 @@ service cloud.firestore {
       match /topUps/{topUpId} {
         allow read, delete: if isMember(groupId);
         allow create, update: if isMember(groupId)
-          && request.resource.data.keys().hasOnly(['id', 'walletId', 'byUid', 'date', 'foreignAmount', 'homeAmount', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['id', 'walletId', 'byUid', 'fromUid', 'date', 'foreignAmount', 'homeAmount', 'createdAt'])
           && request.resource.data.byUid == request.auth.uid
           && request.resource.data.walletId is string
           && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(request.resource.data.walletId))
           && request.resource.data.foreignAmount is int && request.resource.data.foreignAmount > 0
           && request.resource.data.homeAmount is int && request.resource.data.homeAmount >= 0
-          && isIsoDate(request.resource.data.date);
+          && isIsoDate(request.resource.data.date)
+          // Money in the kitty names who put it in, someone on the trip; a member's own cash is theirs.
+          && (getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(request.resource.data.walletId)).data.kind == 'kitty'
+              ? (request.resource.data.get('fromUid', null) is string
+                 && request.resource.data.fromUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids)
+              : !('fromUid' in request.resource.data));
       }
       match /suggestions/{doc} {
         allow read: if isMember(groupId);

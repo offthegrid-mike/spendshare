@@ -13,6 +13,7 @@ import {
   TRIP_SETTLEMENT_MONTH, tripBalanceCopy, tripBreakdown, tripMemberName, tripSummary, valueTrip,
 } from '../../lib/travel/valueTrip';
 import { settleWrite } from '../../lib/settleWrite';
+import type { TripCash } from '../../lib/travel/cash';
 import type { ExpenseDoc, GroupDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
 const TONE = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' } as const;
@@ -26,6 +27,8 @@ interface Props {
   settlements: SettlementDoc[];
   /** Cash payments' home values, from tripCash. */
   cashValues?: Record<string, number | null>;
+  /** The trip's cash, for its values, the kitty's credits and what the kitty hands back. Takes over `cashValues`. */
+  cash?: TripCash;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -33,7 +36,7 @@ function plural(n: number, one: string, many: string): string {
 }
 
 /** A trip's balances and settle-up in its home currency, with what was spent by category and currency. */
-export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements, cashValues = {} }: Props) {
+export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements, cashValues = {}, cash }: Props) {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState('');
   const home = trip.currency;
@@ -41,7 +44,12 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   const nameOf = (uid: string) => tripMemberName(trip, uid, user.uid);
   const avatarName = (uid: string) => trip.members[uid]?.displayName || '?';
 
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cash?.values ?? cashValues, cash?.kittyCredits ?? []);
+  const kitties = (cash?.wallets ?? []).filter((w) => w.kitty && w.kitty.contributors.length > 0);
+  const putIn = (uid: string) => kitties.flatMap((k) => {
+    const c = k.kitty!.contributors.find((x) => x.uid === uid);
+    return c ? [`Put in the kitty ${money(c.home)}, back ${formatMinor(c.handBack, k.wallet.currency)}`] : [];
+  });
   const summary = tripSummary(valuation, settlements);
   const { all: categories } = useCategories(trip.id);
   const breakdown = tripBreakdown(valuation, expenses, home, Object.fromEntries(categories.map((c) => [c.id, c.name])));
@@ -156,10 +164,30 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
         {actionError && <p role="alert" className="mt-2 text-sm text-negative">{actionError}</p>}
       </section>
 
+      {kitties.length > 0 && (
+        <section aria-labelledby="kitty" className="card p-5">
+          <h2 id="kitty" className="mb-2 text-base font-semibold text-ink">Kitty</h2>
+          {kitties.map((k) => {
+            const { currency } = k.wallet;
+            const back = k.kitty!.contributors.filter((c) => c.handBack > 0);
+            return (
+              <p key={k.wallet.id} className="text-sm text-ink">
+                {k.left.foreign > 0
+                  ? `Hand back the ${formatMinor(k.left.foreign, currency)} left: ${back
+                    .map((c) => `${c.uid === user.uid ? 'you' : tripMemberName(trip, c.uid, user.uid)} ${formatMinor(c.handBack, currency)}`)
+                    .join(', ')}.`
+                  : `The ${currency} kitty is used up.`}
+              </p>
+            );
+          })}
+          <p className="mt-1 text-xs text-ink-muted">Each person gets back their share of what's left, in proportion to the cash they put in. The balances already count it.</p>
+        </section>
+      )}
+
       <section aria-labelledby="per-person" className="card p-5">
         <h2 id="per-person" className="mb-3 text-base font-semibold text-ink">Per person</h2>
         <ul className="divide-y divide-line">
-          {valuation.parties.map((uid) => {
+          {valuation.people.map((uid) => {
             const copy = tripBalanceCopy(summary.balance[uid] ?? 0, uid === user.uid, home);
             const name = nameOf(uid);
             return (
@@ -174,7 +202,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
                     </span>
                   </span>
                   <span className="mt-0.5 block text-xs text-ink-muted">
-                    {`Paid for shared ${money(summary.paidShared[uid] ?? 0)} · Share ${money(summary.shareOf[uid] ?? 0)}`}
+                    {[`Paid for shared ${money(summary.paidShared[uid] ?? 0)}`, `Share ${money(summary.shareOf[uid] ?? 0)}`, ...putIn(uid)].join(' · ')}
                   </span>
                 </span>
               </li>

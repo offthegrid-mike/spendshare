@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tripCash, walletIdFor, readableWalletRate, cashLeftFor } from './cash';
+import { tripCash, walletIdFor, kittyIdFor, readableWalletRate, cashLeftFor } from './cash';
 import { valueTrip, tripSummary } from './valueTrip';
 import { expenseHomeTotal } from './tripExpense';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
@@ -170,5 +170,82 @@ describe('cashLeftFor', () => {
     expect(cashLeftFor(cash, w.id)).toBe(7000);
     expect(cashLeftFor(cash, w.id, spend)).toBe(10000);
     expect(cashLeftFor(cash, 'nope_JPY')).toBeNull();
+  });
+});
+
+describe('the kitty — worked example B', () => {
+  // Alex puts in A$300 (¥30,000), Ben A$300 (¥30,000), Chris A$420 (¥40,000): ¥100,000 for A$1,020.
+  const kitty: WalletDoc = { id: kittyIdFor('JPY'), kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
+  const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+    ...topUp(id, kitty.id, foreignAmount, homeAmount), fromUid,
+  });
+  const ups = [put('a', 'alex', 30000, 30000), put('b', 'ben', 30000, 30000), put('c', 'chris', 40000, 42000)];
+  // The kitty pays ¥50,000 for dinner (all three) and ¥30,000 for the museum (Alex and Ben); Ben carries the cash.
+  const dinner = cashPayment('dinner', kitty.id, 50000, { payerUid: 'ben' });
+  const museum = cashPayment('museum', kitty.id, 30000, { payerUid: 'ben', created: 5 });
+  const items = {
+    dinner: [makeItem('d', 'dinner', { amount: 50000, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben', 'chris'] })],
+    museum: [makeItem('m', 'museum', { amount: 30000, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben'] })],
+  };
+  const cash = tripCash([kitty], ups, [dinner, museum]);
+
+  it('values the kitty’s spending at its average rate: A$510 and A$306', () => {
+    expect(cash.values).toEqual({ dinner: 51000, museum: 30600 });
+  });
+
+  it('shares the ¥20,000 left by the cash each put in: ¥6,000, ¥6,000 and ¥8,000', () => {
+    const k = cash.wallets[0].kitty!;
+    expect(k.contributors).toEqual([
+      { uid: 'alex', foreign: 30000, home: 30000, handBack: 6000, handBackHome: 6120, credit: 23880 },
+      { uid: 'ben', foreign: 30000, home: 30000, handBack: 6000, handBackHome: 6120, credit: 23880 },
+      { uid: 'chris', foreign: 40000, home: 42000, handBack: 8000, handBackHome: 8160, credit: 33840 },
+    ]);
+  });
+
+  it('settles as Alex and Ben each paying Chris A$84.20, with the kitty itself owing nothing', () => {
+    const v = valueTrip(trip, [dinner, museum], items, cash.values, cash.kittyCredits);
+    expect(v.people).toEqual(['alex', 'ben', 'chris']);
+    const s = tripSummary(v, []);
+    expect(s.balance).toEqual({ alex: -8420, ben: -8420, chris: 16840, [kitty.id]: 0 });
+    expect(s.transactions).toEqual(expect.arrayContaining([
+      { fromUid: 'alex', toUid: 'chris', amount: 8420 },
+      { fromUid: 'ben', toUid: 'chris', amount: 8420 },
+    ]));
+    expect(s.transactions).toHaveLength(2);
+  });
+});
+
+describe('the kitty', () => {
+  const kitty: WalletDoc = { id: kittyIdFor('JPY'), kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
+  const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+    ...topUp(id, kitty.id, foreignAmount, homeAmount), fromUid,
+  });
+
+  it('adds up several contributions from the same person', () => {
+    const cash = tripCash([kitty], [put('a1', 'alex', 1000, 1000), put('a2', 'alex', 1000, 1100)], []);
+    expect(cash.wallets[0].kitty!.contributors).toEqual([
+      { uid: 'alex', foreign: 2000, home: 2100, handBack: 2000, handBackHome: 2100, credit: 0 },
+    ]);
+  });
+
+  it('credits whoever handed over the cash for what the kitty paid beyond what was put in', () => {
+    const over = cashPayment('over', kitty.id, 1500, { payerUid: 'ben' });
+    const cash = tripCash([kitty], [put('a', 'alex', 1000, 1000)], [over]);
+    expect(cash.wallets[0].kitty!.contributors).toEqual([
+      { uid: 'alex', foreign: 1000, home: 1000, handBack: 0, handBackHome: 0, credit: 1000 },
+    ]);
+    expect(cash.kittyCredits).toEqual([
+      { fromUid: 'alex', toUid: kitty.id, amount: 1000, paid: true },
+      { fromUid: 'ben', toUid: kitty.id, amount: 500, paid: true },
+    ]);
+    const v = valueTrip(trip, [over], { over: [makeItem('o', 'over', { amount: 1500, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] }, cash.values, cash.kittyCredits);
+    expect(tripSummary(v, []).balance[kitty.id]).toBe(0);
+  });
+
+  it('is never anyone’s cash: its payments aren’t credited to who handed them over', () => {
+    const e = cashPayment('e', kitty.id, 1000, { payerUid: 'ben' });
+    const cash = tripCash([kitty], [put('a', 'alex', 1000, 1000)], [e]);
+    const v = valueTrip(trip, [e], { e: [makeItem('i', 'e', { amount: 1000, payerUid: 'ben', shared: true, sharedWith: ['alex'] })] }, cash.values, cash.kittyCredits);
+    expect(tripSummary(v, []).balance).toEqual({ alex: 0, ben: 0, chris: 0, [kitty.id]: 0 });
   });
 });

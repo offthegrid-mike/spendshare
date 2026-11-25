@@ -1569,3 +1569,96 @@ describe('/groups cash wallets and top-ups', () => {
     await assertSucceeds(deleteDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1')));
   });
 });
+
+describe('/groups the kitty', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          manual_sam: { role: 'member', displayName: 'Sam', email: '', manual: true },
+        },
+        memberUids: ['userA', 'manual_sam'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = () => testEnv.authenticatedContext('userA').firestore();
+  const kitty = (extra: Record<string, unknown> = {}) => ({
+    id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'userA', createdAt: new Date(), ...extra,
+  });
+  const putIn = (extra: Record<string, unknown> = {}) => ({
+    id: 't1', walletId: 'kitty_JPY', byUid: 'userA', fromUid: 'manual_sam', date: '2027-05-09',
+    foreignAmount: 30000, homeAmount: 30000, createdAt: new Date(), ...extra,
+  });
+
+  async function start(w: Record<string, unknown>, t: Record<string, unknown>, walletId = 'kitty_JPY') {
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'wallets', walletId), w);
+    batch.set(doc(db, 'groups', 'japan', 'topUps', 't1'), t);
+    return batch.commit();
+  }
+
+  it('lets a member start a kitty and record what anyone on the trip put in', async () => {
+    await assertSucceeds(start(kitty(), putIn()));
+  });
+
+  it('keeps one kitty per currency, with no owner', async () => {
+    await assertFails(start(kitty({ id: 'pot' }), putIn({ walletId: 'pot' }), 'pot'));
+    await assertFails(start(kitty({ ownerUid: 'userA' }), putIn()));
+  });
+
+  it('requires who put money into the kitty, and that they are on the trip', async () => {
+    const { fromUid: _f, ...noFrom } = putIn();
+    void _f;
+    await assertFails(start(kitty(), noFrom));
+    await assertFails(start(kitty(), putIn({ fromUid: 'stranger' })));
+  });
+
+  it('keeps fromUid to the kitty: a personal wallet’s cash is its owner’s', async () => {
+    await assertFails(start(
+      { id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY', createdByUid: 'userA', createdAt: new Date() },
+      putIn({ walletId: 'userA_JPY', fromUid: 'manual_sam' }),
+      'userA_JPY',
+    ));
+  });
+
+  it('never turns a personal wallet into a kitty', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_KRW'), { id: 'kitty_KRW', kind: 'kitty', currency: 'KRW' });
+    });
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_KRW'), { kind: 'personal', ownerUid: 'kitty' }));
+  });
+
+  it('lets anyone on the trip pay from the kitty', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });
+    });
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'expenses', 'e1'), {
+      groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Dinner', payerUid: 'userA',
+      total: 50000, itemCount: 1, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+      currency: 'JPY', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' },
+    });
+    batch.set(doc(db, 'groups', 'japan', 'expenses', 'e1', 'items', 'i1'), {
+      groupId: 'japan', expenseId: 'e1', month: '2027-05', name: 'Dinner', categoryId: 'f', category: 'Food',
+      amount: 50000, shared: true, payerUid: 'userA', sharedWith: ['userA', 'manual_sam'],
+    });
+    await assertSucceeds(batch.commit());
+  });
+});

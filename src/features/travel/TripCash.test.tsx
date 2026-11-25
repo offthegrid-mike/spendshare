@@ -125,4 +125,44 @@ describe('TripCash', () => {
     expect(screen.getByRole('region', { name: 'Ben’s JPY cash' })).toHaveTextContent('Add the cash Ben bought, so its payments can be valued.');
     unmount();
   });
+
+  describe('the kitty (example B)', () => {
+    const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
+    const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+      id, walletId: 'kitty_JPY', byUid: 'alex', fromUid, date: '2027-05-09', foreignAmount, homeAmount, createdAt: null as never,
+    });
+    const ups = [put('a', 'alex', 30000, 30000), put('b', 'ben', 30000, 30000), put('c', 'chris', 40000, 42000)];
+    const spent = [
+      makeExpense('d', { currency: 'JPY', total: 50000, payerUid: 'ben', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } }),
+      makeExpense('m', { currency: 'JPY', total: 30000, payerUid: 'ben', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } }),
+    ];
+
+    it('shows what each person put in and the cash they get back', () => {
+      renderCash([kitty], ups, spent);
+      const card = screen.getByRole('region', { name: 'Kitty · JPY' });
+      expect(card).toHaveTextContent('¥20,000 left');
+      const people = within(within(card).getByRole('list', { name: 'Put in' })).getAllByRole('listitem').map((li) => li.textContent);
+      expect(people).toEqual([
+        'You put in ¥30,000 for A$300.00 · get back ¥6,000',
+        'Ben put in ¥30,000 for A$300.00 · gets back ¥6,000',
+        'Chris put in ¥40,000 for A$420.00 · gets back ¥8,000',
+      ]);
+    });
+
+    it('puts money into the kitty for someone', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderCash([kitty], ups, spent);
+      await u.click(screen.getByRole('combobox', { name: 'Whose cash' }));
+      await u.click(screen.getByRole('option', { name: 'The kitty (shared)' }));
+      await u.click(screen.getByRole('combobox', { name: 'Put in by' }));
+      await u.click(screen.getByRole('option', { name: 'Ben' }));
+      await u.type(screen.getByLabelText('Cash received (JPY)'), '10000');
+      await u.type(screen.getByLabelText('Ben paid (AUD)'), '102');
+      await u.click(screen.getByRole('button', { name: 'Add cash' }));
+      await waitFor(() => expect(addCash).toHaveBeenCalledWith({
+        tripId: 'japan', uid: 'alex', kitty: true, fromUid: 'ben', currency: 'JPY',
+        foreignAmount: 10000, homeAmount: 10200, date: '2027-05-12', walletExists: true,
+      }));
+    });
+  });
 });
