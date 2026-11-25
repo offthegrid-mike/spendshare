@@ -162,7 +162,7 @@ export default function SignIn() {
         <div className="w-full max-w-[380px] self-center">
           <div className="mb-10 flex items-center gap-2.5 lg:hidden">
             <BrandMark size="sm" />
-            <span className="text-lg font-semibold tracking-tight text-ink">SpendShare</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">HomeBase</span>
           </div>
 
           <div key={mode} className="motion-safe:animate-fade-in">

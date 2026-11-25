@@ -7,12 +7,12 @@ export default function BrandPanel() {
     <aside className="hidden bg-accent-soft p-12 lg:flex lg:flex-col xl:p-16">
       <div className="flex items-center gap-2.5">
         <BrandMark size="sm" />
-        <span className="text-lg font-semibold tracking-tight text-ink">SpendShare</span>
+        <span className="text-lg font-semibold tracking-tight text-ink">HomeBase</span>
       </div>
       <div className="my-auto py-12">
         <p className="text-4xl font-semibold leading-[1.1] tracking-tight text-ink xl:text-5xl">
-          <span className="block">Split the shopping.</span>
-          <span className="block">Settle up in one tap.</span>
+          <span className="block">Spending, work and trips.</span>
+          <span className="block">All in one place.</span>
         </p>
         <SampleSettleUp />
       </div>

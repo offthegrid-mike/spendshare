@@ -22,9 +22,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon-512x512.png'],
       manifest: {
-        name: 'SpendShare',
-        short_name: 'SpendShare',
-        description: 'Offline-first expense splitting for households and groups',
+        name: 'HomeBase',
+        short_name: 'HomeBase',
+        description: 'Shared spending, work days and trips for your household, offline-first',
         theme_color: '#f3f6f4',
         background_color: '#f3f6f4',
         display: 'standalone',

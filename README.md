@@ -1,8 +1,14 @@
-# SpendShare
+# HomeBase
 
-Shared expense tracking for households and small groups. Members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
+HomeBase brings a household's everyday records into one app. After sign-in, a **Home screen** leads to its modules:
 
-Alongside it, a personal **Work tracker** records which days you worked from home, at the office or on leave, and totals the hours for the fixed rate working-from-home deduction. A **Home screen** after sign-in leads to both.
+- **SpendShare**: shared expense tracking for households and small groups.
+- **Work tracker**: a personal record of days worked from home, at the office or on leave.
+- **Travel** (in development): shared trip costs in any currency.
+
+In SpendShare, members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
+
+The Work tracker totals the hours worked from home for the fixed rate working-from-home deduction.
 
 It works offline, installs as an app on desktop and mobile, and runs entirely on free tiers (Firebase Spark plan and Cloudflare Workers).
 
@@ -87,7 +93,7 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 
 - Sign in with email and password or with Google.
 - Email verification on sign-up, and password reset by email.
-- Only allowlisted people can use the app. Anyone else who signs in sees a "can't use SpendShare" screen, and the Firestore rules refuse all their reads and writes. An email-and-password account must verify its email first.
+- Only allowlisted people can use the app. Anyone else who signs in sees a "can't use HomeBase" screen, and the Firestore rules refuse all their reads and writes. An email-and-password account must verify its email first.
 
 ### Offline, install, and appearance
 

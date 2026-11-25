@@ -52,11 +52,11 @@ export default function NotAllowed({ user, status, reloadPage = () => window.loc
         <div className="w-full max-w-[380px] self-center">
           <div className="mb-10 flex items-center gap-2.5 lg:hidden">
             <BrandMark size="sm" />
-            <span className="text-lg font-semibold tracking-tight text-ink">SpendShare</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">HomeBase</span>
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            {unverified ? 'Verify your email' : "This account can't use SpendShare"}
+            {unverified ? 'Verify your email' : "This account can't use HomeBase"}
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
             {unverified
