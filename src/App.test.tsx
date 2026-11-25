@@ -41,6 +41,7 @@ vi.mock('./hooks/useExpense', () => ({
   useExpense: () => ({ expense: state.expense, items: [], loading: false }),
 }));
 vi.mock('./hooks/useIncome', () => ({ useIncome: () => ({ income: null, loading: false }) }));
+vi.mock('./hooks/useTripRecords', () => ({ useTripRecords: () => undefined }));
 vi.mock('./hooks/useWorkSettings', async () => {
   const { DEFAULT_WORK_SETTINGS } = await import('./lib/work/workSettings');
   return { useWorkSettings: () => ({ settings: DEFAULT_WORK_SETTINGS, loading: false, loaded: true }) };

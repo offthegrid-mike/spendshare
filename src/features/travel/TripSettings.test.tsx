@@ -16,6 +16,8 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: { now: () => 'NOW' },
 }));
 vi.mock('../../lib/converters', () => ({ groupsCol: {} }));
+const { changeTripCurrency, deleteTrip } = vi.hoisted(() => ({ changeTripCurrency: vi.fn(), deleteTrip: vi.fn() }));
+vi.mock('./tripAdmin', () => ({ changeTripCurrency, deleteTrip }));
 vi.mock('../invites/SendInvite', () => ({
   default: ({ group }: { group: { id: string; kind?: string } }) => <div data-testid="send-invite" data-kind={group.kind} />,
 }));
@@ -31,7 +33,12 @@ const member = { uid: 'priya', email: 'priya@example.com', displayName: 'Priya' 
 
 beforeEach(() => {
   updateDoc.mockReset().mockResolvedValue(undefined);
+  changeTripCurrency.mockReset().mockResolvedValue(undefined);
+  deleteTrip.mockReset().mockResolvedValue(undefined);
 });
+
+const empty = { empty: true, walletIds: ['mike_AUD'] };
+const used = { empty: false, walletIds: ['mike_JPY'] };
 
 describe('TripSettings', () => {
   it('lets the owner change the name and dates', async () => {
@@ -139,5 +146,67 @@ describe('TripSettings', () => {
   it('offers closing only to the owner', () => {
     render(<TripSettings trip={trip} user={member} />);
     expect(screen.queryByRole('button', { name: 'Close trip' })).not.toBeInTheDocument();
+  });
+  describe('home currency', () => {
+    it('lets the owner change it while nothing is on the trip, removing the empty wallets with it', async () => {
+      const u = userEvent.setup();
+      render(<TripSettings trip={{ ...trip, currency: 'TWD' }} user={owner} records={empty} />);
+      await u.click(screen.getByRole('combobox', { name: 'Home currency' }));
+      await u.click(screen.getByRole('option', { name: 'AUD · Australian Dollar' }));
+      await u.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() => expect(changeTripCurrency).toHaveBeenCalledWith('japan', { name: 'Japan', currency: 'AUD' }, ['mike_AUD']));
+      expect(updateDoc).not.toHaveBeenCalled();
+    });
+
+    it('saves as before when the owner leaves it alone', async () => {
+      const u = userEvent.setup();
+      render(<TripSettings trip={trip} user={owner} records={empty} />);
+      await u.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { name: 'Japan' }));
+      expect(changeTripCurrency).not.toHaveBeenCalled();
+    });
+
+    it('is fixed once expenses or cash are on the trip, and says why', () => {
+      render(<TripSettings trip={trip} user={owner} records={used} />);
+      expect(screen.queryByRole('combobox', { name: 'Home currency' })).not.toBeInTheDocument();
+      expect(screen.getByText(/can’t change once expenses or cash are on the trip/)).toBeInTheDocument();
+    });
+
+    it('is fixed for a member who is not the owner, and on a closed trip', () => {
+      const { unmount } = render(<TripSettings trip={trip} user={member} records={empty} />);
+      expect(screen.queryByRole('combobox', { name: 'Home currency' })).not.toBeInTheDocument();
+      unmount();
+      render(<TripSettings trip={{ ...trip, tripClosedAt: { toDate: () => new Date(2027, 4, 21) } as never }} user={owner} records={empty} />);
+      expect(screen.queryByRole('combobox', { name: 'Home currency' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('delete', () => {
+    it('lets the owner delete the trip after confirming', async () => {
+      const u = userEvent.setup();
+      const onDeleted = vi.fn();
+      render(<TripSettings trip={trip} user={owner} onDeleted={onDeleted} />);
+      await u.click(screen.getByRole('button', { name: 'Delete trip' }));
+      expect(deleteTrip).not.toHaveBeenCalled();
+      await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete trip' }));
+      await waitFor(() => expect(deleteTrip).toHaveBeenCalledWith(trip));
+      await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+    });
+
+    it('says so when the delete fails, and stays', async () => {
+      const u = userEvent.setup();
+      const onDeleted = vi.fn();
+      deleteTrip.mockRejectedValue(new Error('offline'));
+      render(<TripSettings trip={trip} user={owner} onDeleted={onDeleted} />);
+      await u.click(screen.getByRole('button', { name: 'Delete trip' }));
+      await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete trip' }));
+      expect(await screen.findByText("Couldn't delete the trip. Check your connection and try again.")).toBeInTheDocument();
+      expect(onDeleted).not.toHaveBeenCalled();
+    });
+
+    it('offers deleting only to the owner', () => {
+      render(<TripSettings trip={trip} user={member} />);
+      expect(screen.queryByRole('button', { name: 'Delete trip' })).not.toBeInTheDocument();
+    });
   });
 });
