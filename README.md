@@ -1,8 +1,14 @@
-# SpendShare
+# HomeBase
 
-Shared expense tracking for households and small groups. Members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
+HomeBase brings a household's everyday records into one app. After sign-in, a **Home screen** leads to its modules:
 
-Alongside it, a personal **Work tracker** records which days you worked from home, at the office or on leave, and totals the hours for the fixed rate working-from-home deduction. A **Home screen** after sign-in leads to both.
+- **SpendShare**: shared expense tracking for households and small groups.
+- **Work tracker**: a personal record of days worked from home, at the office or on leave.
+- **Travel** (in development): shared trip costs in any currency.
+
+In SpendShare, members log what they spend, item by item, and mark each item as shared or personal. SpendShare works out everyone's share and the fewest payments needed to settle up each month.
+
+The Work tracker totals the hours worked from home for the fixed rate working-from-home deduction.
 
 It works offline, installs as an app on desktop and mobile, and runs entirely on free tiers (Firebase Spark plan and Cloudflare Workers).
 
@@ -87,13 +93,14 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 
 - Sign in with email and password or with Google.
 - Email verification on sign-up, and password reset by email.
-- Only allowlisted people can use the app. Anyone else who signs in sees a "can't use SpendShare" screen, and the Firestore rules refuse all their reads and writes. An email-and-password account must verify its email first.
+- Only allowlisted people can use the app. Anyone else who signs in sees a "can't use HomeBase" screen, and the Firestore rules refuse all their reads and writes. An email-and-password account must verify its email first.
 
 ### Offline, install, and appearance
 
 - All data stays readable offline through Firestore's IndexedDB cache, and changes made offline sync when the connection returns.
 - A service worker caches the app shell, so the app opens without a network connection.
-- Installable as a PWA from the browser.
+- Installable as an app. Where the browser supports it (Chrome, Edge, Android), **Install HomeBase** on the More and Work settings screens, and **Install app** in the Home menu, show the browser's install prompt. On iPhone and iPad, the More screen explains Safari's Share, then Add to Home Screen. Both are hidden once the app is installed.
+- Updates download in the background. An open app checks for a new version every hour and whenever it comes back into view, then shows **A new version of HomeBase is ready** with **Reload** and **Later**. Choosing Later, or ignoring it, gets the new version once every HomeBase tab and window has been closed. Reloading alone keeps the old version.
 - Light, dark, or system theme.
 - The More screen shows the build's commit and date, so you can confirm which deploy is live.
 

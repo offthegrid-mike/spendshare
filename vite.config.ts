@@ -19,12 +19,16 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': a new version waits until the user taps Reload in the
+      // update banner (src/components/UpdateBanner.tsx), or every HomeBase
+      // tab and window has closed. src/pwaStart.ts registers the service worker itself.
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon-512x512.png'],
       manifest: {
-        name: 'SpendShare',
-        short_name: 'SpendShare',
-        description: 'Offline-first expense splitting for households and groups',
+        name: 'HomeBase',
+        short_name: 'HomeBase',
+        description: 'Shared spending, work days and trips for your household, offline-first',
         theme_color: '#f3f6f4',
         background_color: '#f3f6f4',
         display: 'standalone',
@@ -50,6 +54,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Take control of the open page on first install, so offline works
+        // from the first visit. Updates still wait for Reload: 'prompt' mode
+        // never skips waiting.
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // pdf.js is only needed when a user scans a PDF receipt, and scanning
         // requires network anyway — lazy-load it on demand instead of precaching

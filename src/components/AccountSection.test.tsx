@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AccountSection from './AccountSection';
+import { usePwaStore, type BeforeInstallPromptEvent } from '../lib/pwa';
 
 const { signOut } = vi.hoisted(() => ({ signOut: vi.fn() }));
 vi.mock('../lib/firebase', () => ({ auth: {} }));
@@ -9,6 +10,7 @@ vi.mock('../lib/features', () => ({ DARK_MODE_ENABLED: true }));
 vi.mock('firebase/auth', () => ({ signOut: (...args: unknown[]) => signOut(...args) }));
 
 beforeEach(() => {
+  usePwaStore.setState({ installPrompt: null, installed: false });
   signOut.mockReset();
   signOut.mockResolvedValue(undefined);
 });
@@ -42,5 +44,11 @@ describe('AccountSection', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Sign out' })).not.toBeDisabled();
+  });
+
+  it('offers to install the app when the browser can', () => {
+    usePwaStore.setState({ installPrompt: new Event('beforeinstallprompt') as BeforeInstallPromptEvent, installed: false });
+    render(<AccountSection />);
+    expect(screen.getByRole('button', { name: /install homebase/i })).toBeInTheDocument();
   });
 });

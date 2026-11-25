@@ -5,8 +5,9 @@ import { auth } from '../lib/firebase';
 import { DARK_MODE_ENABLED } from '../lib/features';
 import LoadingButton from './LoadingButton';
 import ThemeSwitch from './ThemeSwitch';
+import InstallApp from './InstallApp';
 
-/** The Appearance and Account (Sign out) sections shared by the More and Home screens. */
+/** The App (install), Appearance and Account (Sign out) sections shared by the More and Work settings screens. */
 export default function AccountSection() {
   const [signingOut, setSigningOut] = useState(false);
 
@@ -23,6 +24,7 @@ export default function AccountSection() {
 
   return (
     <>
+      <InstallApp />
       {DARK_MODE_ENABLED && (
         <section>
           <h2 className="mb-2 px-1 text-sm font-medium text-ink-muted">Appearance</h2>

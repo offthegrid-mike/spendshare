@@ -32,7 +32,7 @@ describe('NotAllowed', () => {
 
   it('tells a user who is not on the allowlist, by email, and signs them out', async () => {
     render(<NotAllowed user={user()} status="denied" reloadPage={reloadPage} />);
-    expect(screen.getByRole('heading', { name: /can't use spendshare/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /can't use homebase/i })).toBeInTheDocument();
     expect(screen.getByText(/me@example\.com/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /sign out/i }));

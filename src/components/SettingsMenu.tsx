@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { LogOut, Settings } from 'lucide-react';
+import { Download, LogOut, Settings } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useUIStore } from '../stores/uiStore';
@@ -8,6 +8,7 @@ import { THEME_OPTIONS } from '../lib/theme';
 import { DARK_MODE_ENABLED } from '../lib/features';
 import { initialOf } from '../lib/initials';
 import { SPEND_LINKS, type SettingsLink } from '../lib/settingsLinks';
+import { promptInstall, usePwaStore } from '../lib/pwa';
 
 interface SettingsMenuProps {
   /** Manage links at the top of the menu. Defaults to the SpendShare set. */
@@ -30,6 +31,7 @@ export default function SettingsMenu({ links = SPEND_LINKS, account }: SettingsM
   const menuRef = useRef<HTMLDivElement>(null);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+  const canInstall = usePwaStore((s) => s.installPrompt !== null && !s.installed);
 
   // On open, put focus on the first item (menu button pattern).
   useEffect(() => {
@@ -144,6 +146,20 @@ export default function SettingsMenu({ links = SPEND_LINKS, account }: SettingsM
             </>
           )}
           {(hasLinks || DARK_MODE_ENABLED) && <hr className="my-1.5 border-line" />}
+          {canInstall && (
+            <button
+              type="button"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                close({ refocus: false });
+                void promptInstall();
+              }}
+            >
+              <Download size={16} strokeWidth={1.75} className="text-ink-muted" aria-hidden="true" />
+              Install app
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"

@@ -1,6 +1,8 @@
 // Must stay first: it disables Zod's JIT before any schema is built. See the
 // module for why calling config() here instead would be too late.
 import './lib/zodConfig'
+// Next, ahead of the app: see the module.
+import './pwaStart'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

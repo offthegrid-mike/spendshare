@@ -1,11 +1,12 @@
 import type { ComponentProps } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Tag } from 'lucide-react';
 import SettingsMenu from './SettingsMenu';
 import { paths } from '../lib/paths';
+import { usePwaStore, type BeforeInstallPromptEvent } from '../lib/pwa';
 
 const { signOut } = vi.hoisted(() => ({ signOut: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../lib/firebase', () => ({ auth: {} }));
@@ -190,5 +191,29 @@ describe('SettingsMenu', () => {
       expect(screen.getByRole('menuitem', { name: 'Elsewhere' })).toHaveAttribute('href', '/elsewhere');
       expect(screen.queryByRole('menuitem', { name: 'Categories' })).toBeNull();
     });
+  });
+});
+
+describe('SettingsMenu install item', () => {
+  beforeEach(() => {
+    usePwaStore.setState({ installPrompt: null, installed: false });
+  });
+
+  it('offers Install app when the browser can install, and shows its prompt', async () => {
+    const event = Object.assign(new Event('beforeinstallprompt'), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: 'dismissed', platform: 'web' }),
+    }) as unknown as BeforeInstallPromptEvent;
+    usePwaStore.setState({ installPrompt: event, installed: false });
+    renderMenu();
+    await userEvent.click(gear());
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Install app' }));
+    expect(event.prompt).toHaveBeenCalled();
+  });
+
+  it('has no Install app item otherwise', async () => {
+    renderMenu();
+    await userEvent.click(gear());
+    expect(screen.queryByRole('menuitem', { name: 'Install app' })).not.toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ test.describe('M8 — PWA build artifacts', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, '../dist/manifest.webmanifest'), 'utf-8'),
     );
-    expect(manifest.name).toBe('SpendShare');
+    expect(manifest.name).toBe('HomeBase');
     expect(manifest.display).toBe('standalone');
     expect(Array.isArray(manifest.icons)).toBe(true);
     const sizes = manifest.icons.map((i: { sizes: string }) => i.sizes);

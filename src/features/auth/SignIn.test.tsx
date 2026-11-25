@@ -55,3 +55,11 @@ describe('SignIn with Google', () => {
     expect(password.matches(':disabled')).toBe(true);
   });
 });
+
+describe('SignIn branding', () => {
+  it('names the app HomeBase, not SpendShare', () => {
+    render(<SignIn />);
+    expect(screen.getAllByText('HomeBase').length).toBeGreaterThan(0);
+    expect(screen.queryByText('SpendShare')).not.toBeInTheDocument();
+  });
+});

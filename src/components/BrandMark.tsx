@@ -4,7 +4,7 @@ const SIZES = {
 } as const;
 
 /**
- * The SpendShare receipt glyph on an accent tile. scripts/generate-icons.mjs
+ * The HomeBase receipt glyph on an accent tile. scripts/generate-icons.mjs
  * renders every app icon from the same glyph paths, so change both together.
  */
 export default function BrandMark({ size = 'md' }: { size?: keyof typeof SIZES }) {
