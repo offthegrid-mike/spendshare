@@ -66,6 +66,13 @@ describe('promptInstall', () => {
     expect(usePwaStore.getState().installPrompt).toBeNull();
   });
 
+  it('swallows a prompt the browser refuses, so tapping Install never throws', async () => {
+    const event = installEvent();
+    (event.prompt as ReturnType<typeof vi.fn>).mockRejectedValue(new DOMException('no activation', 'NotAllowedError'));
+    usePwaStore.setState({ installPrompt: event });
+    await expect(promptInstall()).resolves.toBe('unavailable');
+  });
+
   it('does nothing without a prompt', async () => {
     await expect(promptInstall()).resolves.toBe('unavailable');
   });

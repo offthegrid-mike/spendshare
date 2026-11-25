@@ -12,7 +12,6 @@ import '@fontsource-variable/geist-mono'
 import './index.css'
 import App from './App.tsx'
 import { startThemeSync } from './lib/theme'
-import UpdateBanner from './components/UpdateBanner'
 
 // Before the first render so the stored theme is in place on first paint.
 startThemeSync()
@@ -21,7 +20,6 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <App />
-      <UpdateBanner />
     </BrowserRouter>
   </StrictMode>,
 )

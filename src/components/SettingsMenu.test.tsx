@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -195,6 +195,10 @@ describe('SettingsMenu', () => {
 });
 
 describe('SettingsMenu install item', () => {
+  beforeEach(() => {
+    usePwaStore.setState({ installPrompt: null, installed: false });
+  });
+
   it('offers Install app when the browser can install, and shows its prompt', async () => {
     const event = Object.assign(new Event('beforeinstallprompt'), {
       prompt: vi.fn().mockResolvedValue(undefined),
@@ -205,7 +209,6 @@ describe('SettingsMenu install item', () => {
     await userEvent.click(gear());
     await userEvent.click(screen.getByRole('menuitem', { name: 'Install app' }));
     expect(event.prompt).toHaveBeenCalled();
-    usePwaStore.setState({ installPrompt: null });
   });
 
   it('has no Install app item otherwise', async () => {

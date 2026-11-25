@@ -20,8 +20,8 @@ export default defineConfig({
     react(),
     VitePWA({
       // 'prompt': a new version waits until the user taps Reload in the
-      // update banner (src/components/UpdateBanner.tsx), or the app is next
-      // opened. src/main.tsx registers the service worker itself.
+      // update banner (src/components/UpdateBanner.tsx), or every HomeBase
+      // tab and window has closed. src/pwaStart.ts registers the service worker itself.
       registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon-512x512.png'],

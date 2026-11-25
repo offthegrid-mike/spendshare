@@ -10,6 +10,7 @@ vi.mock('../lib/features', () => ({ DARK_MODE_ENABLED: true }));
 vi.mock('firebase/auth', () => ({ signOut: (...args: unknown[]) => signOut(...args) }));
 
 beforeEach(() => {
+  usePwaStore.setState({ installPrompt: null, installed: false });
   signOut.mockReset();
   signOut.mockResolvedValue(undefined);
 });
@@ -49,6 +50,5 @@ describe('AccountSection', () => {
     usePwaStore.setState({ installPrompt: new Event('beforeinstallprompt') as BeforeInstallPromptEvent, installed: false });
     render(<AccountSection />);
     expect(screen.getByRole('button', { name: /install homebase/i })).toBeInTheDocument();
-    usePwaStore.setState({ installPrompt: null });
   });
 });

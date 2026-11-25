@@ -74,9 +74,15 @@ export async function promptInstall(): Promise<'accepted' | 'dismissed' | 'unava
   const event = usePwaStore.getState().installPrompt;
   if (!event) return 'unavailable';
   usePwaStore.setState({ installPrompt: null });
-  await event.prompt();
-  const { outcome } = await event.userChoice;
-  return outcome;
+  try {
+    await event.prompt();
+    const { outcome } = await event.userChoice;
+    return outcome;
+  } catch {
+    // The browser refused (prompt already used, or no user gesture). Nothing
+    // to show; Chrome sends a fresh beforeinstallprompt when it allows one.
+    return 'unavailable';
+  }
 }
 
 /**
