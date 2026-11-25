@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { CircleCheck, TriangleAlert } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
+import { useCategories } from '../../hooks/useCategories';
 import { markSettlementPaid, undoSettlement } from '../../lib/settle';
 import { paths } from '../../lib/paths';
 import { formatMinor } from '../../lib/travel/currency';
@@ -40,7 +41,8 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
 
   const valuation = valueTrip(trip, expenses, itemsByExpense);
   const summary = tripSummary(valuation, settlements);
-  const breakdown = tripBreakdown(valuation, expenses, home);
+  const { all: categories } = useCategories(trip.id);
+  const breakdown = tripBreakdown(valuation, expenses, home, Object.fromEntries(categories.map((c) => [c.id, c.name])));
   const paid = settlements.filter((s) => s.paid);
   const approx = valuation.estimated.length > 0 ? '≈ ' : '';
 
@@ -56,7 +58,8 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
     }
   }
 
-  if (expenses.length === 0) {
+  // A paid settlement keeps the page useful after its expenses are deleted: it can be undone or paid back.
+  if (expenses.length === 0 && paid.length === 0) {
     return (
       <div className="card mx-auto max-w-lg p-6 text-center">
         <p className="text-sm text-ink-muted">No expenses yet, so nothing to settle.</p>
@@ -169,7 +172,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
                     </span>
                   </span>
                   <span className="mt-0.5 block text-xs text-ink-muted">
-                    {`Paid ${money(summary.paidTotal[uid] ?? 0)} · Share ${money(summary.shareOf[uid] ?? 0)}`}
+                    {`Paid for shared ${money(summary.paidShared[uid] ?? 0)} · Share ${money(summary.shareOf[uid] ?? 0)}`}
                   </span>
                 </span>
               </li>

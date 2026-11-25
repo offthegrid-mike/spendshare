@@ -11,6 +11,7 @@ const { markSettlementPaid, undoSettlement } = vi.hoisted(() => ({
   markSettlementPaid: vi.fn(), undoSettlement: vi.fn(),
 }));
 vi.mock('../../lib/settle', () => ({ markSettlementPaid, undoSettlement }));
+vi.mock('../../hooks/useCategories', () => ({ useCategories: () => ({ active: [], all: [], loading: false }) }));
 
 const trip = makeTrip('japan', 'Japan', '2027-05-10', '2027-05-20', ['Alex', 'Ben', 'Chris']);
 const chris = { uid: 'chris' } as User;
@@ -19,7 +20,7 @@ const tax = makeExpense('tax', {
   shopName: 'Hotel tax', payerUid: 'ben', currency: 'JPY', total: 15000,
   paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' },
 });
-const taxItems = [makeItem('i1', 'tax', { amount: 15000, payerUid: 'ben', shared: true, sharedWith: ['ben', 'chris'], category: 'Accommodation' })];
+const taxItems = [makeItem('i1', 'tax', { amount: 15000, payerUid: 'ben', shared: true, sharedWith: ['ben', 'chris'], categoryId: 'acc', category: 'Accommodation' })];
 
 function renderSummary(
   { expenses = [tax], items = { tax: taxItems } as Record<string, ItemDoc[]>, settlements = [] as SettlementDoc[] }:
@@ -80,16 +81,23 @@ describe('TripSummary', () => {
     const people = within(screen.getByRole('region', { name: 'Per person' }));
     const ben = people.getByRole('listitem', { name: 'Ben' });
     expect(ben).toHaveTextContent('Gets back A$75.76');
-    expect(ben).toHaveTextContent('Paid A$151.52 · Share A$75.76');
+    expect(ben).toHaveTextContent('Paid for shared A$151.52 · Share A$75.76');
     expect(people.getByRole('listitem', { name: 'You' })).toHaveTextContent('You owe A$75.76');
     expect(people.getByRole('listitem', { name: 'Alex' })).toHaveTextContent('Settled');
+  });
+
+  it('shows only what each person paid for shared items beside their share', () => {
+    const own = makeExpense('own', { payerUid: 'ben', currency: 'AUD', total: 800, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
+    renderSummary({ expenses: [tax, own], items: { tax: taxItems, own: [makeItem('o', 'own', { amount: 800, payerUid: 'ben', shared: false })] } });
+    const ben = within(screen.getByRole('region', { name: 'Per person' })).getByRole('listitem', { name: 'Ben' });
+    expect(ben).toHaveTextContent('Paid for shared A$151.52 · Share A$75.76');
   });
 
   it('totals the spending by category and by the currency paid in', () => {
     const taxi = makeExpense('taxi', { payerUid: 'alex', currency: 'AUD', total: 2500, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
     renderSummary({
       expenses: [tax, taxi],
-      items: { tax: taxItems, taxi: [makeItem('t', 'taxi', { amount: 2500, payerUid: 'alex', category: 'Transport' })] },
+      items: { tax: taxItems, taxi: [makeItem('t', 'taxi', { amount: 2500, payerUid: 'alex', categoryId: 'tr', category: 'Transport' })] },
     });
     const spending = within(screen.getByRole('region', { name: 'Spending' }));
     expect(spending.getByText('≈ A$176.52')).toBeInTheDocument();
@@ -102,6 +110,14 @@ describe('TripSummary', () => {
     const gone = makeExpense('g', { payerUid: 'gone', currency: 'AUD', total: 900, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
     renderSummary({ expenses: [gone], items: { g: [makeItem('gi', 'g', { amount: 900, payerUid: 'gone', shared: true, sharedWith: ['alex', 'chris', 'gone'] })] } });
     expect(within(screen.getByRole('region', { name: 'Settle up' })).getByText('You → A former member')).toBeInTheDocument();
+  });
+
+  it('still shows a payment marked paid after its expenses were deleted, so it can be undone or paid back', () => {
+    const paid = { id: 'trip_chris_ben', month: 'trip', fromUid: 'chris', toUid: 'ben', amount: 7576, paid: true } as SettlementDoc;
+    renderSummary({ expenses: [], items: {}, settlements: [paid] });
+    const settle = within(screen.getByRole('region', { name: 'Settle up' }));
+    expect(settle.getByText('Ben → You')).toBeInTheDocument();
+    expect(settle.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 
   it('says when there is nothing to settle yet', () => {

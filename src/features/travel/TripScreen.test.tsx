@@ -6,11 +6,12 @@ import TripScreen from './TripScreen';
 const hook = vi.hoisted(() => ({
   calls: [] as (string | null)[], error: false, retry: vi.fn(),
   expenses: [] as unknown[], itemsByExpense: {} as Record<string, unknown[]>, settlementCalls: [] as unknown[][],
+  settlements: [] as unknown[],
 }));
 vi.mock('../../hooks/useSettlements', () => ({
   useSettlements: (...args: unknown[]) => {
     hook.settlementCalls.push(args);
-    return { settlements: [], loading: false };
+    return { settlements: hook.settlements, loading: false };
   },
 }));
 vi.mock('../../hooks/useTripExpenses', () => ({
@@ -87,5 +88,12 @@ describe('TripScreen', () => {
     expect(hook.settlementCalls).toContainEqual(['japan', 'trip']);
     hook.expenses = [];
     hook.itemsByExpense = {};
+  });
+
+  it('shows a balance left by a paid settlement even with no expenses', () => {
+    hook.settlements = [{ id: 's', month: 'trip', fromUid: 'mike', toUid: 'priya', amount: 1000, paid: true }];
+    renderAt('/travel/japan');
+    expect(screen.getByRole('region', { name: 'Your balance' })).toHaveTextContent('You get back A$10.00');
+    hook.settlements = [];
   });
 });

@@ -20,7 +20,7 @@ export default function TravelTile({ trips, viewerUid }: { trips: GroupDoc[]; vi
   // Only the featured trip's expenses load; with none featured, nothing does.
   const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
   const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
-  const figures = trip && !loading && !itemsLoading && !settlementsLoading && expenses.length > 0
+  const figures = trip && !loading && !itemsLoading && !settlementsLoading
     ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements)
     : null;
 

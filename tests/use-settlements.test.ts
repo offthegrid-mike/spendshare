@@ -7,11 +7,13 @@ import type { SettlementDoc } from '../src/types/models';
 // ---------------------------------------------------------------------------
 
 let snapshotCallback: ((snap: unknown) => void) | null = null;
+let errorCallback: (() => void) | null = null;
 const unsubscribe = vi.fn();
 
 const { onSnapshot, query, where, collection } = vi.hoisted(() => ({
-  onSnapshot: vi.fn((_q: unknown, cb: (snap: unknown) => void) => {
+  onSnapshot: vi.fn((_q: unknown, cb: (snap: unknown) => void, onError?: () => void) => {
     snapshotCallback = cb;
+    errorCallback = onError ?? null;
     return unsubscribe;
   }),
   query: vi.fn((...args: unknown[]) => ({ _query: args })),
@@ -124,5 +126,23 @@ describe('useSettlements', () => {
     unmount();
 
     expect(unsubscribe).toHaveBeenCalled();
+  });
+});
+
+describe('useSettlements when the query fails', () => {
+  beforeEach(() => {
+    onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void, onError?: () => void) => {
+      snapshotCallback = cb;
+      errorCallback = onError ?? null;
+      return unsubscribe;
+    });
+  });
+
+  it('stops loading instead of waiting for ever', () => {
+    const { result } = renderHook(() => useSettlements('g1', 'trip'));
+    expect(result.current.loading).toBe(true);
+    act(() => errorCallback?.());
+    expect(result.current.loading).toBe(false);
+    expect(result.current.settlements).toEqual([]);
   });
 });

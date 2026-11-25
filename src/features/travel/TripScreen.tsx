@@ -59,8 +59,10 @@ export default function TripScreen({ trips, viewerUid }: Props) {
         </Link>
       </section>
 
-      {!loading && !itemsLoading && !settlementsLoading && expenses.length > 0 && (() => {
-        const { balance } = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements);
+      {!loading && !itemsLoading && !settlementsLoading && (() => {
+        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements);
+        if (!figures) return null;
+        const { balance } = figures;
         const tone = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' }[balance.tone];
         return (
           <section aria-labelledby="your-balance" className="card flex flex-wrap items-center justify-between gap-3 p-4">

@@ -69,13 +69,16 @@ export function valueTrip(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpense
     const parts = spreadInProportion(homeTotal, expenseItems.map((it) => it.amount));
     expenseItems.forEach((it, i) => {
       addParty(expense.payerUid);
-      for (const uid of it.sharedWith ?? []) addParty(uid);
+      // A shared item without a list (written before T2) is shared by the current members,
+      // never by everyone in `parties`, which also holds people who have left.
+      const sharedWith = it.shared ? (it.sharedWith?.length ? it.sharedWith : trip.memberUids) : it.sharedWith;
+      for (const uid of sharedWith ?? []) addParty(uid);
       items.push({
         amount: parts[i],
         shared: it.shared,
         payerUid: expense.payerUid,
         ...(it.refund ? { refund: true } : {}),
-        ...(it.sharedWith ? { sharedWith: it.sharedWith } : {}),
+        ...(sharedWith ? { sharedWith } : {}),
         expenseId: expense.id,
         categoryId: it.categoryId,
         category: it.category,
@@ -98,11 +101,23 @@ export interface TripBreakdown {
   byCurrency: { currency: string; amount: number }[];
 }
 
-export function tripBreakdown(valuation: TripValuation, expenses: ExpenseDoc[], home: string): TripBreakdown {
-  const byCategory = new Map<string, number>();
+/**
+ * `categoryNames` (current names by id) groups a renamed category as one; without
+ * it, or for a deleted category, the name stored on the item is used.
+ */
+export function tripBreakdown(
+  valuation: TripValuation,
+  expenses: ExpenseDoc[],
+  home: string,
+  categoryNames: Record<string, string> = {},
+): TripBreakdown {
+  const byCategory = new Map<string, { name: string; amount: number }>();
   for (const it of valuation.items) {
-    const name = it.category || 'Uncategorised';
-    byCategory.set(name, (byCategory.get(name) ?? 0) + it.amount);
+    const key = it.categoryId || `name:${it.category}`;
+    const name = categoryNames[it.categoryId] || it.category || 'Uncategorised';
+    const entry = byCategory.get(key) ?? { name, amount: 0 };
+    entry.amount += it.amount;
+    byCategory.set(key, entry);
   }
   const byCurrency = new Map<string, number>();
   for (const e of expenses) {
@@ -111,7 +126,7 @@ export function tripBreakdown(valuation: TripValuation, expenses: ExpenseDoc[], 
   }
   return {
     spent: valuation.items.reduce((s, it) => s + it.amount, 0),
-    byCategory: [...byCategory.entries()].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+    byCategory: [...byCategory.values()].sort((a, b) => b.amount - a.amount),
     byCurrency: [...byCurrency.entries()].map(([currency, amount]) => ({ currency, amount })),
   };
 }
@@ -133,14 +148,16 @@ export function tripBalanceCopy(balance: number, isViewer: boolean, currency: st
   return { verb: isViewer ? 'You owe' : 'Owes', amount, tone: 'owe' };
 }
 
-/** What the trip page and Home tile show: spent so far, and the viewer's balance in words. */
+/** What the trip page and Home tile show: spent so far, and the viewer's balance in words; null with nothing spent or paid. */
 export function viewerTripFigures(
   trip: GroupDoc,
   viewerUid: string,
   expenses: ExpenseDoc[],
   itemsByExpense: Record<string, ItemDoc[]>,
   settlements: PaidSettlement[],
-): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } {
+): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } | null {
+  // Nothing to show until something was spent or paid back; a paid settlement alone still leaves a balance.
+  if (expenses.length === 0 && !settlements.some((s) => s.paid)) return null;
   const valuation = valueTrip(trip, expenses, itemsByExpense);
   const summary = tripSummary(valuation, settlements);
   return {

@@ -82,6 +82,13 @@ describe('valueTrip', () => {
     expect(s.transactions).toEqual([]);
   });
 
+  it('splits a shared item with no list of sharers among current members only, not former ones', () => {
+    const e = makeExpense('e', { payerUid: 'gone', currency: 'AUD', total: 900, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
+    const v = valueTrip(trip, [e], { e: [item('i', 'e', { amount: 900, payerUid: 'gone', shared: true })] });
+    expect(v.items[0].sharedWith).toEqual(['alex', 'ben', 'chris']);
+    expect(tripSummary(v, []).shareOf).toEqual({ alex: 300, ben: 300, chris: 300, gone: 0 });
+  });
+
   it('skips an expense whose items have not loaded', () => {
     expect(valueTrip(trip, [card('e')], {}).items).toEqual([]);
   });
@@ -100,6 +107,18 @@ describe('tripBreakdown', () => {
       byCategory: [{ name: 'Food', amount: 10000 }, { name: 'Transport', amount: 2500 }],
       byCurrency: [{ currency: 'JPY', amount: 9900 }, { currency: 'AUD', amount: 2500 }],
     });
+  });
+});
+
+describe('tripBreakdown with current category names', () => {
+  it('groups by category id, under its current name', () => {
+    const a = makeExpense('a', { currency: 'AUD', total: 100, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
+    const b = makeExpense('b', { currency: 'AUD', total: 50, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
+    const v = valueTrip(trip, [a, b], {
+      a: [item('a1', 'a', { amount: 100, categoryId: 'f', category: 'Food' })],
+      b: [item('b1', 'b', { amount: 50, categoryId: 'f', category: 'Food & drink' })],
+    });
+    expect(tripBreakdown(v, [a, b], 'AUD', { f: 'Food & drink' }).byCategory).toEqual([{ name: 'Food & drink', amount: 150 }]);
   });
 });
 
