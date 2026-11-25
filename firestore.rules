@@ -189,7 +189,10 @@ service cloud.firestore {
           return !('paidWith' in d) || (d.paidWith is map && (
             (d.paidWith.get('kind', null) == 'card' && validCard(d.paidWith))
             || (d.paidWith.get('kind', null) == 'wallet' && d.paidWith.keys().hasOnly(['kind', 'walletId'])
-                && d.paidWith.get('walletId', null) is string)));
+                && d.paidWith.get('walletId', null) is string
+                // Cash comes out of the payer's own wallet, which must exist.
+                && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId))
+                && getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.ownerUid == d.payerUid)));
         }
         allow create, update: if isMember(groupId)
           && request.resource.data.createdByUid == request.auth.uid

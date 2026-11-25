@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { valueTrip, tripSummary, spreadInProportion, tripBreakdown, tripMemberName, tripBalanceCopy } from './valueTrip';
+import { valueTrip, tripSummary, spreadInProportion, tripBreakdown, tripMemberName, tripBalanceCopy, viewerTripFigures } from './valueTrip';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
 import type { ExpenseDoc, ItemDoc } from '../../types/models';
 
@@ -119,6 +119,14 @@ describe('tripBreakdown with current category names', () => {
       b: [item('b1', 'b', { amount: 50, categoryId: 'f', category: 'Food & drink' })],
     });
     expect(tripBreakdown(v, [a, b], 'AUD', { f: 'Food & drink' }).byCategory).toEqual([{ name: 'Food & drink', amount: 150 }]);
+  });
+});
+
+describe('viewerTripFigures', () => {
+  it('counts a total with cash payments in it as approximate, as the expense list does', () => {
+    const e = makeExpense('d', { payerUid: 'alex', currency: 'JPY', total: 60000, paidWith: { kind: 'wallet', walletId: 'alex_JPY' } });
+    const figures = viewerTripFigures(trip, 'alex', [e], { d: [item('i', 'd', { amount: 60000, payerUid: 'alex', shared: false })] }, [], { d: 61800 });
+    expect(figures).toEqual(expect.objectContaining({ spent: 61800, estimated: true }));
   });
 });
 

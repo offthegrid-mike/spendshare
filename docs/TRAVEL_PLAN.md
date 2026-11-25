@@ -47,7 +47,7 @@ Tell Claude **"Continue the Travel plan — do T<n>"**. Each milestone follows t
 
 ## Design decisions (proposed in this plan; confirm or change at T0)
 
-1. **Cash is a payment method with a known cost.** Buying foreign cash locks in what it cost in home currency. A cash payment is valued at the **wallet's weighted average rate**: total home currency paid in ÷ total foreign cash received. The market rate on the day doesn't matter.
+1. **Cash is a payment method with a known cost.** Buying foreign cash locks in what it cost in home currency. A cash payment is valued at the **wallet's average rate for the cash bought up to that day** (a running average: top-ups and payments in date order). The market rate on the day doesn't matter, and buying more cash later never changes what an earlier payment was worth. (Changed from one overall average in the T4 review, which let a later purchase reopen balances already settled.)
 2. **Valuation is computed, not stored.** Trip items store their amount in the **expense's own currency**. A pure `valueTrip()` step converts everything to home currency when the summary is built. A later top-up changes a wallet's average rate, and stored home amounts would then go stale. Closing a trip (T6) freezes the values.
 3. **Card payments** carry their own rate on the expense. Save it as *estimated* (the last rate used for that currency is remembered). When the statement arrives, replace it with the *actual* amount charged in home currency, fees included.
 4. **Leftover cash in a personal wallet belongs to its owner** and never enters the split.
@@ -213,13 +213,15 @@ Pure modules with no UI. Everything later depends on these.
 
 ### Task 4.2: Paying from a wallet — done
 - The editor's **Paid with** is Card or Cash. Cash offers the wallets in the expense's currency (yours first); the wallet's owner becomes the payer, and there's no rate to enter. A warning shows when the payment is more than the cash left (it's still saved).
-- `tripCash` values every cash payment at its wallet's average rate, cumulatively in the order spent (day, then when added) with `valueSpends`, so spending plus what's left always equals what the cash cost. The list ("Cash" chip), detail, summary, trip page and Home tile all use these values. A payment from a wallet with no cash added stays out of the balances, and says so.
+- `tripCash` values every cash payment at a running average: top-ups and payments in date order (top-ups first on a day, payments by when they were added), each payment drawing from the cash bought up to then. A payment beyond that cash (made before the cash was recorded, or overspent) is valued at the wallet's overall average for that part. Each value comes out of the pool, so spending plus what's left always equals what the cash cost. A payment in a different currency from its wallet is left unvalued. The list ("Cash" chip), detail, summary, trip page and Home tile all use these values. A payment from a wallet with no cash added stays out of the balances, and says so.
 - `useTripData` combines a trip's expenses and wallets for every screen.
 - **Not in T4:** refunds (trips have none yet).
 
 ### Task 4.3: Rules — done
 - Wallets: members only; `kind` 'personal'; the id is `ownerUid_CUR`; the owner is on the trip; owner and currency never change.
 - Top-ups: members only; written by their author (`byUid`); whole amounts, `foreignAmount > 0` and `homeAmount >= 0`; an ISO date; into a wallet that exists once the batch lands; no other keys.
+- A cash payment's wallet must exist and belong to the expense's payer.
+- Removing a top-up asks first.
 
 **Acceptance:** example A gives Ben and Chris A$206 each to pay Alex, and the wallet shows ¥40,000 left at 0.0103.
 
@@ -271,7 +273,7 @@ Pure modules with no UI. Everything later depends on these.
 
 ## Risks and open questions
 
-- **Values move while a trip is open.** A late top-up changes a wallet's average rate, which changes earlier cash values. This is correct, but may surprise people. Show "values update as cash is added", and freeze them at close.
+- **Values move while a trip is open:** mostly settled in T4. A later top-up no longer changes earlier cash payments (running average). Values still move when a top-up is backdated or removed, or a card's amount charged is entered, so the trip still freezes them at close (T6).
 - **`ItemDoc.amount` means different things.** In a household it's cents in the group currency. On a trip it's minor units of the expense's currency. Every trip screen must format with the expense currency. A test helper should fail if a trip item is formatted with `formatMoney`.
 - **Collection-group queries on items** (year summary, search) are scoped per group, so trip items don't leak into household totals. Check this again in T1.
 - **A former member who paid for something** (found in T0 review): **fixed** in the PR #17 review. `computeSummary` counts any payer or sharer who has left as a party, so they're paid back and balances add up, in households and trips alike, and they show as "A former member". Households with such a payer see a new "pay back" line in settle-up for those months.

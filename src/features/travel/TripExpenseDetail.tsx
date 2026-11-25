@@ -147,8 +147,8 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
         {paid?.kind === 'wallet' && (
           <p className="text-[13px] tabular-nums text-ink-muted">
             {`Paid in cash from ${expense.payerUid === user.uid ? 'your' : `${memberName(trip, expense.payerUid)}’s`} ${currency} cash · `}
-            {homeTotal !== null && wallet?.rate
-              ? `≈ ${formatMinor(homeTotal, home)} at its average rate (1 ${home} = ${readableWalletRate(wallet.rate, currency, home)} ${currency})`
+            {homeTotal !== null && wallet?.rate && homeTotal > 0
+              ? `≈ ${formatMinor(homeTotal, home)} at its average rate (1 ${home} = ${readableWalletRate({ foreign: expense.total, home: homeTotal }, currency, home)} ${currency})`
               : 'not valued yet: add the cash that was bought on the Cash page'}
           </p>
         )}

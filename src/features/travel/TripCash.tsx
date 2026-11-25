@@ -2,7 +2,9 @@ import { useId, useState, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
 import { format, parseISO } from 'date-fns';
 import { Banknote, TriangleAlert, X } from 'lucide-react';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import LoadingButton from '../../components/LoadingButton';
+import { useUIStore } from '../../stores/uiStore';
 import Select from '../../components/ui/Select';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { readableWalletRate, walletIdFor, type TripCash as TripCashState, type WalletState } from '../../lib/travel/cash';
@@ -33,6 +35,15 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
   const who = owner(trip, state.wallet.ownerUid, user.uid);
   const title = `${who.possessive} ${currency} cash`;
   const [removing, setRemoving] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ id: string; label: string } | null>(null);
+
+  function remove(topUpId: string) {
+    setConfirming(null);
+    setRemoving(topUpId);
+    deleteTopUp(trip.id, topUpId)
+      .catch(() => useUIStore.getState().showNotice({ message: "Couldn't remove that cash. Try again." }))
+      .finally(() => setRemoving(null));
+  }
 
   return (
     <section aria-label={title} className="card space-y-2 p-4">
@@ -45,10 +56,10 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
           {`${formatMinor(-state.left.foreign, currency)} more spent than added`}
         </p>
       )}
-      {state.rate ? (
+      {state.rate && state.leftRate ? (
         <p className="text-[13px] text-ink-muted">
           {state.left.home !== null && state.left.foreign > 0 && `Cost ${formatMinor(state.left.home, home)} · `}
-          {`Average 1 ${home} = ${readableWalletRate(state.rate, currency, home)} ${currency}`}
+          {`Average 1 ${home} = ${readableWalletRate(state.leftRate, currency, home)} ${currency}`}
         </p>
       ) : (
         <p className="text-[13px] text-warning">{`Add the cash ${who.name === 'You' ? 'you' : who.name} bought, so its payments can be valued.`}</p>
@@ -68,10 +79,7 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
                   type="button"
                   aria-label={`Remove ${formatMinor(t.foreignAmount, currency)} added on ${when}`}
                   disabled={removing === t.id}
-                  onClick={() => {
-                    setRemoving(t.id);
-                    deleteTopUp(trip.id, t.id).catch(() => {}).finally(() => setRemoving(null));
-                  }}
+                  onClick={() => setConfirming({ id: t.id, label })}
                   className="grid h-8 w-8 place-items-center rounded-[10px] text-ink-muted hover:bg-recessed hover:text-ink disabled:opacity-50"
                 >
                   <X size={14} aria-hidden="true" />
@@ -81,6 +89,14 @@ function WalletCard({ trip, user, state }: { trip: GroupDoc; user: User; state: 
           })}
         </ul>
       )}
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Remove this cash?"
+        message={`${confirming?.label ?? ''} comes out of ${who.possessive === 'Your' ? 'your' : who.possessive} ${currency} cash, and its payments are valued again without it.`}
+        confirmLabel="Remove"
+        onConfirm={() => confirming && remove(confirming.id)}
+        onCancel={() => setConfirming(null)}
+      />
     </section>
   );
 }

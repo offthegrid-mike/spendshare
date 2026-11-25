@@ -32,6 +32,9 @@ export function useTripData(tripId: string | null): {
     loading: exp.loading || w.loading,
     itemsLoading: exp.itemsLoading,
     error: exp.error || w.error,
-    retry: exp.retry,
+    retry: () => {
+      exp.retry();
+      w.retry();
+    },
   };
 }

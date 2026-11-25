@@ -159,7 +159,8 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, cash
       return s + (Number.isFinite(n) ? n : 0);
     }, 0);
     if (cashPayment) {
-      return { total, home: payingWallet?.rate ? valueCash(total, payingWallet.rate) : null };
+      // An estimate at the average of the cash left, which a new payment draws from.
+      return { total, home: payingWallet?.leftRate ? valueCash(total, payingWallet.leftRate) : null };
     }
     const rate = foreign ? parseRate(draft.rate) : 1;
     return { total, home: rate > 0 ? toHome(total, draft.currency, home, rate) : null };

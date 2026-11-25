@@ -7,6 +7,7 @@ import TripCash from './TripCash';
 import { tripCash } from '../../lib/travel/cash';
 import { makeExpense, makeTrip } from '../../test/fixtures';
 import type { TopUpDoc, WalletDoc } from '../../types/models';
+import { useUIStore } from '../../stores/uiStore';
 
 const { addCash, deleteTopUp } = vi.hoisted(() => ({ addCash: vi.fn(), deleteTopUp: vi.fn() }));
 vi.mock('./cashWrite', () => ({ addCash, deleteTopUp }));
@@ -98,11 +99,23 @@ describe('TripCash', () => {
     expect(addCash).not.toHaveBeenCalled();
   });
 
-  it('removes cash added by mistake', async () => {
+  it('removes cash added by mistake, after confirming', async () => {
     const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderCash();
     await u.click(screen.getAllByRole('button', { name: /Remove/ })[0]);
+    expect(deleteTopUp).not.toHaveBeenCalled();
+    await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(deleteTopUp).toHaveBeenCalledWith('japan', 't1'));
+  });
+
+  it('says so when removing cash fails', async () => {
+    deleteTopUp.mockRejectedValue(new Error('denied'));
+    useUIStore.setState({ notice: null });
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderCash();
+    await u.click(screen.getAllByRole('button', { name: /Remove/ })[0]);
+    await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(useUIStore.getState().notice?.message).toBe("Couldn't remove that cash. Try again."));
   });
 
   it('flags a wallet that has paid out more than was put in, or has no cash added', () => {

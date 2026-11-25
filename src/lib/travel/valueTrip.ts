@@ -169,7 +169,8 @@ export function viewerTripFigures(
   const summary = tripSummary(valuation, settlements);
   return {
     spent: valuation.items.reduce((s, it) => s + it.amount, 0),
-    estimated: valuation.estimated.length > 0,
+    // Cash values move as wallets change, so a total with cash in it is approximate, as in the expense list.
+    estimated: valuation.estimated.length > 0 || valuation.items.some((it) => expenses.find((e) => e.id === it.expenseId)?.paidWith?.kind === 'wallet'),
     balance: tripBalanceCopy(summary.balance[viewerUid] ?? 0, true, trip.currency),
   };
 }

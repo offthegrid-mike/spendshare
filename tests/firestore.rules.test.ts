@@ -1449,8 +1449,14 @@ describe('/groups trip expenses (currency, paidWith, sharedWith)', () => {
     await assertSucceeds(save(expense({ paidWith: { kind: 'card', rate: 96.7, rateStatus: 'actual', homeTotal: 15510 } })));
   });
 
-  it('allows a wallet payment', async () => {
-    await assertSucceeds(save(expense({ paidWith: { kind: 'wallet', walletId: 'w1' } })));
+  it('allows a cash payment from the payer’s own wallet, and no one else’s or a missing one', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'userA_JPY'), { kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'sam_JPY'), { kind: 'personal', ownerUid: 'sam', currency: 'JPY' });
+    });
+    await assertSucceeds(save(expense({ paidWith: { kind: 'wallet', walletId: 'userA_JPY' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet', walletId: 'sam_JPY' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet', walletId: 'nope_JPY' } })));
   });
 
   it('denies a malformed currency', async () => {

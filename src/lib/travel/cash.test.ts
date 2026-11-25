@@ -117,6 +117,51 @@ describe('tripCash', () => {
   });
 });
 
+describe('tripCash — a running average in date order', () => {
+  const w = wallet('alex');
+
+  it('values a payment only from the cash bought up to its day, so buying more later doesn’t change it', () => {
+    const cash = tripCash([w], [
+      topUp('first', w.id, 50000, 50000, '2027-05-10'),
+      topUp('later', w.id, 50000, 53000, '2027-05-12'),
+    ], [cashPayment('dinner', w.id, 50000, { tripDay: '2027-05-10' })]);
+    expect(cash.values).toEqual({ dinner: 50000 });
+    expect(cash.wallets[0].left).toEqual({ foreign: 50000, home: 53000 });
+  });
+
+  it('gives the average of the cash left, which is what the next payment draws from', () => {
+    const cash = tripCash([w], [
+      topUp('first', w.id, 50000, 50000, '2027-05-10'),
+      topUp('later', w.id, 50000, 53000, '2027-05-12'),
+    ], [cashPayment('dinner', w.id, 50000, { tripDay: '2027-05-10' })]);
+    expect(cash.wallets[0].leftRate).toEqual({ foreign: 50000, home: 53000 });
+    expect(cash.wallets[0].rate).toEqual({ foreign: 100000, home: 103000 });
+  });
+
+  it('counts cash bought on the day of a payment as bought before it', () => {
+    const cash = tripCash([w], [topUp('same', w.id, 1000, 1000, '2027-05-12')], [cashPayment('x', w.id, 1000, { tripDay: '2027-05-12' })]);
+    expect(cash.values).toEqual({ x: 1000 });
+  });
+
+  it('values a payment made before any cash was recorded at the wallet’s overall average', () => {
+    const cash = tripCash([w], [topUp('t', w.id, 10000, 10300, '2027-05-14')], [cashPayment('x', w.id, 1000, { tripDay: '2027-05-11' })]);
+    expect(cash.values).toEqual({ x: 1030 });
+    expect(cash.wallets[0].left).toEqual({ foreign: 9000, home: 9270 });
+  });
+
+  it('values the part of an overspend beyond the cash left at the overall average, keeping spent plus left exact', () => {
+    const cash = tripCash([w], [topUp('t', w.id, 1000, 1000)], [cashPayment('x', w.id, 1500)]);
+    expect(cash.values).toEqual({ x: 1500 });
+    expect(cash.wallets[0].left).toEqual({ foreign: -500, home: -500 });
+  });
+
+  it('leaves a payment in another currency than its wallet unvalued, rather than mis-valuing it', () => {
+    const cash = tripCash([w], [topUp('t', w.id, 1000, 1000)], [cashPayment('usd', w.id, 2000, { currency: 'USD' })]);
+    expect(cash.values).toEqual({ usd: null });
+    expect(cash.wallets[0].left.foreign).toBe(1000);
+  });
+});
+
 describe('cashLeftFor', () => {
   it('is the wallet’s cash left, adding back what an expense being edited already took', () => {
     const w = wallet('alex');

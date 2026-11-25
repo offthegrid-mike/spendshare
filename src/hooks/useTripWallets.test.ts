@@ -44,4 +44,13 @@ describe('useTripWallets', () => {
     expect(listeners).toHaveLength(0);
     expect(result.current.loading).toBe(false);
   });
+
+  it('listens again on retry after an error', () => {
+    const { result } = renderHook(() => useTripWallets('japan'));
+    act(() => { listeners[0].error(); listeners[1].error(); });
+    act(() => result.current.retry());
+    expect(listeners).toHaveLength(4);
+    expect(result.current.error).toBe(false);
+    expect(result.current.loading).toBe(true);
+  });
 });
