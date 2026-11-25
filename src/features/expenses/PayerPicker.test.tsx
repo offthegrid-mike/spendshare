@@ -34,6 +34,6 @@ describe('PayerPicker', () => {
 
   it('keeps a payer who has left the group as a choice', () => {
     render(<PayerPicker group={pair} viewerUid="mike" value="ghost" onChange={() => {}} />);
-    expect(screen.getByRole('radio', { name: /ghost/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /A former member/ })).toBeChecked();
   });
 });

@@ -17,7 +17,7 @@ import { recentWorkingDays, todayStatus, type RecentStatus, type TodayStatus } f
 import { formatHours } from '../../lib/work/workTime';
 import { writeWorkDay } from '../../lib/work/workWrite';
 import { summariseYear } from '../../lib/work/workYear';
-import { settleWrite } from '../work/settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 
 // Home's Work tile (spec 6.4): today's status, the gaps to fill, the Home hours so
 // far this income year and a strip of the last five working days, with a way into

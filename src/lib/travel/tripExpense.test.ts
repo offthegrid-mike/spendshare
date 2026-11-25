@@ -20,6 +20,11 @@ describe('parseRate', () => {
     expect(parseRate('16 000')).toBe(16000);
   });
 
+  it('reads European and English grouping with a decimal part', () => {
+    expect(parseRate('10.450,5')).toBe(10450.5);
+    expect(parseRate('10,450.5')).toBe(10450.5);
+  });
+
   it('is NaN for anything else', () => {
     expect(parseRate('')).toBeNaN();
     expect(parseRate('abc')).toBeNaN();
@@ -174,6 +179,15 @@ describe('tripDayGroups', () => {
       ['2027-05-12', 'Day 3 · Wed 12 May', ['b', 'c']],
       ['2027-05-10', 'Day 1 · Mon 10 May', ['a']],
     ]);
+  });
+
+  it('lists a day’s expenses newest first, with one still saving at the top', () => {
+    const groups = tripDayGroups([
+      tripExpense('old', { day: '2027-05-12', created: 1 }),
+      tripExpense('saving', { day: '2027-05-12' }),
+      tripExpense('new', { day: '2027-05-12', created: 2 }),
+    ], trip);
+    expect(groups[0].expenses.map((e) => e.id)).toEqual(['saving', 'new', 'old']);
   });
 
   it('labels days outside the trip as before or after it', () => {

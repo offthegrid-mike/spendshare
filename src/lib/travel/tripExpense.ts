@@ -9,13 +9,23 @@ import type { ExpenseDoc, TripDates } from '../../types/models';
  * show it: 1 A$ = ¥99), estimated until the amount actually charged is entered.
  */
 
-/** A typed rate. A lone comma is a decimal comma ("98,5", "0,615") unless three digits follow a non-zero number ("16,000"). */
+/**
+ * A typed rate. With both '.' and ',', the later is the decimal mark. A lone comma
+ * is a decimal comma ("98,5", "0,615") unless it groups thousands ("16,000").
+ */
 export function parseRate(text: string): number {
   const s = text.replace(/\s/g, '');
   if (!s) return NaN;
-  const loneComma = s.includes(',') && !s.includes('.');
-  const thousands = /^[1-9]\d{0,2}(,\d{3})+$/.test(s);
-  const normal = loneComma && !thousands ? s.replace(',', '.') : s.replace(/,/g, '');
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+  let normal: string;
+  if (lastDot >= 0 && lastComma >= 0) {
+    // Both appear: the later one is the decimal mark ("10.450,5", "10,450.5").
+    normal = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else {
+    const thousands = /^[1-9]\d{0,2}(,\d{3})+$/.test(s);
+    normal = lastComma >= 0 && !thousands ? s.replace(',', '.') : s.replace(/,/g, '');
+  }
   const n = Number(normal);
   return Number.isFinite(n) ? n : NaN;
 }
@@ -162,7 +172,9 @@ export function tripDayGroups(expenses: ExpenseDoc[], trip: TripDates): TripDay[
   }
   return [...byDay.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([date, list]) => {
+    .map(([date, unsorted]) => {
+      // Every trip expense sits at noon of its day, so order within a day by when it was added.
+      const list = [...unsorted].sort((a, b) => createdMillis(b) - createdMillis(a));
       const when = format(parseISO(date), 'EEE d MMM');
       const p = tripProgress(trip, date);
       const prefix = p.status === 'current' ? `Day ${p.day}` : p.status === 'upcoming' ? 'Before the trip' : 'After the trip';

@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { groupsCol } from '../../lib/converters';
+import { settleWrite } from '../../lib/settleWrite';
 import { formatTripDates, validateTripInput } from '../../lib/travel/trips';
 import DatePicker from '../expenses/DatePicker';
 import MembersSection from '../groups/MembersSection';
@@ -40,10 +41,10 @@ export default function TripSettings({ trip, user }: Props) {
     setSaving(true);
     setError('');
     try {
-      await updateDoc(doc(groupsCol, trip.id), {
+      await settleWrite(updateDoc(doc(groupsCol, trip.id), {
         name: name.trim(),
         ...(datesChanged ? { trip: { startDate, endDate } } : {}),
-      });
+      }));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {

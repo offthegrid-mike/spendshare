@@ -2,7 +2,7 @@ import { doc, serverTimestamp, Timestamp, updateDoc, writeBatch } from 'firebase
 import { db } from '../../lib/firebase';
 import { expensesCol, itemsCol } from '../../lib/converters';
 import { chargedRate, type BuiltTripExpense } from '../../lib/travel/tripExpense';
-import { settleWrite } from '../work/settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 import type { ExpenseDoc, ItemDoc, TripPayment } from '../../types/models';
 
 // Trip writes don't wait for the server while offline (travellers often are):

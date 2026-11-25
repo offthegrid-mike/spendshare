@@ -15,7 +15,7 @@ describe('memberName', () => {
     const g = makeGroup('g', 'G');
     g.members.priya = { ...g.members.priya, displayName: '' };
     expect(memberName(g, 'priya')).toBe('priya@example.com');
-    expect(memberName(pair, 'ghost')).toBe('ghost');
+    expect(memberName(pair, 'ghost')).toBe('A former member');
   });
 });
 

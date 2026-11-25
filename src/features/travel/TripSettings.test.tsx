@@ -28,7 +28,9 @@ const trip = makeTrip('japan', 'Japan', '2027-05-10', '2027-05-20');
 const owner = { uid: 'mike', email: 'mike@example.com', displayName: 'Mike' } as User;
 const member = { uid: 'priya', email: 'priya@example.com', displayName: 'Priya' } as User;
 
-beforeEach(() => updateDoc.mockReset().mockResolvedValue(undefined));
+beforeEach(() => {
+  updateDoc.mockReset().mockResolvedValue(undefined);
+});
 
 describe('TripSettings', () => {
   it('lets the owner change the name and dates', async () => {
@@ -90,5 +92,18 @@ describe('TripSettings', () => {
     render(<TripSettings trip={trip} user={owner} />);
     expect(screen.getByText('Priya')).toBeInTheDocument();
     expect(screen.getByTestId('send-invite')).toHaveAttribute('data-kind', 'trip');
+  });
+
+  it('does not wait for the server while offline', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    updateDoc.mockReturnValue(new Promise(() => {}));
+    const u = userEvent.setup();
+    render(<TripSettings trip={trip} user={owner} />);
+    await u.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument();
+    await u.type(screen.getByPlaceholderText('e.g. Jane Smith'), 'Sam');
+    await u.click(screen.getByRole('button', { name: 'Add member' }));
+    await waitFor(() => expect(screen.getByPlaceholderText('e.g. Jane Smith')).toHaveValue(''));
+    vi.restoreAllMocks();
   });
 });

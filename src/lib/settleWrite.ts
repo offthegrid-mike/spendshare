@@ -1,4 +1,4 @@
-import { useUIStore } from '../../stores/uiStore';
+import { useUIStore } from '../stores/uiStore';
 
 // Firestore's write promise resolves only when the server acknowledges the write,
 // never while offline, even though the write is queued in the local cache at once

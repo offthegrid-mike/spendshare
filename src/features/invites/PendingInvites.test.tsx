@@ -40,6 +40,7 @@ describe('PendingInvites', () => {
     render(<PendingInvites user={user} />);
     await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
 
+    expect(screen.getByText(/invited you to join the trip/)).toBeInTheDocument();
     await waitFor(() => expect(useUIStore.getState().notice?.message).toBe('You joined Tasmania trip'));
     expect(useUIStore.getState().pendingGroupId).toBeNull();
     expect(useUIStore.getState().selectedGroupId).toBe('g1');

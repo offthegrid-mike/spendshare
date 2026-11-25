@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { User } from 'firebase/auth';
 
 const { addDoc, seed } = vi.hoisted(() => ({ addDoc: vi.fn(), seed: vi.fn() }));
-vi.mock('firebase/firestore', () => ({ addDoc, serverTimestamp: () => 'TS' }));
+vi.mock('firebase/firestore', () => ({ setDoc: addDoc, doc: () => ({ id: 'trip-1' }), serverTimestamp: () => 'TS' }));
 vi.mock('../converters', () => ({ groupsCol: 'groupsCol' }));
 vi.mock('../seedCategories', () => ({ seedDefaultCategories: seed }));
 
@@ -20,7 +20,7 @@ describe('createTrip', () => {
     const id = await createTrip(user, { name: ' Japan 2027 ', currency: 'AUD', startDate: '2027-05-10', endDate: '2027-05-20' });
     expect(id).toBe('trip-1');
     expect(addDoc).toHaveBeenCalledWith(
-      'groupsCol',
+      { id: 'trip-1' },
       expect.objectContaining({
         name: 'Japan 2027',
         currency: 'AUD',

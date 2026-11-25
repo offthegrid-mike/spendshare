@@ -88,7 +88,7 @@ describe('ExpenseRow (disclosure)', () => {
 
   it('copes with a payer who has left the group', () => {
     renderRow({ expense: { ...exp, payerUid: 'ghost' } });
-    expect(screen.getByTitle('Paid by ghost')).toHaveTextContent('G');
+    expect(screen.getByTitle('Paid by A former member')).toHaveTextContent('A');
   });
 
   it('shows just the item count when there is no category', () => {

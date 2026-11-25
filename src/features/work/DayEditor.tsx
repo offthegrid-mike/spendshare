@@ -18,7 +18,7 @@ import {
   type DayFormState,
   type FormEvent,
 } from './dayForm';
-import { settleWrite } from './settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 
 // One day's form: the type and, for Home, the start, finish and hours (dayForm
 // keeps the three in step). Besides saving, it clears the day, confirms a Home

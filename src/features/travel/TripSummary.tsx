@@ -12,7 +12,7 @@ import { expenseHomeTotal } from '../../lib/travel/tripExpense';
 import {
   TRIP_SETTLEMENT_MONTH, tripBalanceCopy, tripBreakdown, tripMemberName, tripSummary, valueTrip,
 } from '../../lib/travel/valueTrip';
-import { settleWrite } from '../work/settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 import type { ExpenseDoc, GroupDoc, ItemDoc, SettlementDoc } from '../../types/models';
 
 const TONE = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' } as const;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { UserPlus, Trash2, Crown } from 'lucide-react';
 import { groupsCol } from '../../lib/converters';
+import { settleWrite } from '../../lib/settleWrite';
 import LoadingButton from '../../components/LoadingButton';
 import Avatar from '../../components/ui/Avatar';
 import Chip from '../../components/ui/Chip';
@@ -27,7 +28,8 @@ export default function MembersSection({ group, currentUserUid }: Props) {
     setAddError('');
     try {
       const uid = `manual_${crypto.randomUUID()}`;
-      await updateDoc(doc(groupsCol, group.id), {
+      // Not waiting for the server while offline: the change is already in the local cache.
+      await settleWrite(updateDoc(doc(groupsCol, group.id), {
         [`members.${uid}`]: {
           role: 'member',
           displayName: memberName.trim(),
@@ -36,7 +38,7 @@ export default function MembersSection({ group, currentUserUid }: Props) {
           manual: true,
         },
         memberUids: arrayUnion(uid),
-      });
+      }));
       setMemberName('');
       setMemberEmail('');
     } catch {
@@ -50,10 +52,10 @@ export default function MembersSection({ group, currentUserUid }: Props) {
     setRemoveError('');
     setRemovingIds((prev) => new Set(prev).add(uid));
     try {
-      await updateDoc(doc(groupsCol, group.id), {
+      await settleWrite(updateDoc(doc(groupsCol, group.id), {
         [`members.${uid}`]: deleteField(),
         memberUids: arrayRemove(uid),
-      });
+      }));
     } catch {
       setRemoveError('Failed to remove member. Please try again.');
     } finally {

@@ -48,6 +48,8 @@ export function computeSummary(members: string[], items: SummaryItem[], settleme
       shareOf[uid] += share;
     }
   }
+  // Likewise a payer who is no longer a member is still paid back, so balances add up.
+  for (const uid of Object.keys(paidShared)) if (!parties.includes(uid)) parties.push(uid);
   const balance: Record<string, number> = {};
   for (const m of parties) balance[m] = (paidShared[m] ?? 0) - (shareOf[m] ?? 0);
   for (const s of settlements) {

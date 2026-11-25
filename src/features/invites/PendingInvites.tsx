@@ -33,7 +33,7 @@ export default function PendingInvites({ user }: Props) {
           >
             <p className="text-sm text-ink">
               <span className="font-semibold">{invite.invitedByName}</span>{' '}
-              invited you to join{' '}
+              {invite.groupKind === 'trip' ? 'invited you to join the trip' : 'invited you to join'}{' '}
               <span className="font-semibold">{invite.groupName}</span>.
             </p>
             {error?.id === invite.ref.path && (
