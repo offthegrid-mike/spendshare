@@ -9,7 +9,14 @@ import type { GroupDoc } from '../../types/models';
 
 vi.mock('../../lib/firebase', () => ({ auth: {} }));
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }));
-vi.mock('../../lib/features', () => ({ DARK_MODE_ENABLED: true }));
+const flags = vi.hoisted(() => ({ travel: false }));
+vi.mock('../../lib/features', () => ({
+  DARK_MODE_ENABLED: true,
+  get TRAVEL_ENABLED() { return flags.travel; },
+}));
+vi.mock('./TravelTile', () => ({
+  default: ({ trips }: { trips: unknown[] }) => <div data-testid="travel-tile" data-trips={trips.length} />,
+}));
 vi.mock('./SpendTile', () => ({
   default: ({ groups, group, viewerUid }: { groups: unknown[]; group: { id: string } | null; viewerUid: string }) => (
     <div data-testid="spend-tile" data-viewer={viewerUid} data-groups={groups.length} data-group={group?.id ?? ''} />
@@ -38,7 +45,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 9, 19, 9)); // Monday 19 October 2026, 09:00
 });
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  flags.travel = false;
+});
 
 describe('HomeScreen', () => {
   it('greets the user by first name, with today in words', () => {
@@ -119,5 +129,17 @@ describe('HomeScreen', () => {
     expect(menu).toHaveTextContent('mike@example.com');
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Categories' })).toBeNull();
+  });
+
+  it('shows the Travel tile with the trips only when Travel is on', () => {
+    renderHome();
+    expect(screen.queryByTestId('travel-tile')).not.toBeInTheDocument();
+    flags.travel = true;
+    render(
+      <MemoryRouter>
+        <HomeScreen user={mike} groups={[household]} group={household} trips={[household, household]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('travel-tile')).toHaveAttribute('data-trips', '2');
   });
 });

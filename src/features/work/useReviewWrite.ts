@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { WorkAction } from '../../lib/work/workDay';
 import { writeWorkDay } from '../../lib/work/workWrite';
 import type { WorkDayDoc, WorkSettingsDoc } from '../../types/models';
-import { settleWrite } from './settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 
 export const REVIEW_WRITE_FAILED = "Couldn't update the day. Try again.";
 

@@ -27,6 +27,16 @@ vi.mock('react-day-picker', () => ({
 import DatePicker from './DatePicker';
 
 describe('DatePicker', () => {
+  it('names its button after the field, so two pickers on one form can be told apart', () => {
+    render(<DatePicker name="First day" value="2027-05-10" onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'First day: May 10, 2027' })).toBeInTheDocument();
+  });
+
+  it('is called Date when no name is given', () => {
+    render(<DatePicker value="" onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Date: Pick a date' })).toBeInTheDocument();
+  });
+
   it('displays the formatted date when a value is provided', () => {
     render(<DatePicker id="dp" value="2026-06-15" onChange={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Jun 15, 2026/i })).toBeInTheDocument();

@@ -9,12 +9,20 @@ export interface UserDoc {
   memberOf: string[]; createdAt: Timestamp;
 }
 export interface GroupMember { role: Role; displayName: string; email: string; joinedAt: Timestamp; manual?: boolean; }
+/** A trip's first and last days, 'YYYY-MM-DD', both included. */
+export interface TripDates { startDate: string; endDate: string; }
 export interface GroupDoc {
-  id: string; name: string; currency: string; ownerUid: Uid;
+  id: string; name: string;
+  currency: string; // a trip's home currency, which balances and settle-up use
+  ownerUid: Uid;
   members: Record<Uid, GroupMember>; memberUids: Uid[]; createdAt: Timestamp;
+  kind?: 'trip';    // missing = a household; set at creation and never changed (see lib/travel/trips.ts)
+  trip?: TripDates; // trips only
+  tripClosedAt?: Timestamp; // a closed trip is read-only (the owner can reopen it); settle-up still works
 }
 export interface InviteDoc {
   email: string; invitedByUid: Uid; invitedByName: string; groupName: string;
+  groupKind?: 'trip'; // so accepting a trip invite doesn't switch the household
   status: 'pending' | 'accepted' | 'revoked' | 'declined'; createdAt: Timestamp;
 }
 export interface CategoryDoc {
@@ -29,7 +37,21 @@ export interface ExpenseDoc {
   discountPercent?: number; // percent (e.g. 2 or 2.5) — see computeDiscountCents in lib/discount.ts
   kind?: 'refund';          // missing for a purchase; amounts stay positive (see lib/refund.ts)
   refundOf?: string;        // a refund's original expense id
+  // Trips only (see lib/travel/tripExpense.ts). On a trip, total and item amounts
+  // are minor units of `currency`, not of the group's (home) currency.
+  currency?: string;        // missing = the group's currency
+  paidWith?: TripPayment;
+  tripDay?: string;         // 'YYYY-MM-DD' as chosen; `date` read in another time zone can fall on another day
 }
+
+/**
+ * How a trip expense was paid. A card payment carries its rate as "1 home =
+ * rate foreign", estimated until the amount actually charged (homeTotal, in
+ * home minor units) is entered. A wallet payment (T4) is valued at the wallet's rate.
+ */
+export type TripPayment =
+  | { kind: 'card'; rate: number; rateStatus: 'estimated' | 'actual'; homeTotal?: number }
+  | { kind: 'wallet'; walletId: string };
 export interface ItemDoc {
   id: string; groupId: string; expenseId: string; month: string;
   name: string; categoryId: string; category: string; amount: number; shared: boolean;
@@ -39,6 +61,39 @@ export interface ItemDoc {
   unitAmount?: number; // per-item price in cents (default: same as amount when quantity is 1)
   refund?: boolean;    // denormalized from the expense's kind, so item-only sums can subtract it
   tags?: string[];     // as typed; matched by lib/tags tagKey; at most MAX_TAGS
+  sharedWith?: Uid[];  // trips: who shares a shared item; missing = every member (see lib/settlement)
+}
+/**
+ * Cash in one foreign currency (lib/travel/cash.ts): a member's own
+ * (groups/{tripId}/wallets/{ownerUid_CUR}, one per person per currency) or the
+ * trip's shared kitty (wallets/{kitty_CUR}, no owner; everyone puts money in).
+ */
+export interface WalletDoc {
+  id: string; kind: 'personal' | 'kitty';
+  ownerUid?: Uid; // personal only
+  keptBy?: Uid;   // kitty only: the member who keeps the cash left, instead of handing it back
+  currency: string;
+  createdByUid: Uid; createdAt: Timestamp;
+}
+/** Cash put into a wallet: groups/{tripId}/topUps/{id}. Amounts are minor units. */
+export interface TopUpDoc {
+  id: string; walletId: string; byUid: Uid;
+  fromUid?: Uid;         // kitty only: who put the money in (byUid is who recorded it)
+  date: string;          // 'YYYY-MM-DD'
+  foreignAmount: number; // of the wallet's currency received, > 0
+  homeAmount: number;    // of the trip's home currency paid for it, >= 0
+  createdAt: Timestamp;
+}
+/**
+ * Foreign cash one member hands another to settle up: groups/{tripId}/handovers/{id}.
+ * It leaves the giver's wallet at its running average and arrives in the
+ * receiver's at that cost, and counts as a payment of that value. See lib/travel/cash.ts.
+ */
+export interface HandoverDoc {
+  id: string; fromUid: Uid; toUid: Uid; currency: string;
+  foreignAmount: number; // minor units, > 0
+  date: string;          // 'YYYY-MM-DD'
+  byUid: Uid; createdAt: Timestamp;
 }
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
@@ -116,4 +171,5 @@ export const itemSchema = z.object({
   unitAmount: z.number().int().nonnegative().optional(),
   refund: z.boolean().optional(),
   tags: z.array(z.string()).max(10).optional(), // MAX_TAGS in lib/tags (kept literal: models must not import lib)
+  sharedWith: z.array(z.string()).min(1).max(20).optional(),
 });

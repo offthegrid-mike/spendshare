@@ -7,6 +7,8 @@ import { firstNameOf, greeting, longDate } from '../../lib/greeting';
 import PendingInvites from '../invites/PendingInvites';
 import SpendTile from './SpendTile';
 import WorkTile from './WorkTile';
+import TravelTile from './TravelTile';
+import { TRAVEL_ENABLED } from '../../lib/features';
 import type { GroupDoc } from '../../types/models';
 
 interface Props {
@@ -14,10 +16,12 @@ interface Props {
   groups: GroupDoc[];
   /** The selected household; null while it loads or when there is none. */
   group: GroupDoc | null;
+  /** The user's trips, for the Travel tile. */
+  trips?: GroupDoc[];
 }
 
 /** The screen after sign-in: a greeting, any pending invites, and a tile for each side of the app. */
-export default function HomeScreen({ user, groups, group }: Props) {
+export default function HomeScreen({ user, groups, group, trips = [] }: Props) {
   // The Work clock ticks each minute (and on returning to the tab), so a Home
   // screen left open overnight greets the new morning with the new date.
   const clock = useWorkClock();
@@ -44,6 +48,7 @@ export default function HomeScreen({ user, groups, group }: Props) {
           <div className="grid gap-4 lg:grid-cols-2">
             <SpendTile groups={groups} group={group} viewerUid={user.uid} />
             <WorkTile uid={user.uid} />
+            {TRAVEL_ENABLED && <TravelTile trips={trips} viewerUid={user.uid} />}
           </div>
         </main>
       </div>

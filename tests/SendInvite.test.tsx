@@ -139,4 +139,11 @@ describe('SendInvite', () => {
 
     expect(revokeInvite).toHaveBeenCalledWith('g1', 'alice@example.com');
   });
+
+  it('marks an invite to a trip as a trip invite', async () => {
+    render(<SendInvite user={user} group={{ id: 't1', name: 'Japan', kind: 'trip' }} />);
+    await userEvent.type(getEmailInput(), 'friend@example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Send invite' }));
+    expect(sendInvite).toHaveBeenCalledWith(expect.objectContaining({ gid: 't1', groupName: 'Japan', groupKind: 'trip' }));
+  });
 });

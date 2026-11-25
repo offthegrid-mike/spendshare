@@ -7,7 +7,7 @@ import { resolveRate } from '../../lib/work/workRates';
 import { formatHours } from '../../lib/work/workTime';
 import { saveWorkSettings } from '../../lib/work/workWrite';
 import type { WorkSettingsDoc } from '../../types/models';
-import { settleWrite } from './settleWrite';
+import { settleWrite } from '../../lib/settleWrite';
 import { useWork } from './WorkContext';
 
 // The Settings tab: the usual work days, the default hours of a day and the rate

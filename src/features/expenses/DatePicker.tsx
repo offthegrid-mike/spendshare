@@ -31,11 +31,14 @@ const YEARS_AHEAD = 5;
 interface Props {
   id?: string;
   value: string; // YYYY-MM-DD
+  /** What the field is, for its accessible name ("First day: May 10, 2027"); defaults to Date. */
+  name?: string;
   onChange: (value: string) => void;
   error?: string;
+  disabled?: boolean;
 }
 
-export default function DatePicker({ id, value, onChange, error }: Props) {
+export default function DatePicker({ id, value, name = 'Date', onChange, error, disabled = false }: Props) {
   const [open, setOpen] = useState(false);
   // The month shown, and whether the month/year grid replaces the days.
   const [view, setView] = useState<Date>(() => new Date());
@@ -86,11 +89,12 @@ export default function DatePicker({ id, value, onChange, error }: Props) {
         ref={triggerRef}
         id={id}
         type="button"
-        aria-label={`Date: ${label}`}
+        aria-label={`${name}: ${label}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        disabled={disabled}
         onClick={toggle}
-        className="field flex w-full items-center justify-between text-left"
+        className="field flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span>{label}</span>
         <Calendar size={16} strokeWidth={1.75} className="shrink-0 text-ink-muted" aria-hidden="true" />

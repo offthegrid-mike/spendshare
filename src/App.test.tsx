@@ -5,7 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import App from './App';
 import { useUIStore } from './stores/uiStore';
 import { paths } from './lib/paths';
-import { makeGroup } from './test/fixtures';
+import { makeGroup, makeTrip } from './test/fixtures';
 
 const state = vi.hoisted(() => ({
   user: null as { uid: string; email: string } | null,
@@ -16,11 +16,14 @@ const state = vi.hoisted(() => ({
   access: 'allowed' as string,
   groupsUid: undefined as string | undefined,
 }));
-const flags = vi.hoisted(() => ({ work: false }));
+const flags = vi.hoisted(() => ({ work: false, travel: false }));
 
 vi.mock('./lib/features', () => ({
   get WORK_ENABLED() {
     return flags.work;
+  },
+  get TRAVEL_ENABLED() {
+    return flags.travel;
   },
   DARK_MODE_ENABLED: true,
 }));
@@ -86,9 +89,31 @@ vi.mock('./features/work/MonthTab', () => ({ default: () => <div data-testid="wo
 vi.mock('./features/work/YearTab', () => ({ default: () => <div data-testid="work-year" /> }));
 vi.mock('./features/work/WorkSettings', () => ({ default: () => <div data-testid="work-more" /> }));
 vi.mock('./features/home/HomeScreen', () => ({
-  default: ({ user, groups, group }: { user: { uid: string }; groups: unknown[]; group: { id: string } | null }) => (
-    <div data-testid="home-screen" data-user={user.uid} data-groups={groups.length} data-group={group?.id ?? ''} />
+  default: ({ user, groups, group, trips }: {
+    user: { uid: string }; groups: unknown[]; group: { id: string } | null; trips: { id: string }[];
+  }) => (
+    <div
+      data-testid="home-screen" data-user={user.uid} data-groups={groups.length} data-group={group?.id ?? ''}
+      data-trips={trips.map((t) => t.id).join(',')}
+    />
   ),
+}));
+vi.mock('./features/travel/TripList', () => ({
+  default: ({ trips }: { trips: { id: string }[] }) => <div data-testid="trip-list" data-trips={trips.map((t) => t.id).join(',')} />,
+}));
+vi.mock('./features/travel/TripScreen', () => ({ default: () => <div data-testid="trip-screen" /> }));
+vi.mock('./features/travel/NewTripScreen', () => ({
+  default: ({ defaultCurrency }: { defaultCurrency: string }) => <div data-testid="new-trip" data-currency={defaultCurrency} />,
+}));
+vi.mock('./features/travel/tripRoutes', () => ({
+  NewTripExpenseRoute: () => <div data-testid="new-trip-expense" />,
+  TripExpenseRoute: () => <div data-testid="trip-expense" />,
+  EditTripExpenseRoute: () => <div data-testid="edit-trip-expense" />,
+  TripSummaryRoute: () => <div data-testid="trip-summary" />,
+  TripCashRoute: () => <div data-testid="trip-cash" />,
+}));
+vi.mock('./features/travel/TripSettings', () => ({
+  default: ({ trip }: { trip: { id: string } }) => <div data-testid="trip-settings" data-trip={trip.id} />,
 }));
 
 const mike = { uid: 'mike', email: 'mike@example.com' };
@@ -112,6 +137,7 @@ const location = () => screen.getByTestId('location').textContent;
 
 beforeEach(() => {
   flags.work = false;
+  flags.travel = false;
   state.user = mike;
   state.groups = [home];
   state.expense = null;
@@ -411,5 +437,84 @@ describe('App with the work tracker on', () => {
     renderApp(paths.work);
     expect(screen.getByTestId('sign-in')).toBeInTheDocument();
     expect(screen.queryByTestId('work-today')).toBeNull();
+  });
+});
+
+describe('App with trips', () => {
+  const japan = makeTrip('japan', 'Japan', '2027-05-10', '2027-05-20');
+
+  beforeEach(() => {
+    flags.work = true;
+    flags.travel = true;
+    state.groups = [japan, home];
+  });
+
+  it('hands Home the households and the trips separately', () => {
+    renderApp('/');
+    const homeScreen = screen.getByTestId('home-screen');
+    expect(homeScreen).toHaveAttribute('data-groups', '1');
+    expect(homeScreen).toHaveAttribute('data-trips', 'japan');
+  });
+
+  it('never selects a trip as the household, even when it comes first', () => {
+    useUIStore.setState({ selectedGroupId: null });
+    renderApp('/');
+    expect(useUIStore.getState().selectedGroupId).toBe('g1');
+  });
+
+  it('moves a stale selection off a trip onto a household', () => {
+    useUIStore.setState({ selectedGroupId: 'japan' });
+    renderApp('/');
+    expect(useUIStore.getState().selectedGroupId).toBe('g1');
+  });
+
+  it('serves the trip list, a new trip, a trip and its settings under /travel', () => {
+    const { unmount } = renderApp('/travel');
+    expect(screen.getByTestId('trip-list')).toHaveAttribute('data-trips', 'japan');
+    unmount();
+    const second = renderApp('/travel/new');
+    expect(screen.getByTestId('new-trip')).toHaveAttribute('data-currency', 'AUD');
+    second.unmount();
+    const third = renderApp('/travel/japan');
+    expect(screen.getByTestId('trip-screen')).toBeInTheDocument();
+    third.unmount();
+    renderApp('/travel/japan/settings');
+    expect(screen.getByTestId('trip-settings')).toHaveAttribute('data-trip', 'japan');
+  });
+
+  it('defaults a new trip to the selected household’s currency', () => {
+    const usd = { ...makeGroup('g2', 'Flat'), currency: 'USD' };
+    state.groups = [japan, home, usd];
+    useUIStore.setState({ selectedGroupId: 'g2' });
+    renderApp('/travel/new');
+    expect(screen.getByTestId('new-trip')).toHaveAttribute('data-currency', 'USD');
+  });
+
+  it('serves adding, viewing and editing a trip expense', () => {
+    const first = renderApp('/travel/japan/expense/new');
+    expect(screen.getByTestId('new-trip-expense')).toBeInTheDocument();
+    first.unmount();
+    const second = renderApp('/travel/japan/expense/e1');
+    expect(screen.getByTestId('trip-expense')).toBeInTheDocument();
+    second.unmount();
+    const third = renderApp('/travel/japan/expense/e1/edit');
+    expect(screen.getByTestId('edit-trip-expense')).toBeInTheDocument();
+    third.unmount();
+    const fourth = renderApp('/travel/japan/summary');
+    expect(screen.getByTestId('trip-summary')).toBeInTheDocument();
+    fourth.unmount();
+    renderApp('/travel/japan/cash');
+    expect(screen.getByTestId('trip-cash')).toBeInTheDocument();
+  });
+
+  it('sends the settings of an unknown trip back to the trip list', () => {
+    renderApp('/travel/nope/settings');
+    expect(location()).toBe('/travel');
+  });
+
+  it('has no /travel while Travel is off', () => {
+    flags.travel = false;
+    renderApp('/travel');
+    expect(screen.queryByTestId('trip-list')).toBeNull();
   });
 });

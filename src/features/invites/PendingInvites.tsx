@@ -33,7 +33,7 @@ export default function PendingInvites({ user }: Props) {
           >
             <p className="text-sm text-ink">
               <span className="font-semibold">{invite.invitedByName}</span>{' '}
-              invited you to join{' '}
+              {invite.groupKind === 'trip' ? 'invited you to join the trip' : 'invited you to join'}{' '}
               <span className="font-semibold">{invite.groupName}</span>.
             </p>
             {error?.id === invite.ref.path && (
@@ -50,7 +50,8 @@ export default function PendingInvites({ user }: Props) {
                     .then(() => {
                       const gid = invite.ref.parent.parent?.id;
                       if (!gid) return;
-                      selectGroupWhenReady(gid);
+                      // A trip lives under Travel; only a household becomes the selected group.
+                      if (invite.groupKind !== 'trip') selectGroupWhenReady(gid);
                       showNotice({ message: `You joined ${invite.groupName}` });
                     })
                     .catch(() =>

@@ -68,3 +68,8 @@ export function makeWorkDay(date: string, overrides: Partial<WorkDayDoc> = {}): 
     ...overrides,
   };
 }
+
+/** A trip group (kind 'trip') with the given first and last days, built on makeGroup. */
+export function makeTrip(id: string, name: string, startDate: string, endDate: string, memberNames?: string[]): GroupDoc {
+  return { ...makeGroup(id, name, memberNames), kind: 'trip', trip: { startDate, endDate } };
+}

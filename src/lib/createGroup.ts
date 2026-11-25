@@ -1,14 +1,32 @@
-import { addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { groupsCol } from './converters';
 import { seedDefaultCategories } from './seedCategories';
+import { settleWrite } from './settleWrite';
+import type { GroupDoc } from '../types/models';
 
 export const CURRENCIES = ['AUD', 'USD', 'EUR', 'GBP'] as const;
 
-/** Creates a group owned by `user`, seeds its default categories, and returns its id. */
-export async function createGroup(user: User, input: { name: string; currency: string }): Promise<string> {
+interface CreateOptions {
+  /** Fields a trip adds to the group doc. */
+  extra?: Pick<GroupDoc, 'kind' | 'trip'>;
+  /** Category names to seed instead of the household defaults. */
+  categories?: readonly string[];
+}
+
+/**
+ * Creates a group owned by `user`, seeds its default categories, and returns its id.
+ * Offline it returns at once: both writes are already in the local cache, and
+ * settleWrite raises a notice if the server refuses them later.
+ */
+export async function createGroup(
+  user: User,
+  input: { name: string; currency: string },
+  options: CreateOptions = {},
+): Promise<string> {
   const now = serverTimestamp();
-  const ref = await addDoc(groupsCol, {
+  const ref = doc(groupsCol);
+  await settleWrite(setDoc(ref, {
     id: '',
     name: input.name.trim(),
     currency: input.currency,
@@ -23,7 +41,8 @@ export async function createGroup(user: User, input: { name: string; currency: s
     },
     memberUids: [user.uid],
     createdAt: now,
-  });
-  await seedDefaultCategories(ref.id);
+    ...options.extra,
+  }));
+  await settleWrite(options.categories ? seedDefaultCategories(ref.id, options.categories) : seedDefaultCategories(ref.id));
   return ref.id;
 }

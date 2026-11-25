@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useUIStore } from '../../stores/uiStore';
+import { useUIStore } from '../stores/uiStore';
 import { settleWrite } from './settleWrite';
 
 const SYNC_FAILED = "Couldn't sync a Work change. Check your connection and try again.";
@@ -74,5 +74,13 @@ describe('settleWrite', () => {
       await Promise.resolve();
       expect(useUIStore.getState().notice).toBeNull();
     });
+  });
+
+  it('raises the caller’s own message when an offline write is rejected later', async () => {
+    setOnline(false);
+    const write = deferred();
+    await settleWrite(write.promise, "Couldn't sync a trip change.");
+    write.reject(new Error('denied'));
+    await vi.waitFor(() => expect(useUIStore.getState().notice?.message).toBe("Couldn't sync a trip change."));
   });
 });

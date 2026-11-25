@@ -7,7 +7,8 @@ export type BalanceTone = 'owed' | 'owe' | 'settled';
 
 export function memberName(group: GroupDoc, uid: string): string {
   const m = group.members[uid];
-  return m?.displayName || m?.email || uid;
+  // A removed member's entry goes with them; they can still be owed money or owe it.
+  return m?.displayName || m?.email || 'A former member';
 }
 
 function viewerBalance(summary: Summary, viewerUid: string): number {

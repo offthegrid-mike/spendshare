@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { User } from 'firebase/auth';
 
-const { addDoc, seed } = vi.hoisted(() => ({ addDoc: vi.fn(), seed: vi.fn() }));
-vi.mock('firebase/firestore', () => ({ addDoc, serverTimestamp: () => 'TS' }));
+const { setDoc, doc, seed } = vi.hoisted(() => ({
+  setDoc: vi.fn(), doc: vi.fn(() => ({ id: 'g-new' })), seed: vi.fn(),
+}));
+const addDoc = setDoc; // the group write, as these tests knew it
+vi.mock('firebase/firestore', () => ({ setDoc, doc, serverTimestamp: () => 'TS' }));
 vi.mock('./converters', () => ({ groupsCol: 'groupsCol' }));
 vi.mock('./seedCategories', () => ({ seedDefaultCategories: seed }));
 
@@ -20,8 +23,9 @@ describe('createGroup', () => {
     const id = await createGroup(user, { name: '  Tasmania trip ', currency: 'AUD' });
 
     expect(id).toBe('g-new');
+    expect(doc).toHaveBeenCalledWith('groupsCol');
     expect(addDoc).toHaveBeenCalledWith(
-      'groupsCol',
+      { id: 'g-new' },
       expect.objectContaining({
         name: 'Tasmania trip',
         currency: 'AUD',
@@ -31,6 +35,15 @@ describe('createGroup', () => {
       }),
     );
     expect(seed).toHaveBeenCalledWith('g-new');
+  });
+
+  it('returns at once while offline, with the group and its categories queued locally', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    setDoc.mockReturnValue(new Promise(() => {}));
+    seed.mockReturnValue(new Promise(() => {}));
+    await expect(createGroup(user, { name: 'Trip', currency: 'AUD' })).resolves.toBe('g-new');
+    expect(seed).toHaveBeenCalledWith('g-new');
+    vi.restoreAllMocks();
   });
 
   it('does not seed categories when the group write fails', async () => {

@@ -1264,3 +1264,579 @@ describe('Firestore Rules - Work', () => {
     });
   });
 });
+
+describe('/groups trips (kind: trip)', () => {
+  let testEnv: RulesTestEnvironment;
+
+  const owner = { userA: { role: 'owner', displayName: 'Alice', email: 'alice@test.com', joinedAt: new Date() } };
+  /** A copy of `obj` without the given keys. */
+  function without(obj: Record<string, unknown>, ...keys: string[]) {
+    return Object.fromEntries(Object.entries(obj).filter(([k]) => !keys.includes(k)));
+  }
+
+  const baseTrip = {
+    id: '',
+    name: 'Japan',
+    currency: 'AUD',
+    ownerUid: 'userA',
+    members: owner,
+    memberUids: ['userA'],
+    createdAt: new Date(),
+    kind: 'trip',
+    trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+  };
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'groups', 'japan'), {
+        ...baseTrip,
+        members: { ...owner, userB: { role: 'member', displayName: 'Bob', email: 'userb@test.com', joinedAt: new Date() } },
+        memberUids: ['userA', 'userB'],
+      });
+      await setDoc(doc(db, 'groups', 'home'), { ...without(baseTrip, 'kind', 'trip'), name: 'Home' });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const as = (uid: string) => testEnv.authenticatedContext(uid).firestore();
+
+  describe('create', () => {
+    it('allows creating a trip with valid dates', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), baseTrip));
+    });
+
+    it('allows a one-day trip', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-10' },
+      }));
+    });
+
+    it('still allows a household with neither kind nor trip', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'kind', 'trip')));
+    });
+
+    it('denies any kind other than trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), { ...baseTrip, kind: 'household' }));
+    });
+
+    it('denies a trip without dates, and dates without kind trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'trip')));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'kind')));
+    });
+
+    it('denies an end before the start, a malformed date, or extra keys in trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-09' },
+      }));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '10/05/2027', endDate: '2027-05-20' },
+      }));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-20', closedAt: 'x' },
+      }));
+    });
+  });
+
+  describe('update', () => {
+    it('lets the owner change the dates', async () => {
+      await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-21' },
+      }));
+    });
+
+    it('denies the owner invalid dates', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-01' },
+      }));
+    });
+
+    it('denies a member who is not the owner changing the dates', async () => {
+      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-21' },
+      }));
+    });
+
+    it('still lets a member rename the trip', async () => {
+      await assertSucceeds(updateDoc(doc(as('userB'), 'groups', 'japan'), { name: 'Japan & Korea' }));
+    });
+
+    it('never lets anyone change kind: not turning a trip into a household or back', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { kind: deleteField(), trip: deleteField() }));
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'home'), {
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      }));
+    });
+
+    it('never lets anyone change a trip’s home currency, though a household’s can change', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'USD' }));
+      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), { currency: 'USD' }));
+      await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'home'), { currency: 'USD' }));
+    });
+
+    it('denies adding trip dates to a household', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'home'), {
+        trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      }));
+    });
+  });
+
+  it('lets a member send an invite marked as a trip invite', async () => {
+    await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'japan', 'invites', 'userc@test.com'), {
+      email: 'userc@test.com', invitedByUid: 'userA', invitedByName: 'Alice', groupName: 'Japan',
+      groupKind: 'trip', status: 'pending', createdAt: new Date(),
+    }));
+  });
+});
+
+describe('/groups trip expenses (currency, paidWith, sharedWith)', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: { userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' } },
+        memberUids: ['userA'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const db = () => testEnv.authenticatedContext('userA').firestore();
+  const expense = (extra: Record<string, unknown> = {}) => ({
+    groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Ichiran', payerUid: 'userA',
+    total: 4500, itemCount: 1, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+    currency: 'JPY', paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' },
+    ...extra,
+  });
+  const item = (extra: Record<string, unknown> = {}) => ({
+    groupId: 'japan', expenseId: 'e1', month: '2027-05', name: 'Ramen', categoryId: 'food', category: 'Food',
+    amount: 4500, shared: true, payerUid: 'userA', sharedWith: ['userA'],
+    ...extra,
+  });
+
+  async function save(exp: Record<string, unknown>, it: Record<string, unknown> = item()) {
+    const fs = db();
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'groups', 'japan', 'expenses', 'e1'), exp);
+    batch.set(doc(fs, 'groups', 'japan', 'expenses', 'e1', 'items', 'i1'), it);
+    return batch.commit();
+  }
+
+  it('allows a card payment in a foreign currency with an estimated rate, and its sharers', async () => {
+    await assertSucceeds(save(expense()));
+  });
+
+  it('allows recording what the card was actually charged', async () => {
+    await assertSucceeds(save(expense({ paidWith: { kind: 'card', rate: 96.7, rateStatus: 'actual', homeTotal: 15510 } })));
+  });
+
+  it('allows a cash payment from the payer’s own wallet, and no one else’s or a missing one', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'userA_JPY'), { kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'sam_JPY'), { kind: 'personal', ownerUid: 'sam', currency: 'JPY' });
+    });
+    await assertSucceeds(save(expense({ paidWith: { kind: 'wallet', walletId: 'userA_JPY' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet', walletId: 'sam_JPY' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet', walletId: 'nope_JPY' } })));
+  });
+
+  it('denies a malformed currency', async () => {
+    await assertFails(save(expense({ currency: 'yen' })));
+    await assertFails(save(expense({ currency: 5 })));
+  });
+
+  it('denies a card payment without a positive rate, with a bad status, or with extra keys', async () => {
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 0, rateStatus: 'estimated' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rateStatus: 'estimated' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'guessed' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'actual', homeTotal: -1 } })));
+    await assertFails(save(expense({ paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated', note: 'x' } })));
+  });
+
+  it('denies any other way of paying', async () => {
+    await assertFails(save(expense({ paidWith: { kind: 'cheque' } })));
+    await assertFails(save(expense({ paidWith: { kind: 'wallet' } })));
+  });
+
+  it('denies an empty or oversized list of sharers', async () => {
+    await assertFails(save(expense(), item({ sharedWith: [] })));
+    await assertFails(save(expense(), item({ sharedWith: Array.from({ length: 21 }, (_, i) => `u${i}`) })));
+    await assertFails(save(expense(), item({ sharedWith: 'userA' })));
+  });
+});
+
+describe('/groups cash wallets and top-ups', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          manual_sam: { role: 'member', displayName: 'Sam', email: '', manual: true },
+        },
+        memberUids: ['userA', 'manual_sam'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = (uid = 'userA') => testEnv.authenticatedContext(uid).firestore();
+  const wallet = (extra: Record<string, unknown> = {}) => ({
+    id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY', createdByUid: 'userA', createdAt: new Date(), ...extra,
+  });
+  const topUp = (extra: Record<string, unknown> = {}) => ({
+    id: 't1', walletId: 'userA_JPY', byUid: 'userA', date: '2027-05-09', foreignAmount: 50000, homeAmount: 50000, createdAt: new Date(), ...extra,
+  });
+
+  async function addCash(w: Record<string, unknown>, t: Record<string, unknown>, walletId = 'userA_JPY') {
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'wallets', walletId), w);
+    batch.set(doc(db, 'groups', 'japan', 'topUps', 't1'), t);
+    return batch.commit();
+  }
+
+  it('lets a member create their wallet and add cash to it in one go', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+  });
+
+  it('lets a member keep a wallet for someone without an account', async () => {
+    await assertSucceeds(addCash(wallet({ id: 'manual_sam_JPY', ownerUid: 'manual_sam' }), topUp({ walletId: 'manual_sam_JPY' }), 'manual_sam_JPY'));
+  });
+
+  it('allows only one wallet per person per currency: the id must be owner_currency', async () => {
+    await assertFails(addCash(wallet(), topUp({ walletId: 'other' }), 'other'));
+  });
+
+  it('denies a wallet for someone not on the trip, or with a malformed currency', async () => {
+    await assertFails(addCash(wallet({ id: 'stranger_JPY', ownerUid: 'stranger' }), topUp({ walletId: 'stranger_JPY' }), 'stranger_JPY'));
+    await assertFails(addCash(wallet({ id: 'userA_yen', currency: 'yen' }), topUp({ walletId: 'userA_yen' }), 'userA_yen'));
+  });
+
+  it('denies cash added to a wallet that does not exist', async () => {
+    await assertFails(setDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1'), topUp()));
+  });
+
+  it('denies top-ups with no cash, a negative cost, a bad date, another author or extra fields', async () => {
+    await assertFails(addCash(wallet(), topUp({ foreignAmount: 0 })));
+    await assertFails(addCash(wallet(), topUp({ foreignAmount: 1.5 })));
+    await assertFails(addCash(wallet(), topUp({ homeAmount: -1 })));
+    await assertFails(addCash(wallet(), topUp({ date: '9 May' })));
+    await assertFails(addCash(wallet(), topUp({ byUid: 'someoneElse' })));
+    await assertFails(addCash(wallet(), topUp({ note: 'x' })));
+  });
+
+  it('never lets a wallet change owner or currency', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY'), { ownerUid: 'manual_sam' }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY'), { currency: 'KRW' }));
+  });
+
+  it('keeps wallets and top-ups to members of the trip', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+    await assertFails(getDoc(doc(fs('userB'), 'groups', 'japan', 'wallets', 'userA_JPY')));
+    await assertFails(getDoc(doc(fs('userB'), 'groups', 'japan', 'topUps', 't1')));
+    await assertSucceeds(deleteDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1')));
+  });
+});
+
+describe('/groups the kitty', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          manual_sam: { role: 'member', displayName: 'Sam', email: '', manual: true },
+        },
+        memberUids: ['userA', 'manual_sam'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = () => testEnv.authenticatedContext('userA').firestore();
+  const kitty = (extra: Record<string, unknown> = {}) => ({
+    id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'userA', createdAt: new Date(), ...extra,
+  });
+  const putIn = (extra: Record<string, unknown> = {}) => ({
+    id: 't1', walletId: 'kitty_JPY', byUid: 'userA', fromUid: 'manual_sam', date: '2027-05-09',
+    foreignAmount: 30000, homeAmount: 30000, createdAt: new Date(), ...extra,
+  });
+
+  async function start(w: Record<string, unknown>, t: Record<string, unknown>, walletId = 'kitty_JPY') {
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'wallets', walletId), w);
+    batch.set(doc(db, 'groups', 'japan', 'topUps', 't1'), t);
+    return batch.commit();
+  }
+
+  it('lets a member start a kitty and record what anyone on the trip put in', async () => {
+    await assertSucceeds(start(kitty(), putIn()));
+  });
+
+  it('keeps one kitty per currency, with no owner', async () => {
+    await assertFails(start(kitty({ id: 'pot' }), putIn({ walletId: 'pot' }), 'pot'));
+    await assertFails(start(kitty({ ownerUid: 'userA' }), putIn()));
+  });
+
+  it('requires who put money into the kitty, and that they are on the trip', async () => {
+    const { fromUid: _f, ...noFrom } = putIn();
+    void _f;
+    await assertFails(start(kitty(), noFrom));
+    await assertFails(start(kitty(), putIn({ fromUid: 'stranger' })));
+  });
+
+  it('keeps fromUid to the kitty: a personal wallet’s cash is its owner’s', async () => {
+    await assertFails(start(
+      { id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY', createdByUid: 'userA', createdAt: new Date() },
+      putIn({ walletId: 'userA_JPY', fromUid: 'manual_sam' }),
+      'userA_JPY',
+    ));
+  });
+
+  it('never turns a personal wallet into a kitty', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_KRW'), { id: 'kitty_KRW', kind: 'kitty', currency: 'KRW' });
+    });
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_KRW'), { kind: 'personal', ownerUid: 'kitty' }));
+  });
+
+  it('requires whoever hands over the kitty’s cash to be on the trip', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });
+    });
+    const db = fs();
+    await assertFails(setDoc(doc(db, 'groups', 'japan', 'expenses', 'e2'), {
+      groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Dinner', payerUid: 'stranger',
+      total: 500, itemCount: 0, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+      currency: 'JPY', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' },
+    }));
+  });
+
+  it('lets a member choose who keeps what’s left in the kitty, or go back to handing it out', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'userA_JPY'), { id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+    });
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { keptBy: 'manual_sam' }));
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { keptBy: deleteField() }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { keptBy: 'stranger' }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY'), { keptBy: 'manual_sam' }));
+  });
+
+  it('lets anyone on the trip pay from the kitty', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });
+    });
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'expenses', 'e1'), {
+      groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Dinner', payerUid: 'userA',
+      total: 50000, itemCount: 1, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+      currency: 'JPY', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' },
+    });
+    batch.set(doc(db, 'groups', 'japan', 'expenses', 'e1', 'items', 'i1'), {
+      groupId: 'japan', expenseId: 'e1', month: '2027-05', name: 'Dinner', categoryId: 'f', category: 'Food',
+      amount: 50000, shared: true, payerUid: 'userA', sharedWith: ['userA', 'manual_sam'],
+    });
+    await assertSucceeds(batch.commit());
+  });
+});
+
+describe('/groups cash hand-overs', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          manual_sam: { role: 'member', displayName: 'Sam', email: '', manual: true },
+        },
+        memberUids: ['userA', 'manual_sam'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+      await setDoc(doc(db, 'groups', 'japan', 'wallets', 'userA_JPY'), { id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = () => testEnv.authenticatedContext('userA').firestore();
+  const handover = (extra: Record<string, unknown> = {}) => ({
+    id: 'h1', fromUid: 'userA', toUid: 'manual_sam', currency: 'JPY', foreignAmount: 20000, date: '2027-05-20',
+    byUid: 'userA', createdAt: new Date(), ...extra,
+  });
+  async function give(h: Record<string, unknown>) {
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'wallets', 'manual_sam_JPY'), {
+      id: 'manual_sam_JPY', kind: 'personal', ownerUid: 'manual_sam', currency: 'JPY', createdByUid: 'userA', createdAt: new Date(),
+    });
+    batch.set(doc(db, 'groups', 'japan', 'handovers', 'h1'), h);
+    return batch.commit();
+  }
+
+  it('records cash handed from one member’s wallet to another’s', async () => {
+    await assertSucceeds(give(handover()));
+  });
+
+  it('needs the giver to have cash in that currency, and two different members', async () => {
+    await assertFails(give(handover({ currency: 'KRW' })));
+    await assertFails(give(handover({ toUid: 'userA' })));
+    await assertFails(give(handover({ toUid: 'stranger' })));
+  });
+
+  it('denies no cash, a bad date, another author or extra fields', async () => {
+    await assertFails(give(handover({ foreignAmount: 0 })));
+    await assertFails(give(handover({ date: 'today' })));
+    await assertFails(give(handover({ byUid: 'manual_sam' })));
+    await assertFails(give(handover({ note: 'x' })));
+  });
+
+  it('lets a member undo a hand-over', async () => {
+    await assertSucceeds(give(handover()));
+    await assertSucceeds(deleteDoc(doc(fs(), 'groups', 'japan', 'handovers', 'h1')));
+  });
+});
+
+describe('/groups closing a trip', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  async function seed(closed: boolean) {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          userB: { role: 'member', displayName: 'Bob', email: 'userb@test.com' },
+        },
+        memberUids: ['userA', 'userB'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+        ...(closed ? { tripClosedAt: new Date() } : {}),
+      });
+      await setDoc(doc(db, 'groups', 'japan', 'expenses', 'e1'), {
+        groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Dinner', payerUid: 'userA',
+        total: 500, itemCount: 0, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+      });
+      await setDoc(doc(db, 'groups', 'japan', 'wallets', 'userA_JPY'), { id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY' });
+      await setDoc(doc(db, 'groups', 'japan', 'topUps', 't1'), { id: 't1', walletId: 'userA_JPY', byUid: 'userA', date: '2027-05-09', foreignAmount: 100, homeAmount: 1 });
+    });
+  }
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = (uid = 'userA') => testEnv.authenticatedContext(uid).firestore();
+  const expense = { groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Taxi', payerUid: 'userA',
+    total: 900, itemCount: 0, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date() };
+
+  it('lets the owner close and reopen a trip, and no one else', async () => {
+    await seed(false);
+    await assertFails(updateDoc(doc(fs('userB'), 'groups', 'japan'), { tripClosedAt: new Date() }));
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan'), { tripClosedAt: new Date() }));
+    await assertFails(updateDoc(doc(fs('userB'), 'groups', 'japan'), { tripClosedAt: deleteField() }));
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan'), { tripClosedAt: deleteField() }));
+  });
+
+  it('freezes a closed trip’s name and dates, while members can still join or leave', async () => {
+    await seed(true);
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan'), { name: 'Japan 2' }));
+    await assertFails(updateDoc(doc(fs('userB'), 'groups', 'japan'), { name: 'Japan 2' }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan'), { trip: { startDate: '2027-05-10', endDate: '2027-05-25' } }));
+    await assertSucceeds(updateDoc(doc(fs(), 'groups', 'japan'), { tripClosedAt: deleteField(), name: 'Japan 2' }));
+  });
+
+  it('keeps an open trip open to changes', async () => {
+    await seed(false);
+    await assertSucceeds(setDoc(doc(fs(), 'groups', 'japan', 'expenses', 'e2'), expense));
+  });
+
+  it('freezes a closed trip’s expenses, cash and hand-overs', async () => {
+    await seed(true);
+    await assertFails(setDoc(doc(fs(), 'groups', 'japan', 'expenses', 'e2'), expense));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'expenses', 'e1'), { shopName: 'Lunch' }));
+    await assertFails(deleteDoc(doc(fs(), 'groups', 'japan', 'expenses', 'e1')));
+    await assertFails(deleteDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1')));
+    await assertFails(setDoc(doc(fs(), 'groups', 'japan', 'topUps', 't2'), {
+      id: 't2', walletId: 'userA_JPY', byUid: 'userA', date: '2027-05-09', foreignAmount: 100, homeAmount: 1,
+    }));
+    await assertFails(deleteDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY')));
+  });
+
+  it('still lets people mark settle-up paid on a closed trip', async () => {
+    await seed(true);
+    await assertSucceeds(setDoc(doc(fs(), 'groups', 'japan', 'settlements', 'trip_userB_userA'), {
+      id: 'trip_userB_userA', month: 'trip', fromUid: 'userB', toUid: 'userA', amount: 500, paid: true,
+    }));
+  });
+
+  it('never lets a household be closed', async () => {
+    await seed(false);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'home'), {
+        ownerUid: 'userA', name: 'Home', currency: 'AUD', members: { userA: { role: 'owner' } }, memberUids: ['userA'], createdAt: new Date(),
+      });
+    });
+    await assertFails(updateDoc(doc(fs(), 'groups', 'home'), { tripClosedAt: new Date() }));
+  });
+});

@@ -20,6 +20,8 @@ jobs:
       VITE_FB_SENDER_ID: ${{ secrets.VITE_FB_SENDER_ID }}
       VITE_FB_APP_ID: ${{ secrets.VITE_FB_APP_ID }}
       VITE_OCR_PROXY_URL: ${{ secrets.VITE_OCR_PROXY_URL }}
+      # PR previews show Travel; production turns it on with this same variable when ready.
+      VITE_TRAVEL_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - run: npm ci && npm run build

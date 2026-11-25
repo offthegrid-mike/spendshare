@@ -62,6 +62,15 @@ describe('computeSummary paidShared', () => {
     const s = computeSummary(['alice'], [{ amount: 500, shared: true, payerUid: 'gone' }], []);
     expect(s.paidShared).toEqual({ alice: 0, gone: 500 });
   });
+
+  it('pays back a payer who is no longer a member, so balances add up', () => {
+    const s = computeSummary(['alice', 'bob'], [{ amount: 900, shared: true, payerUid: 'gone' }], []);
+    expect(s.balance).toEqual({ alice: -450, bob: -450, gone: 900 });
+    expect(s.transactions).toEqual(expect.arrayContaining([
+      { fromUid: 'alice', toUid: 'gone', amount: 450 },
+      { fromUid: 'bob', toUid: 'gone', amount: 450 },
+    ]));
+  });
 });
 
 describe('computeSummary with refunds', () => {

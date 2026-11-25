@@ -31,6 +31,21 @@ The original roadmap (milestones M0–M8: authentication, groups, invites, categ
 - **Export:** two CSV files per income year, one row per day with the year's totals, and one row per revision.
 - Set the rate for each income year (known rates are built in), your usual work days and your default hours. Work data is private to each user, not shared with a household.
 
+### Travel (in development)
+
+Shared trip costs in any currency, built milestone by milestone from [docs/TRAVEL_PLAN.md](docs/TRAVEL_PLAN.md). It is always on in development and off in production builds unless `VITE_TRAVEL_ENABLED=true`.
+
+- A **trip** is its own group, with a name, first and last days, and a home currency that balances are worked out in. Trips never appear in the household switcher.
+- Trips are listed under **Now**, **Upcoming** and **Past** at `/travel`. A Home tile shows the trip under way ("Day 3 of 11") or the next one.
+- Invite people by email, or add members without an account, as in a household. Accepting a trip invite leaves your household selection alone.
+- **Expenses in any currency:** record where, when, who paid, and each item with who shares it (everyone at first; tap people to leave them out). A foreign-currency card payment takes an estimated rate ("1 AUD = 99 JPY", remembered per currency), shows its value in the home currency, and is marked Estimated until you enter what the card was actually charged.
+- Expenses are listed by day of the trip, with what's been spent so far. Saving works offline.
+- **Balances and settle-up** in the home currency: who pays whom, with Mark paid and Undo, each person's balance, and spending by category and by currency. Card payments still at an estimated rate are flagged, and someone who has left the trip is still paid back. The trip page and the Home tile show your balance.
+- **Cash wallets:** record foreign cash when you buy it ("¥50,000 for A$500"), for yourself or anyone on the trip. Pay for things "with cash", and each payment is valued at what that cash cost: your wallet's average rate, not the rate on the day. The Cash page shows what's left and what it cost.
+- **Paying back in cash:** on the balances page, **Pay in cash** hands foreign cash to the person you owe. It counts at what that cash cost you, and goes into their cash at that cost.
+- **Closing a trip:** when the trip is over, the owner can close it so nothing changes by accident. Settle-up still works, and the owner can reopen it. **Export expenses** and **Export cash** download every item and every movement of cash as CSV.
+- **A shared kitty:** everyone puts money into one pot of foreign cash, recording who put in what. The kitty pays for shared things, and whoever hands the cash over is noted. The balances work out who owes whom. What's left is handed back in proportion to the cash each person put in, and the app tells you how much each person gets. Or one person keeps it, at what it cost.
+
 ### Expenses
 
 - Record an expense with a shop, date, payer, and line items. Each item has a category, an amount, an optional quantity and remark, and a **shared** or **personal** flag.

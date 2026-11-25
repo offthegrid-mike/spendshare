@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Navigate, Routes, Route, useParams } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useAllowlist } from './hooks/useAllowlist';
 import { useGroups } from './hooks/useGroups';
 import { useUIStore } from './stores/uiStore';
 import { resolveSelection } from './lib/groupSelection';
+import { splitGroups } from './lib/travel/trips';
 import SignIn from './features/auth/SignIn';
 import NotAllowed from './features/auth/NotAllowed';
 import GroupSettings from './features/groups/GroupSettings';
@@ -33,8 +34,16 @@ import TodayTab from './features/work/TodayTab';
 import MonthTab from './features/work/MonthTab';
 import YearTab from './features/work/YearTab';
 import WorkSettings from './features/work/WorkSettings';
+import TravelLayout from './features/travel/TravelLayout';
+import TripList from './features/travel/TripList';
+import TripScreen from './features/travel/TripScreen';
+import TripSettings from './features/travel/TripSettings';
+import NewTripScreen from './features/travel/NewTripScreen';
+import {
+  EditTripExpenseRoute, NewTripExpenseRoute, TripCashRoute, TripExpenseRoute, TripSummaryRoute,
+} from './features/travel/tripRoutes';
 import { paths } from './lib/paths';
-import { WORK_ENABLED } from './lib/features';
+import { TRAVEL_ENABLED, WORK_ENABLED } from './lib/features';
 import { AppSplash, RouteSkeleton } from './components/AppSkeletons';
 import type { User } from 'firebase/auth';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from './types/models';
@@ -108,12 +117,23 @@ function RefundExpenseRoute({ group, user }: { group: GroupDoc; user: User }) {
   return <RefundRoute group={group} currentUserUid={user.uid} originalId={id} />;
 }
 
+function TripSettingsRoute({ trips, user }: { trips: GroupDoc[]; user: User }) {
+  const { tripId } = useParams<{ tripId: string }>();
+  const trip = trips.find((t) => t.id === tripId);
+  if (!trip) return <Navigate to={paths.travel} replace />;
+  // The key starts each trip's form fresh.
+  return <TripSettings key={trip.id} trip={trip} user={user} />;
+}
+
 function App() {
   const { user, loading: authLoading } = useAuth();
   const access = useAllowlist(user);
   // Load nothing for someone the rules would refuse; every read would fail.
   const allowedUser = access === 'allowed' ? user : null;
-  const { groups, loading: groupsLoading } = useGroups(allowedUser?.uid);
+  const { groups: allGroups, loading: groupsLoading } = useGroups(allowedUser?.uid);
+  // Trips are groups too, but every household screen, the switcher and the
+  // selection only ever see households; trips live under /travel.
+  const { households: groups, trips } = useMemo(() => splitGroups(allGroups), [allGroups]);
   const { selectedGroupId, setGroup, pendingGroupId, clearPendingGroup } = useUIStore();
   const { group } = useGroup(allowedUser ? selectedGroupId : null);
 
@@ -136,7 +156,7 @@ function App() {
       <Route
         path={paths.home}
         element={
-          WORK_ENABLED ? <HomeScreen user={user} groups={groups} group={group} /> : <Navigate to={paths.spend} replace />
+          WORK_ENABLED ? <HomeScreen user={user} groups={groups} group={group} trips={trips} /> : <Navigate to={paths.spend} replace />
         }
       />
       {WORK_ENABLED && (
@@ -145,6 +165,19 @@ function App() {
           <Route path="month" element={<MonthTab />} />
           <Route path="year" element={<YearTab />} />
           <Route path="more" element={<WorkSettings />} />
+        </Route>
+      )}
+      {TRAVEL_ENABLED && (
+        <Route path={paths.travel} element={<TravelLayout />}>
+          <Route index element={<TripList trips={trips} user={user} />} />
+          <Route path="new" element={<NewTripScreen user={user} defaultCurrency={(groups.find((g) => g.id === selectedGroupId) ?? groups[0])?.currency ?? 'AUD'} />} />
+          <Route path=":tripId" element={<TripScreen trips={trips} viewerUid={user.uid} />} />
+          <Route path=":tripId/settings" element={<TripSettingsRoute trips={trips} user={user} />} />
+          <Route path=":tripId/summary" element={<TripSummaryRoute trips={trips} user={user} />} />
+          <Route path=":tripId/cash" element={<TripCashRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/new" element={<NewTripExpenseRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/:expenseId" element={<TripExpenseRoute trips={trips} user={user} />} />
+          <Route path=":tripId/expense/:expenseId/edit" element={<EditTripExpenseRoute trips={trips} user={user} />} />
         </Route>
       )}
       <Route path={paths.spend} element={<SpendGate groups={groups} user={user} />}>

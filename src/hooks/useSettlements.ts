@@ -21,6 +21,9 @@ export function useSettlements(
     const unsub = onSnapshot(q, (snap) => {
       setSettlements(snap.docs.map((d) => d.data()));
       setLoadedKey(`${gid}:${selectedMonth}`);
+    }, () => {
+      // A refused query (e.g. while membership propagates) must not leave callers loading for ever.
+      setLoadedKey(`${gid}:${selectedMonth}`);
     });
 
     return () => {
