@@ -9,7 +9,7 @@ const hook = vi.hoisted(() => ({
   settlements: [] as unknown[],
 }));
 vi.mock('../../hooks/useTripWallets', () => ({
-  useTripWallets: () => ({ wallets: [], topUps: [], loading: false, error: false }),
+  useTripWallets: () => ({ wallets: [], topUps: [], loading: false, error: false, retry: () => {} }),
 }));
 vi.mock('../../hooks/useSettlements', () => ({
   useSettlements: (...args: unknown[]) => {
