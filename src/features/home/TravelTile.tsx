@@ -1,17 +1,28 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Plane } from 'lucide-react';
+import { useSettlements } from '../../hooks/useSettlements';
+import { useTripExpenses } from '../../hooks/useTripExpenses';
 import { useWorkClock } from '../../hooks/useWorkClock';
+import { formatMinor } from '../../lib/travel/currency';
+import { TRIP_SETTLEMENT_MONTH, viewerTripFigures } from '../../lib/travel/valueTrip';
 import { paths } from '../../lib/paths';
 import { featuredTrip, formatTripDates, tripProgress } from '../../lib/travel/trips';
 import { progressText } from '../travel/tripText';
 import type { GroupDoc } from '../../types/models';
 
 const LINE = 'flex items-baseline justify-between gap-3 border-t border-line py-2 text-[13px] text-ink-muted';
+const BALANCE_TONE = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink' } as const;
 
-/** Home's Travel tile: the trip under way or the next one, with a way into Travel. */
-export default function TravelTile({ trips }: { trips: GroupDoc[] }) {
+/** Home's Travel tile: the trip under way or the next one, what's been spent and your balance, with a way into Travel. */
+export default function TravelTile({ trips, viewerUid }: { trips: GroupDoc[]; viewerUid: string }) {
   const { today } = useWorkClock();
   const trip = featuredTrip(trips, today);
+  // Only the featured trip's expenses load; with none featured, nothing does.
+  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
+  const figures = trip && !loading && !itemsLoading && !settlementsLoading && expenses.length > 0
+    ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements)
+    : null;
 
   return (
     <section aria-label="Travel" className="card p-4">
@@ -42,6 +53,20 @@ export default function TravelTile({ trips }: { trips: GroupDoc[] }) {
             <span>{tripProgress(trip.trip, today).status === 'current' ? 'Under way' : 'Next trip'}</span>
             <span className="font-medium text-ink">{progressText(tripProgress(trip.trip, today))}</span>
           </p>
+          {figures && (
+            <>
+              <p className={LINE}>
+                <span>Spent so far</span>
+                <span className="money text-ink">{`${figures.estimated ? '≈ ' : ''}${formatMinor(figures.spent, trip.currency)}`}</span>
+              </p>
+              <p className={LINE}>
+                <span>Your balance</span>
+                <span className={`font-semibold ${BALANCE_TONE[figures.balance.tone]}`}>
+                  {`${figures.balance.verb}${figures.balance.amount ? ` ${figures.balance.amount}` : ''}`}
+                </span>
+              </p>
+            </>
+          )}
         </Link>
       ) : (
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">

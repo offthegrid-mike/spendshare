@@ -17,7 +17,7 @@
 | **T0** — Money foundations (minor units, split among chosen people) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 (open) |
 | **T1** — Trip groups and the Travel shell | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T2** — Trip expenses in foreign currency (card) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
-| **T3** — Trip summary and settle-up | ⬜ | `travel/T3-settle` | |
+| **T3** — Trip summary and settle-up | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T4** — Personal cash wallets | ⬜ | `travel/T4-wallets` | |
 | **T5** — Shared kitty | ⬜ | `travel/T5-kitty` | |
 | **T6** — Cash hand-overs, closing a trip, export | ⬜ | `travel/T6-close` | |
@@ -190,15 +190,17 @@ Pure modules with no UI. Everything later depends on these.
 
 # T3 — Trip summary and settle-up
 
-### Task 3.1: `valueTrip()` (`src/lib/travel/valueTrip.ts`, pure)
-- Takes the trip's expenses, items, wallets and top-ups. Returns `SummaryItem[]` in home currency (card: `homeTotal` if actual, otherwise amount × rate, spread across items in proportion; wallet: `valueCash` at that wallet's rate), and a list of what can't be valued yet (for example, a wallet with no top-ups).
-- Feeds `computeSummary`. Tests: examples A and C, a mixed trip, and an item refund.
+### Task 3.1: `valueTrip()` (`src/lib/travel/valueTrip.ts`, pure) — done
+- Takes the trip's expenses and items. Returns items in home currency for `computeSummary`: a card payment's home value (`homeTotal` if charged, else its estimate) is spread over its items in proportion (`spreadInProportion`, exact to the minor unit). Also returns the payments still estimated and those that can't be valued yet (wallet payments until T4, which adds wallets and top-ups here).
+- **Parties** are the members plus anyone who paid or shares an item and has since left. So a former member who paid is paid back, and balances add up. That settles the T0 risk for trips without changing household settle-up.
+- Tests: example C, proportional spread, a former member, a wallet payment, settlements already paid.
 
-### Task 3.2: Summary screen
-- Settle-up first (reusing the Summary components and `markSettlementPaid` with `month: 'trip'`), then balances, totals by person, by category and by day, and spending in each currency.
-- A banner lists any card payments still on estimated rates, linking to each one.
-- Settle-up can name someone who has since left the trip (`computeSummary` keeps a former member's share). Show a readable name for them, not the uid that `memberName` falls back to: for example, keep each member's name on the trip after they leave.
-- Cash payments are valued with `valueSpends` (cumulatively, in date order), not `valueCash` one at a time, so rounding doesn't drift from what was paid in.
+### Task 3.2: Summary screen — done
+- `/travel/:tripId/summary`: settle-up first (`markSettlementPaid` with `month: 'trip'`, through `settleWrite` so it works offline; Undo), then each person's balance, paid and share, then spending by category and by the currency paid in. It's its own component, because the household Summary formats money in cents, which is wrong for a home currency like JPY.
+- A banner lists card payments still on estimated rates, linking to each one.
+- Someone who has left the trip shows as "A former member" (their name leaves with them).
+- The trip page shows your balance with a link to settle up; the Home tile adds spent so far and your balance.
+- **Not in T3:** totals by day (the trip page already lists expenses by day). For T4: value cash payments with `valueSpends` (cumulatively, in date order), not `valueCash` one at a time, so rounding doesn't drift from what was paid in.
 
 **Acceptance:** example C settles as expected, and marking it paid and undoing it both work.
 
@@ -272,6 +274,6 @@ Pure modules with no UI. Everything later depends on these.
 - **Values move while a trip is open.** A late top-up changes a wallet's average rate, which changes earlier cash values. This is correct, but may surprise people. Show "values update as cash is added", and freeze them at close.
 - **`ItemDoc.amount` means different things.** In a household it's cents in the group currency. On a trip it's minor units of the expense's currency. Every trip screen must format with the expense currency. A test helper should fail if a trip item is formatted with `formatMoney`.
 - **Collection-group queries on items** (year summary, search) are scoped per group, so trip items don't leak into household totals. Check this again in T1.
-- **A former member who paid for something** (found in T0 review, and already true for households): `computeSummary` gives a balance only to current members and to people named in `sharedWith`. A removed member's payments are left out, so balances don't sum to zero and no one is told to pay them back. Fixing it changes household settle-up as well, so it needs its own decision. Handle it before T3, or block removing a trip member who still has a balance.
+- **A former member who paid for something** (found in T0 review): **handled for trips in T3**, where `valueTrip` counts everyone who paid or shares. Households still leave a removed member's payments out of settle-up, so their balances don't sum to zero; fixing that changes household settle-up and needs its own decision.
 - **Turning Travel on in production** (found in T1 review): a client still running a cached version from before T1 doesn't know `kind`, and would list trips as households. Before setting `VITE_TRAVEL_ENABLED=true` in production, make sure the deployed version has been live long enough for installed apps to update.
 - **Offline creation of a trip** (also true for households): `createGroup` awaits `addDoc`, which resolves only once the server has the write, so offline the form stays on "Creating…". Fix before Travel goes live: write with `setDoc` on a ref from `doc(groupsCol)` and don't wait for the server. Invites need a connection anyway.

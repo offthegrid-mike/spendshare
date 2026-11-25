@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
+import { useSettlements } from '../../hooks/useSettlements';
 import { useTripExpenses } from '../../hooks/useTripExpenses';
+import { TRIP_SETTLEMENT_MONTH, viewerTripFigures } from '../../lib/travel/valueTrip';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { paths } from '../../lib/paths';
 import { formatTripDates, tripProgress } from '../../lib/travel/trips';
@@ -16,7 +18,9 @@ export default function TripScreen({ trips, viewerUid }: Props) {
   const { tripId } = useParams<{ tripId: string }>();
   const { today } = useWorkClock();
   const trip = trips.find((t) => t.id === tripId);
-  const { expenses, itemsByExpense, loading, error, retry } = useTripExpenses(trip?.trip ? trip.id : null);
+  const tripKey = trip?.trip ? trip.id : null;
+  const { expenses, itemsByExpense, loading, itemsLoading, error, retry } = useTripExpenses(tripKey);
+  const { settlements, loading: settlementsLoading } = useSettlements(tripKey, TRIP_SETTLEMENT_MONTH);
 
   if (!trip?.trip) {
     return (
@@ -54,6 +58,23 @@ export default function TripScreen({ trips, viewerUid }: Props) {
           Members and settings
         </Link>
       </section>
+
+      {!loading && !itemsLoading && !settlementsLoading && expenses.length > 0 && (() => {
+        const { balance } = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements);
+        const tone = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' }[balance.tone];
+        return (
+          <section aria-labelledby="your-balance" className="card flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <h3 id="your-balance" className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Your balance</h3>
+              <p className={`text-base font-semibold ${tone}`}>
+                {balance.verb}
+                {balance.amount && <> <span className="money">{balance.amount}</span></>}
+              </p>
+            </div>
+            <Link to={paths.tripSummary(trip.id)} className="btn-outline">Balances and settle-up</Link>
+          </section>
+        );
+      })()}
 
       {error ? (
         <div role="alert" className="card flex items-center justify-between gap-3 p-4 text-sm text-negative">

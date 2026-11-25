@@ -3,14 +3,23 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import TripScreen from './TripScreen';
 
-const hook = vi.hoisted(() => ({ calls: [] as (string | null)[], error: false, retry: vi.fn() }));
+const hook = vi.hoisted(() => ({
+  calls: [] as (string | null)[], error: false, retry: vi.fn(),
+  expenses: [] as unknown[], itemsByExpense: {} as Record<string, unknown[]>, settlementCalls: [] as unknown[][],
+}));
+vi.mock('../../hooks/useSettlements', () => ({
+  useSettlements: (...args: unknown[]) => {
+    hook.settlementCalls.push(args);
+    return { settlements: [], loading: false };
+  },
+}));
 vi.mock('../../hooks/useTripExpenses', () => ({
   useTripExpenses: (id: string | null) => {
     hook.calls.push(id);
-    return { expenses: [], itemsByExpense: {}, loading: false, itemsLoading: false, error: hook.error, retry: hook.retry };
+    return { expenses: hook.expenses, itemsByExpense: hook.itemsByExpense, loading: false, itemsLoading: false, error: hook.error, retry: hook.retry };
   },
 }));
-import { makeTrip } from '../../test/fixtures';
+import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
 
 const japan = makeTrip('japan', 'Japan', '2026-10-17', '2026-10-27', ['Mike', 'Priya', 'Sam']);
 
@@ -66,5 +75,17 @@ describe('TripScreen', () => {
     screen.getByRole('button', { name: 'Try again' }).click();
     expect(hook.retry).toHaveBeenCalled();
     hook.error = false;
+  });
+
+  it('shows the viewer’s balance with a way to settle up', () => {
+    hook.expenses = [makeExpense('e', { payerUid: 'priya', currency: 'AUD', total: 3000, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } })];
+    hook.itemsByExpense = { e: [makeItem('i', 'e', { amount: 3000, payerUid: 'priya', shared: true, sharedWith: ['mike', 'priya', 'sam'] })] };
+    renderAt('/travel/japan');
+    const card = screen.getByRole('region', { name: 'Your balance' });
+    expect(card).toHaveTextContent('You owe A$10.00');
+    expect(within(card).getByRole('link', { name: 'Balances and settle-up' })).toHaveAttribute('href', '/travel/japan/summary');
+    expect(hook.settlementCalls).toContainEqual(['japan', 'trip']);
+    hook.expenses = [];
+    hook.itemsByExpense = {};
   });
 });

@@ -48,7 +48,7 @@ export default function HomeScreen({ user, groups, group, trips = [] }: Props) {
           <div className="grid gap-4 lg:grid-cols-2">
             <SpendTile groups={groups} group={group} viewerUid={user.uid} />
             <WorkTile uid={user.uid} />
-            {TRAVEL_ENABLED && <TravelTile trips={trips} />}
+            {TRAVEL_ENABLED && <TravelTile trips={trips} viewerUid={user.uid} />}
           </div>
         </main>
       </div>

@@ -1,7 +1,10 @@
 import type { User } from 'firebase/auth';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { RouteSkeleton } from '../../components/AppSkeletons';
+import { useSettlements } from '../../hooks/useSettlements';
 import { useTripExpenses } from '../../hooks/useTripExpenses';
+import { TRIP_SETTLEMENT_MONTH } from '../../lib/travel/valueTrip';
+import TripSummary from './TripSummary';
 import { paths } from '../../lib/paths';
 import TripExpenseDetail from './TripExpenseDetail';
 import TripExpenseEditor from './TripExpenseEditor';
@@ -65,6 +68,20 @@ export function EditTripExpenseRoute({ trips, user }: Props) {
         existing={{ expense, items: itemsByExpense[expense.id] ?? [] }}
         onSaved={(id) => navigate(paths.tripExpense(trip.id, id), { replace: true })}
       />
+    </div>
+  );
+}
+
+export function TripSummaryRoute({ trips, user }: Props) {
+  const trip = useTrip(trips);
+  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
+  if (!trip) return <Navigate to={paths.travel} replace />;
+  if (loading || itemsLoading || settlementsLoading) return <RouteSkeleton />;
+  return (
+    <div className="mx-auto max-w-lg space-y-3">
+      <h2 className="text-lg font-semibold text-ink">{`Balances · ${trip.name}`}</h2>
+      <TripSummary trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} settlements={settlements} />
     </div>
   );
 }
