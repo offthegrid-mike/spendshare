@@ -99,7 +99,8 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 
 - All data stays readable offline through Firestore's IndexedDB cache, and changes made offline sync when the connection returns.
 - A service worker caches the app shell, so the app opens without a network connection.
-- Installable as a PWA from the browser.
+- Installable as an app. Where the browser supports it (Chrome, Edge, Android), **Install HomeBase** on the More and Work settings screens, and **Install app** in the Home menu, show the browser's install prompt. On iPhone and iPad, the More screen explains Safari's Share, then Add to Home Screen. Both are hidden once the app is installed.
+- Updates download in the background. An open app checks for a new version every hour and whenever it comes back into view, then shows **A new version of HomeBase is ready** with **Reload** and **Later**. Choosing Later, or ignoring it, gets the new version the next time the app is opened.
 - Light, dark, or system theme.
 - The More screen shows the build's commit and date, so you can confirm which deploy is live.
 
