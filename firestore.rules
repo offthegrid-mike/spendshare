@@ -249,6 +249,34 @@ service cloud.firestore {
           && (!('amount' in request.resource.data)
               || (request.resource.data.amount is number && request.resource.data.amount >= 0));
       }
+      // Trips: cash wallets, one per person per foreign currency (id = ownerUid_CUR),
+      // for any member including one without an account. Owner and currency never change.
+      match /wallets/{walletId} {
+        allow read, delete: if isMember(groupId);
+        allow create, update: if isMember(groupId)
+          && request.resource.data.kind == 'personal'
+          && request.resource.data.ownerUid is string
+          && request.resource.data.currency is string
+          && request.resource.data.currency.matches('[A-Z]{3}')
+          && walletId == request.resource.data.ownerUid + '_' + request.resource.data.currency
+          && request.resource.data.ownerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids
+          && (resource == null
+              || (request.resource.data.ownerUid == resource.data.ownerUid
+                  && request.resource.data.currency == resource.data.currency));
+      }
+      // Cash put into a wallet: whole minor units received (> 0) and paid (>= 0), on a day,
+      // by the member writing it, into a wallet that exists once the write lands.
+      match /topUps/{topUpId} {
+        allow read, delete: if isMember(groupId);
+        allow create, update: if isMember(groupId)
+          && request.resource.data.keys().hasOnly(['id', 'walletId', 'byUid', 'date', 'foreignAmount', 'homeAmount', 'createdAt'])
+          && request.resource.data.byUid == request.auth.uid
+          && request.resource.data.walletId is string
+          && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(request.resource.data.walletId))
+          && request.resource.data.foreignAmount is int && request.resource.data.foreignAmount > 0
+          && request.resource.data.homeAmount is int && request.resource.data.homeAmount >= 0
+          && isIsoDate(request.resource.data.date);
+      }
       match /suggestions/{doc} {
         allow read: if isMember(groupId);
         allow write: if isMember(groupId);

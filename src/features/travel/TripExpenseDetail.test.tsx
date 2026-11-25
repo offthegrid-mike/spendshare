@@ -7,6 +7,7 @@ import TripExpenseDetail from './TripExpenseDetail';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
 import type { ExpenseDoc } from '../../types/models';
 import { useUIStore } from '../../stores/uiStore';
+import { tripCash } from '../../lib/travel/cash';
 
 const { recordCharge, deleteTripExpense } = vi.hoisted(() => ({ recordCharge: vi.fn(), deleteTripExpense: vi.fn() }));
 vi.mock('./tripWrite', () => ({ recordCharge, deleteTripExpense }));
@@ -114,6 +115,27 @@ describe('TripExpenseDetail', () => {
   it('shows the day the payer chose', () => {
     renderDetail({ ...estimated, tripDay: '2027-05-11' });
     expect(screen.getByText('Ben paid · Tue 11 May 2027')).toBeInTheDocument();
+  });
+
+  it('shows a cash payment’s wallet and its value at the cash’s average rate, with nothing to enter', () => {
+    const dinner = { ...estimated, payerUid: 'alex', total: 60000, paidWith: { kind: 'wallet' as const, walletId: 'alex_JPY' } };
+    const cash = tripCash(
+      [{ id: 'alex_JPY', kind: 'personal', ownerUid: 'alex', currency: 'JPY', createdByUid: 'alex', createdAt: null as never }],
+      [
+        { id: 't1', walletId: 'alex_JPY', byUid: 'alex', date: '2027-05-09', foreignAmount: 50000, homeAmount: 50000, createdAt: null as never },
+        { id: 't2', walletId: 'alex_JPY', byUid: 'alex', date: '2027-05-09', foreignAmount: 50000, homeAmount: 53000, createdAt: null as never },
+      ],
+      [dinner],
+    );
+    render(
+      <MemoryRouter initialEntries={['/travel/japan/expense/e1']}>
+        <Routes>
+          <Route path="/travel/:tripId/expense/:expenseId" element={<TripExpenseDetail trip={trip} user={alex} expenses={[dinner]} itemsByExpense={{ e1: items }} cash={cash} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Paid in cash from your JPY cash · ≈ A$618.00 at its average rate (1 AUD = 97.09 JPY)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Amount charged (AUD)')).not.toBeInTheDocument();
   });
 
   it('says so for an expense that is not on the trip', () => {

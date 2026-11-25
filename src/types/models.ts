@@ -62,6 +62,22 @@ export interface ItemDoc {
   tags?: string[];     // as typed; matched by lib/tags tagKey; at most MAX_TAGS
   sharedWith?: Uid[];  // trips: who shares a shared item; missing = every member (see lib/settlement)
 }
+/**
+ * A trip member's cash in one foreign currency: groups/{tripId}/wallets/{ownerUid_CUR}.
+ * The id makes it one wallet per person per currency. See lib/travel/cash.ts.
+ */
+export interface WalletDoc {
+  id: string; kind: 'personal'; ownerUid: Uid; currency: string;
+  createdByUid: Uid; createdAt: Timestamp;
+}
+/** Cash put into a wallet: groups/{tripId}/topUps/{id}. Amounts are minor units. */
+export interface TopUpDoc {
+  id: string; walletId: string; byUid: Uid;
+  date: string;          // 'YYYY-MM-DD'
+  foreignAmount: number; // of the wallet's currency received, > 0
+  homeAmount: number;    // of the trip's home currency paid for it, >= 0
+  createdAt: Timestamp;
+}
 export interface IncomeDoc { id?: string; uid: Uid; month: string; amount: number; description?: string; }
 export interface SettlementDoc {
   id: string; month: string; fromUid: Uid; toUid: Uid; amount: number;

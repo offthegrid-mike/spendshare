@@ -24,6 +24,7 @@ export const paths = {
   trip: (id: string): string => `/travel/${id}`,
   tripSettings: (id: string): string => `/travel/${id}/settings`,
   tripSummary: (id: string): string => `/travel/${id}/summary`,
+  tripCash: (id: string): string => `/travel/${id}/cash`,
   newTripExpense: (id: string): string => `/travel/${id}/expense/new`,
   tripExpense: (id: string, expenseId: string): string => `/travel/${id}/expense/${expenseId}`,
   editTripExpense: (id: string, expenseId: string): string => `/travel/${id}/expense/${expenseId}/edit`,

@@ -8,6 +8,9 @@ const hook = vi.hoisted(() => ({
   expenses: [] as unknown[], itemsByExpense: {} as Record<string, unknown[]>, settlementCalls: [] as unknown[][],
   settlements: [] as unknown[],
 }));
+vi.mock('../../hooks/useTripWallets', () => ({
+  useTripWallets: () => ({ wallets: [], topUps: [], loading: false, error: false }),
+}));
 vi.mock('../../hooks/useSettlements', () => ({
   useSettlements: (...args: unknown[]) => {
     hook.settlementCalls.push(args);
@@ -95,5 +98,10 @@ describe('TripScreen', () => {
     renderAt('/travel/japan');
     expect(screen.getByRole('region', { name: 'Your balance' })).toHaveTextContent('You get back A$10.00');
     hook.settlements = [];
+  });
+
+  it('links to the trip’s cash', () => {
+    renderAt('/travel/japan');
+    expect(screen.getByRole('link', { name: 'Cash' })).toHaveAttribute('href', '/travel/japan/cash');
   });
 });

@@ -16,6 +16,7 @@ function noon(day: string): Date {
 }
 
 function payment(built: BuiltTripExpense, home: string, existing?: ExpenseDoc): TripPayment {
+  if (built.payment.kind === 'wallet') return { kind: 'wallet', walletId: built.payment.walletId };
   if (built.currency.toUpperCase() === home.toUpperCase()) return { kind: 'card', rate: 1, rateStatus: 'actual' };
   const old = existing?.paidWith;
   // What the card was charged still holds while the currency and total are unchanged.

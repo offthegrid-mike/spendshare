@@ -9,7 +9,7 @@ import { db } from './firebase';
 import type {
   UserDoc, GroupDoc, ExpenseDoc, ItemDoc, IncomeDoc,
   CategoryDoc, InviteDoc, SettlementDoc, SuggestionsDoc,
-  WorkDayDoc, WorkSettingsDoc,
+  WorkDayDoc, WorkSettingsDoc, WalletDoc, TopUpDoc,
 } from '../types/models';
 
 function col<T extends DocumentData>(path: string): CollectionReference<T> {
@@ -24,6 +24,8 @@ export const incomeCol = (gid: string) => col<IncomeDoc>(`groups/${gid}/income`)
 export const categoriesCol = (gid: string) => col<CategoryDoc>(`groups/${gid}/categories`);
 export const invitesCol = (gid: string) => col<InviteDoc>(`groups/${gid}/invites`);
 export const settlementsCol = (gid: string) => col<SettlementDoc>(`groups/${gid}/settlements`);
+export const walletsCol = (gid: string) => col<WalletDoc>(`groups/${gid}/wallets`);
+export const topUpsCol = (gid: string) => col<TopUpDoc>(`groups/${gid}/topUps`);
 
 export const workDaysCol = (uid: string) => col<WorkDayDoc>(`users/${uid}/workDays`);
 

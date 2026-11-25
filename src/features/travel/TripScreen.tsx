@@ -1,8 +1,8 @@
 import { Link, useParams } from 'react-router-dom';
-import { Settings } from 'lucide-react';
+import { Banknote, Settings } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
 import { useSettlements } from '../../hooks/useSettlements';
-import { useTripExpenses } from '../../hooks/useTripExpenses';
+import { useTripData } from '../../hooks/useTripData';
 import { TRIP_SETTLEMENT_MONTH, viewerTripFigures } from '../../lib/travel/valueTrip';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { paths } from '../../lib/paths';
@@ -19,7 +19,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
   const { today } = useWorkClock();
   const trip = trips.find((t) => t.id === tripId);
   const tripKey = trip?.trip ? trip.id : null;
-  const { expenses, itemsByExpense, loading, itemsLoading, error, retry } = useTripExpenses(tripKey);
+  const { expenses, itemsByExpense, cash, loading, itemsLoading, error, retry } = useTripData(tripKey);
   const { settlements, loading: settlementsLoading } = useSettlements(tripKey, TRIP_SETTLEMENT_MONTH);
 
   if (!trip?.trip) {
@@ -53,14 +53,20 @@ export default function TripScreen({ trips, viewerUid }: Props) {
           })}
         </ul>
 
-        <Link to={paths.tripSettings(trip.id)} className="btn-outline mt-4">
-          <Settings size={14} aria-hidden="true" />
-          Members and settings
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link to={paths.tripSettings(trip.id)} className="btn-outline">
+            <Settings size={14} aria-hidden="true" />
+            Members and settings
+          </Link>
+          <Link to={paths.tripCash(trip.id)} className="btn-outline">
+            <Banknote size={14} aria-hidden="true" />
+            Cash
+          </Link>
+        </div>
       </section>
 
       {!loading && !itemsLoading && !settlementsLoading && (() => {
-        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements);
+        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values);
         if (!figures) return null;
         const { balance } = figures;
         const tone = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' }[balance.tone];
@@ -86,7 +92,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
       ) : loading ? (
         <div role="status" aria-label="Loading expenses" className="card h-24 animate-pulse" />
       ) : (
-        <TripExpenseList trip={trip} expenses={expenses} itemsByExpense={itemsByExpense} viewerUid={viewerUid} />
+        <TripExpenseList trip={trip} expenses={expenses} itemsByExpense={itemsByExpense} viewerUid={viewerUid} cashValues={cash.values} />
       )}
     </div>
   );

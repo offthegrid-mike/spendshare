@@ -12,6 +12,9 @@ vi.mock('../../hooks/useTripExpenses', () => ({
   },
 }));
 vi.mock('../../hooks/useSettlements', () => ({ useSettlements: () => ({ settlements: [], loading: false }) }));
+vi.mock('../../hooks/useTripWallets', () => ({
+  useTripWallets: () => ({ wallets: [], topUps: [], loading: false, error: false }),
+}));
 
 function renderTile(trips = [makeTrip('japan', 'Japan', '2026-10-17', '2026-10-27')], viewerUid = 'mike') {
   return render(

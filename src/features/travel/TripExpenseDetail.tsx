@@ -9,6 +9,7 @@ import { memberName } from '../../lib/balance';
 import { paths } from '../../lib/paths';
 import { formatMinor, minorDigits, toMinor } from '../../lib/travel/currency';
 import { expenseDay, expenseHomeTotal, isEstimated } from '../../lib/travel/tripExpense';
+import { readableWalletRate, type TripCash } from '../../lib/travel/cash';
 import { useUIStore } from '../../stores/uiStore';
 import { deleteTripExpense, recordCharge } from './tripWrite';
 import type { ExpenseDoc, GroupDoc, ItemDoc } from '../../types/models';
@@ -18,6 +19,7 @@ interface Props {
   user: User;
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
+  cash?: TripCash;
 }
 
 /** A rate for reading: up to four significant digits ("99", "96.71", "0.6154"). */
@@ -89,7 +91,7 @@ function ChargeForm({ trip, user, expense, onDone, onCancel }: {
 }
 
 /** One trip expense: its items and sharers, the rate it was valued at, and entering what the card was charged. */
-export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense }: Props) {
+export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense, cash }: Props) {
   const { expenseId } = useParams<{ expenseId: string }>();
   const navigate = useNavigate();
   const [changingCharge, setChangingCharge] = useState(false);
@@ -111,7 +113,8 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
   const foreign = currency !== home;
   const items = itemsByExpense[expense.id] ?? [];
   const paid = expense.paidWith;
-  const homeTotal = expenseHomeTotal(expense, home);
+  const homeTotal = expenseHomeTotal(expense, home, cash?.values);
+  const wallet = paid?.kind === 'wallet' ? cash?.wallets.find((w) => w.wallet.id === paid.walletId) : undefined;
   const payer = expense.payerUid === user.uid ? 'You' : memberName(trip, expense.payerUid);
   const showChargeForm = foreign && paid?.kind === 'card' && (isEstimated(expense, home) || changingCharge);
 
@@ -141,6 +144,14 @@ export default function TripExpenseDetail({ trip, user, expenses, itemsByExpense
             </p>
           )}
         </div>
+        {paid?.kind === 'wallet' && (
+          <p className="text-[13px] tabular-nums text-ink-muted">
+            {`Paid in cash from ${expense.payerUid === user.uid ? 'your' : `${memberName(trip, expense.payerUid)}’s`} ${currency} cash · `}
+            {homeTotal !== null && wallet?.rate
+              ? `≈ ${formatMinor(homeTotal, home)} at its average rate (1 ${home} = ${readableWalletRate(wallet.rate, currency, home)} ${currency})`
+              : 'not valued yet: add the cash that was bought on the Cash page'}
+          </p>
+        )}
         {showChargeForm ? (
           <ChargeForm
             trip={trip}

@@ -41,7 +41,8 @@ Shared trip costs in any currency, built milestone by milestone from [docs/TRAVE
 - **Expenses in any currency:** record where, when, who paid, and each item with who shares it (everyone at first; tap people to leave them out). A foreign-currency card payment takes an estimated rate ("1 AUD = 99 JPY", remembered per currency), shows its value in the home currency, and is marked Estimated until you enter what the card was actually charged.
 - Expenses are listed by day of the trip, with what's been spent so far. Saving works offline.
 - **Balances and settle-up** in the home currency: who pays whom, with Mark paid and Undo, each person's balance, and spending by category and by currency. Card payments still at an estimated rate are flagged, and someone who has left the trip is still paid back. The trip page and the Home tile show your balance.
-- Cash wallets and the kitty come in later milestones.
+- **Cash wallets:** record foreign cash when you buy it ("¥50,000 for A$500"), for yourself or anyone on the trip. Pay for things "with cash", and each payment is valued at what that cash cost: your wallet's average rate, not the rate on the day. The Cash page shows what's left and what it cost.
+- The shared kitty comes in a later milestone.
 
 ### Expenses
 

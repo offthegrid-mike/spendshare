@@ -2,9 +2,10 @@ import type { User } from 'firebase/auth';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { RouteSkeleton } from '../../components/AppSkeletons';
 import { useSettlements } from '../../hooks/useSettlements';
-import { useTripExpenses } from '../../hooks/useTripExpenses';
+import { useTripData } from '../../hooks/useTripData';
 import { TRIP_SETTLEMENT_MONTH } from '../../lib/travel/valueTrip';
 import TripSummary from './TripSummary';
+import TripCash from './TripCash';
 import { paths } from '../../lib/paths';
 import TripExpenseDetail from './TripExpenseDetail';
 import TripExpenseEditor from './TripExpenseEditor';
@@ -22,7 +23,7 @@ export function NewTripExpenseRoute({ trips, user }: Props) {
   const trip = useTrip(trips);
   const navigate = useNavigate();
   // Waits for the trip's expenses, so the last currency and rate can be offered.
-  const { expenses, loading } = useTripExpenses(trip?.id ?? null);
+  const { expenses, cash, loading } = useTripData(trip?.id ?? null);
   if (!trip) return <Navigate to={paths.travel} replace />;
   if (loading) return <RouteSkeleton />;
   return (
@@ -33,6 +34,7 @@ export function NewTripExpenseRoute({ trips, user }: Props) {
         trip={trip}
         user={user}
         expenses={expenses}
+        cash={cash}
         onSaved={() => navigate(paths.trip(trip.id), { replace: true })}
       />
     </div>
@@ -41,17 +43,17 @@ export function NewTripExpenseRoute({ trips, user }: Props) {
 
 export function TripExpenseRoute({ trips, user }: Props) {
   const trip = useTrip(trips);
-  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   if (!trip) return <Navigate to={paths.travel} replace />;
   if (loading || itemsLoading) return <RouteSkeleton />;
-  return <TripExpenseDetail trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} />;
+  return <TripExpenseDetail trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} cash={cash} />;
 }
 
 export function EditTripExpenseRoute({ trips, user }: Props) {
   const trip = useTrip(trips);
   const { expenseId } = useParams<{ expenseId: string }>();
   const navigate = useNavigate();
-  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   if (!trip) return <Navigate to={paths.travel} replace />;
   // The form takes its starting values once, so it waits for the items too.
   if (loading || itemsLoading) return <RouteSkeleton />;
@@ -66,6 +68,7 @@ export function EditTripExpenseRoute({ trips, user }: Props) {
         user={user}
         expenses={expenses}
         existing={{ expense, items: itemsByExpense[expense.id] ?? [] }}
+        cash={cash}
         onSaved={(id) => navigate(paths.tripExpense(trip.id, id), { replace: true })}
       />
     </div>
@@ -74,14 +77,29 @@ export function EditTripExpenseRoute({ trips, user }: Props) {
 
 export function TripSummaryRoute({ trips, user }: Props) {
   const trip = useTrip(trips);
-  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
   if (!trip) return <Navigate to={paths.travel} replace />;
   if (loading || itemsLoading || settlementsLoading) return <RouteSkeleton />;
   return (
     <div className="mx-auto max-w-lg space-y-3">
       <h2 className="text-lg font-semibold text-ink">{`Balances · ${trip.name}`}</h2>
-      <TripSummary trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} settlements={settlements} />
+      <TripSummary
+        trip={trip} user={user} expenses={expenses} itemsByExpense={itemsByExpense} settlements={settlements} cashValues={cash.values}
+      />
+    </div>
+  );
+}
+
+export function TripCashRoute({ trips, user }: Props) {
+  const trip = useTrip(trips);
+  const { expenses, cash, loading } = useTripData(trip?.id ?? null);
+  if (!trip) return <Navigate to={paths.travel} replace />;
+  if (loading) return <RouteSkeleton />;
+  return (
+    <div className="mx-auto max-w-lg space-y-3">
+      <h2 className="text-lg font-semibold text-ink">{`Cash · ${trip.name}`}</h2>
+      <TripCash trip={trip} user={user} cash={cash} expenses={expenses} />
     </div>
   );
 }

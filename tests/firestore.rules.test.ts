@@ -1477,3 +1477,89 @@ describe('/groups trip expenses (currency, paidWith, sharedWith)', () => {
     await assertFails(save(expense(), item({ sharedWith: 'userA' })));
   });
 });
+
+describe('/groups cash wallets and top-ups', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan'), {
+        ownerUid: 'userA', name: 'Japan', currency: 'AUD',
+        members: {
+          userA: { role: 'owner', displayName: 'Alice', email: 'usera@test.com' },
+          manual_sam: { role: 'member', displayName: 'Sam', email: '', manual: true },
+        },
+        memberUids: ['userA', 'manual_sam'], createdAt: new Date(),
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const fs = (uid = 'userA') => testEnv.authenticatedContext(uid).firestore();
+  const wallet = (extra: Record<string, unknown> = {}) => ({
+    id: 'userA_JPY', kind: 'personal', ownerUid: 'userA', currency: 'JPY', createdByUid: 'userA', createdAt: new Date(), ...extra,
+  });
+  const topUp = (extra: Record<string, unknown> = {}) => ({
+    id: 't1', walletId: 'userA_JPY', byUid: 'userA', date: '2027-05-09', foreignAmount: 50000, homeAmount: 50000, createdAt: new Date(), ...extra,
+  });
+
+  async function addCash(w: Record<string, unknown>, t: Record<string, unknown>, walletId = 'userA_JPY') {
+    const db = fs();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'groups', 'japan', 'wallets', walletId), w);
+    batch.set(doc(db, 'groups', 'japan', 'topUps', 't1'), t);
+    return batch.commit();
+  }
+
+  it('lets a member create their wallet and add cash to it in one go', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+  });
+
+  it('lets a member keep a wallet for someone without an account', async () => {
+    await assertSucceeds(addCash(wallet({ id: 'manual_sam_JPY', ownerUid: 'manual_sam' }), topUp({ walletId: 'manual_sam_JPY' }), 'manual_sam_JPY'));
+  });
+
+  it('allows only one wallet per person per currency: the id must be owner_currency', async () => {
+    await assertFails(addCash(wallet(), topUp({ walletId: 'other' }), 'other'));
+  });
+
+  it('denies a wallet for someone not on the trip, or with a malformed currency', async () => {
+    await assertFails(addCash(wallet({ id: 'stranger_JPY', ownerUid: 'stranger' }), topUp({ walletId: 'stranger_JPY' }), 'stranger_JPY'));
+    await assertFails(addCash(wallet({ id: 'userA_yen', currency: 'yen' }), topUp({ walletId: 'userA_yen' }), 'userA_yen'));
+  });
+
+  it('denies cash added to a wallet that does not exist', async () => {
+    await assertFails(setDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1'), topUp()));
+  });
+
+  it('denies top-ups with no cash, a negative cost, a bad date, another author or extra fields', async () => {
+    await assertFails(addCash(wallet(), topUp({ foreignAmount: 0 })));
+    await assertFails(addCash(wallet(), topUp({ foreignAmount: 1.5 })));
+    await assertFails(addCash(wallet(), topUp({ homeAmount: -1 })));
+    await assertFails(addCash(wallet(), topUp({ date: '9 May' })));
+    await assertFails(addCash(wallet(), topUp({ byUid: 'someoneElse' })));
+    await assertFails(addCash(wallet(), topUp({ note: 'x' })));
+  });
+
+  it('never lets a wallet change owner or currency', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY'), { ownerUid: 'manual_sam' }));
+    await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'userA_JPY'), { currency: 'KRW' }));
+  });
+
+  it('keeps wallets and top-ups to members of the trip', async () => {
+    await assertSucceeds(addCash(wallet(), topUp()));
+    await assertFails(getDoc(doc(fs('userB'), 'groups', 'japan', 'wallets', 'userA_JPY')));
+    await assertFails(getDoc(doc(fs('userB'), 'groups', 'japan', 'topUps', 't1')));
+    await assertSucceeds(deleteDoc(doc(fs(), 'groups', 'japan', 'topUps', 't1')));
+  });
+});

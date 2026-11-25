@@ -3,10 +3,14 @@ import type { User } from 'firebase/auth';
 import { Plus, X } from 'lucide-react';
 import Checkbox from '../../components/ui/Checkbox';
 import LoadingButton from '../../components/LoadingButton';
+import SegmentedControl from '../../components/ui/SegmentedControl';
 import Select from '../../components/ui/Select';
 import { useCategories } from '../../hooks/useCategories';
 import { useWorkClock } from '../../hooks/useWorkClock';
+import { cashLeftFor, tripCash, type TripCash } from '../../lib/travel/cash';
 import { currencyOptions, formatMinor, minorDigits, toMinor } from '../../lib/travel/currency';
+import { tripMemberName } from '../../lib/travel/valueTrip';
+import { valueCash } from '../../lib/travel/wallet';
 import {
   buildTripExpense, expenseDay, lastRates, parseRate, toHome, type TripExpenseDraft, type TripItemDraft,
 } from '../../lib/travel/tripExpense';
@@ -25,8 +29,16 @@ interface Props {
   /** The trip's expenses, for the last currency and rate used. */
   expenses: ExpenseDoc[];
   existing?: { expense: ExpenseDoc; items: ItemDoc[] };
+  /** The trip's cash wallets, for paying from cash. */
+  cash?: TripCash;
   onSaved: (expenseId: string) => void;
 }
+
+const NO_CASH = tripCash([], [], []);
+const PAID_WITH = [
+  { value: 'card' as const, label: 'Card' },
+  { value: 'cash' as const, label: 'Cash' },
+];
 
 /** A rate as typed: up to six significant digits, so a rate worked out from a charge stays readable. */
 function rateText(rate: number | undefined): string {
@@ -55,10 +67,14 @@ function initialDraft(
   if (existing) {
     const { expense, items } = existing;
     const currency = expense.currency ?? trip.currency;
+    const paid = expense.paidWith;
     return {
       date: expenseDay(expense),
       shopName: expense.shopName ?? '',
       payerUid: expense.payerUid,
+      payment: paid?.kind === 'wallet'
+        ? { kind: 'wallet', walletId: paid.walletId, ownerUid: expense.payerUid }
+        : { kind: 'card' },
       currency,
       rate: expense.paidWith?.kind === 'card' && currency !== trip.currency ? rateText(expense.paidWith.rate) : '',
       items: items.map((it) => ({
@@ -75,6 +91,7 @@ function initialDraft(
     date: defaultDay(trip, today),
     shopName: '',
     payerUid: viewerUid,
+    payment: { kind: 'card' },
     currency: last.currency,
     rate: rateText(last.rates[last.currency]),
     items: [blankItem(firstCategory, everyone)],
@@ -86,7 +103,7 @@ function blankItem(categoryId: string, sharedWith: string[]): TripItemDraft {
 }
 
 /** Adds or edits a trip expense in any currency, choosing who shares each item. */
-export default function TripExpenseEditor({ trip, user, expenses, existing, onSaved }: Props) {
+export default function TripExpenseEditor({ trip, user, expenses, existing, cash = NO_CASH, onSaved }: Props) {
   const id = useId();
   const { today } = useWorkClock();
   const { active: categories, all: allCategories } = useCategories(trip.id);
@@ -108,9 +125,29 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
     setError('');
   }
 
+  // Wallets that can pay in the expense's currency, the viewer's first.
+  const walletsFor = (currency: string) => cash.wallets
+    .filter((w) => w.wallet.currency === currency)
+    .sort((a, b) => Number(b.wallet.ownerUid === user.uid) - Number(a.wallet.ownerUid === user.uid));
+  const cashPayment = draft.payment?.kind === 'wallet' ? draft.payment : null;
+  const payingWallet = cashPayment ? cash.wallets.find((w) => w.wallet.id === cashPayment.walletId) : undefined;
+
+  function pickWallet(currency: string): TripExpenseDraft['payment'] {
+    const first = walletsFor(currency)[0];
+    return { kind: 'wallet', walletId: first?.wallet.id ?? '', ownerUid: first?.wallet.ownerUid ?? '' };
+  }
+
   function changeCurrency(currency: string) {
-    // Each currency keeps its own last rate.
-    patch({ currency, rate: rateText(lastRates(expenses, home).rates[currency]) });
+    // Each currency keeps its own last rate; cash moves to a wallet in the new currency.
+    patch({
+      currency,
+      rate: rateText(lastRates(expenses, home).rates[currency]),
+      ...(cashPayment ? { payment: pickWallet(currency) } : {}),
+    });
+  }
+
+  function changePaidWith(kind: 'card' | 'cash') {
+    patch({ payment: kind === 'cash' ? pickWallet(draft.currency) : { kind: 'card' } });
   }
 
   // Categories may still be loading when a new expense opens; fill the first in as they arrive.
@@ -121,9 +158,15 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
       const n = toMinor(it.amount || '0', draft.currency);
       return s + (Number.isFinite(n) ? n : 0);
     }, 0);
+    if (cashPayment) {
+      return { total, home: payingWallet?.rate ? valueCash(total, payingWallet.rate) : null };
+    }
     const rate = foreign ? parseRate(draft.rate) : 1;
     return { total, home: rate > 0 ? toHome(total, draft.currency, home, rate) : null };
-  }, [items, draft.currency, draft.rate, foreign, home]);
+  }, [items, draft.currency, draft.rate, foreign, home, cashPayment, payingWallet]);
+  const cashLeft = cashPayment ? cashLeftFor(cash, cashPayment.walletId, existing?.expense) : null;
+  const ownerName = (uid: string) => tripMemberName(trip, uid, user.uid);
+  const walletLabel = (uid: string) => (uid === user.uid ? 'Your cash' : `${ownerName(uid)}’s cash`);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -174,7 +217,6 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
           <label htmlFor={`${id}-date`} className="mb-1 block text-sm font-medium text-ink">Date</label>
           <DatePicker id={`${id}-date`} value={draft.date} onChange={(date) => patch({ date })} />
         </div>
-        <PayerPicker group={trip} viewerUid={user.uid} value={draft.payerUid} onChange={(payerUid) => patch({ payerUid })} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p id={`${id}-currency`} className="mb-1 text-sm font-medium text-ink">Currency</p>
@@ -186,7 +228,7 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
               options={CURRENCY_OPTIONS}
             />
           </div>
-          {foreign && (
+          {foreign && !cashPayment && (
             <div>
               <label htmlFor={`${id}-rate`} className="mb-1 block text-sm font-medium text-ink">Exchange rate</label>
               <div className="flex items-center gap-2 text-sm text-ink-muted">
@@ -204,10 +246,43 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
             </div>
           )}
         </div>
-        {foreign && (
+        {foreign && !cashPayment && (
           <p className="text-xs text-ink-muted">
             Paid by card at an estimated rate. Once you see what the card was charged, enter it on the expense.
           </p>
+        )}
+        <div>
+          <p className="mb-1 text-sm font-medium text-ink">Paid with</p>
+          <SegmentedControl
+            label="Paid with"
+            options={PAID_WITH}
+            value={cashPayment ? 'cash' : 'card'}
+            onChange={changePaidWith}
+          />
+        </div>
+        {cashPayment ? (
+          walletsFor(draft.currency).length > 0 ? (
+            <div>
+              <p id={`${id}-wallet`} className="mb-1 text-sm font-medium text-ink">Whose cash</p>
+              <Select
+                aria-labelledby={`${id}-wallet`}
+                title="Whose cash"
+                value={cashPayment.walletId}
+                onChange={(walletId) => {
+                  const w = cash.wallets.find((x) => x.wallet.id === walletId);
+                  patch({ payment: { kind: 'wallet', walletId, ownerUid: w?.wallet.ownerUid ?? '' } });
+                }}
+                options={walletsFor(draft.currency).map((w) => ({ value: w.wallet.id, label: walletLabel(w.wallet.ownerUid) }))}
+              />
+              {cashPayment.ownerUid && (
+                <p className="mt-1 text-xs text-ink-muted">{`Paid by ${cashPayment.ownerUid === user.uid ? 'you' : ownerName(cashPayment.ownerUid)}`}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[13px] text-warning">{`No ${draft.currency} cash yet. Add it on the Cash page first.`}</p>
+          )
+        ) : (
+          <PayerPicker group={trip} viewerUid={user.uid} value={draft.payerUid} onChange={(payerUid) => patch({ payerUid })} />
         )}
       </div>
 
@@ -298,6 +373,12 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
           )}
         </span>
       </div>
+      {cashPayment && cashLeft !== null && totals.total > cashLeft && (
+        <p className="text-[13px] text-warning">
+          {`That’s more than the ${formatMinor(Math.max(cashLeft, 0), draft.currency)} left in ${
+            cashPayment.ownerUid === user.uid ? 'your' : `${ownerName(cashPayment.ownerUid)}’s`} cash.`}
+        </p>
+      )}
 
       {error && <p role="alert" className="text-sm text-negative">{error}</p>}
       <LoadingButton type="submit" loading={saving} loadingText="Saving…" className="btn-primary h-11 w-full">

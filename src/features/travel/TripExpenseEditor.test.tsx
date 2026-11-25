@@ -3,6 +3,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { User } from 'firebase/auth';
 import TripExpenseEditor from './TripExpenseEditor';
+import { tripCash } from '../../lib/travel/cash';
+import type { TopUpDoc, WalletDoc } from '../../types/models';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
 import type { CategoryDoc } from '../../types/models';
 
@@ -75,7 +77,7 @@ describe('TripExpenseEditor', () => {
       tripId: 'japan', uid: 'alex', home: 'AUD',
       categories: { food: 'Food', fun: 'Activities', old: 'Souvenirs' },
       built: {
-        date: '2027-05-12', shopName: 'Ichiran', payerUid: 'alex', currency: 'JPY', rate: 99, total: 5300,
+        date: '2027-05-12', shopName: 'Ichiran', payerUid: 'alex', currency: 'JPY', rate: 99, payment: { kind: 'card' }, total: 5300,
         items: [
           { name: 'Ramen', categoryId: 'food', amount: 4500, shared: true, sharedWith: ['alex', 'ben'] },
           { name: 'Keyring', categoryId: 'food', amount: 800, shared: false },
@@ -155,5 +157,73 @@ describe('TripExpenseEditor', () => {
     await u.type(screen.getByLabelText('Item 1 amount'), '4500');
     await u.click(screen.getByRole('button', { name: 'Save expense' }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  describe('paying from cash', () => {
+    const wallet = (ownerUid: string): WalletDoc => ({
+      id: `${ownerUid}_JPY`, kind: 'personal', ownerUid, currency: 'JPY', createdByUid: ownerUid, createdAt: null as never,
+    });
+    const topUp = (walletId: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
+      id: `t-${walletId}`, walletId, byUid: 'alex', date: '2027-05-09', foreignAmount, homeAmount, createdAt: null as never,
+    });
+    const cash = tripCash(
+      [wallet('alex'), wallet('ben')],
+      [topUp('alex_JPY', 100000, 103000), topUp('ben_JPY', 5000, 5000)],
+      [],
+    );
+
+    it('pays from the viewer’s cash in that currency, valued at its average rate, with no rate to enter', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<TripExpenseEditor trip={trip} user={alex} expenses={[lastJpy]} cash={cash} onSaved={onSaved} />);
+      await u.click(screen.getByRole('button', { name: 'Cash' }));
+      expect(screen.queryByLabelText('Exchange rate')).not.toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'Whose cash' })).toHaveTextContent('Your cash');
+      await u.type(screen.getByLabelText('Item 1 name'), 'Dinner');
+      await u.type(screen.getByLabelText('Item 1 amount'), '60000');
+      expect(screen.getByText('≈ A$618.00')).toBeInTheDocument();
+      await u.click(screen.getByRole('button', { name: 'Save expense' }));
+      await waitFor(() => expect(saveTripExpense).toHaveBeenCalledWith(expect.objectContaining({
+        built: expect.objectContaining({ payerUid: 'alex', payment: { kind: 'wallet', walletId: 'alex_JPY' }, total: 60000 }),
+      })));
+    });
+
+    it('makes the wallet’s owner the payer, and warns when it’s more than their cash left', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<TripExpenseEditor trip={trip} user={alex} expenses={[lastJpy]} cash={cash} onSaved={onSaved} />);
+      await u.click(screen.getByRole('button', { name: 'Cash' }));
+      await u.click(screen.getByRole('combobox', { name: 'Whose cash' }));
+      await u.click(screen.getByRole('option', { name: 'Ben’s cash' }));
+      expect(screen.getByText('Paid by Ben')).toBeInTheDocument();
+      await u.type(screen.getByLabelText('Item 1 name'), 'Taxi');
+      await u.type(screen.getByLabelText('Item 1 amount'), '6000');
+      expect(screen.getByText('That’s more than the ¥5,000 left in Ben’s cash.')).toBeInTheDocument();
+      await u.click(screen.getByRole('button', { name: 'Save expense' }));
+      await waitFor(() => expect(saveTripExpense).toHaveBeenCalledWith(expect.objectContaining({
+        built: expect.objectContaining({ payerUid: 'ben', payment: { kind: 'wallet', walletId: 'ben_JPY' } }),
+      })));
+    });
+
+    it('says when nobody has cash in that currency yet, and won’t save', async () => {
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<TripExpenseEditor trip={trip} user={alex} expenses={[]} cash={cash} onSaved={onSaved} />);
+      await u.click(screen.getByRole('button', { name: 'Cash' }));
+      expect(screen.getByText('No AUD cash yet. Add it on the Cash page first.')).toBeInTheDocument();
+      await u.type(screen.getByLabelText('Item 1 name'), 'Taxi');
+      await u.type(screen.getByLabelText('Item 1 amount'), '20');
+      await u.click(screen.getByRole('button', { name: 'Save expense' }));
+      expect(await screen.findByText('Choose whose cash paid.')).toBeInTheDocument();
+    });
+
+    it('opens a cash expense with Cash chosen, counting its own amount as still available', () => {
+      const expense = makeExpense('e1', {
+        day: '2027-05-11', payerUid: 'ben', currency: 'JPY', total: 5000, paidWith: { kind: 'wallet', walletId: 'ben_JPY' },
+      });
+      const withSpend = tripCash([wallet('alex'), wallet('ben')], [topUp('alex_JPY', 100000, 103000), topUp('ben_JPY', 5000, 5000)], [expense]);
+      const items = [makeItem('i1', 'e1', { name: 'Taxi', amount: 5000, categoryId: 'food', shared: true, sharedWith: ['ben'] })];
+      render(<TripExpenseEditor trip={trip} user={alex} expenses={[expense]} cash={withSpend} existing={{ expense, items }} onSaved={onSaved} />);
+      expect(screen.getByRole('button', { name: 'Cash' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('combobox', { name: 'Whose cash' })).toHaveTextContent('Ben’s cash');
+      expect(screen.queryByText(/more than the/)).not.toBeInTheDocument();
+    });
   });
 });

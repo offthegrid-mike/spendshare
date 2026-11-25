@@ -120,6 +120,21 @@ describe('TripSummary', () => {
     expect(settle.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 
+  it('settles cash payments at their wallet’s value (example A)', () => {
+    const dinner = makeExpense('dinner', { payerUid: 'alex', currency: 'JPY', total: 60000, paidWith: { kind: 'wallet', walletId: 'alex_JPY' } });
+    render(
+      <MemoryRouter>
+        <TripSummary
+          trip={trip} user={chris} expenses={[dinner]} settlements={[]} cashValues={{ dinner: 61800 }}
+          itemsByExpense={{ dinner: [makeItem('d', 'dinner', { amount: 60000, payerUid: 'alex', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] }}
+        />
+      </MemoryRouter>,
+    );
+    const settle = within(screen.getByRole('region', { name: 'Settle up' }));
+    expect(settle.getByText('You → Alex')).toBeInTheDocument();
+    expect(settle.getAllByText('A$206.00')).toHaveLength(2);
+  });
+
   it('says when there is nothing to settle yet', () => {
     renderSummary({ expenses: [], items: {} });
     expect(screen.getByText('No expenses yet, so nothing to settle.')).toBeInTheDocument();

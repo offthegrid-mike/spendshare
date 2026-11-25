@@ -83,6 +83,7 @@ describe('buildTripExpense', () => {
         payerUid: 'alex',
         currency: 'JPY',
         rate: 99,
+        payment: { kind: 'card' },
         total: 6000,
         items: [
           { name: 'Ramen', categoryId: 'food', amount: 4500, shared: true, sharedWith: ['alex', 'ben', 'chris'] },
@@ -90,6 +91,17 @@ describe('buildTripExpense', () => {
         ],
       },
     });
+  });
+
+  it('pays from a cash wallet: the wallet’s owner is the payer, and no rate is needed', () => {
+    const result = buildTripExpense(draft({ payment: { kind: 'wallet', walletId: 'ben_JPY', ownerUid: 'ben' }, rate: '' }), 'AUD');
+    expect(result.ok && result.value.payment).toEqual({ kind: 'wallet', walletId: 'ben_JPY' });
+    expect(result.ok && result.value.payerUid).toBe('ben');
+  });
+
+  it('asks whose cash paid when no wallet is chosen', () => {
+    expect(buildTripExpense(draft({ payment: { kind: 'wallet', walletId: '', ownerUid: '' } }), 'AUD'))
+      .toEqual({ ok: false, error: 'Choose whose cash paid.' });
   });
 
   it('needs no rate in the home currency, and uses 1', () => {

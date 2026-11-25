@@ -110,6 +110,7 @@ vi.mock('./features/travel/tripRoutes', () => ({
   TripExpenseRoute: () => <div data-testid="trip-expense" />,
   EditTripExpenseRoute: () => <div data-testid="edit-trip-expense" />,
   TripSummaryRoute: () => <div data-testid="trip-summary" />,
+  TripCashRoute: () => <div data-testid="trip-cash" />,
 }));
 vi.mock('./features/travel/TripSettings', () => ({
   default: ({ trip }: { trip: { id: string } }) => <div data-testid="trip-settings" data-trip={trip.id} />,
@@ -499,8 +500,11 @@ describe('App with trips', () => {
     const third = renderApp('/travel/japan/expense/e1/edit');
     expect(screen.getByTestId('edit-trip-expense')).toBeInTheDocument();
     third.unmount();
-    renderApp('/travel/japan/summary');
+    const fourth = renderApp('/travel/japan/summary');
     expect(screen.getByTestId('trip-summary')).toBeInTheDocument();
+    fourth.unmount();
+    renderApp('/travel/japan/cash');
+    expect(screen.getByTestId('trip-cash')).toBeInTheDocument();
   });
 
   it('sends the settings of an unknown trip back to the trip list', () => {

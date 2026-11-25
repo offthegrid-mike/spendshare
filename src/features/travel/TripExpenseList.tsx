@@ -11,16 +11,21 @@ interface Props {
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
   viewerUid: string;
+  /** Cash payments' home values, from tripCash. */
+  cashValues?: Record<string, number | null>;
 }
 
 function title(expense: ExpenseDoc, items: ItemDoc[] | undefined): string {
   return expense.shopName?.trim() || items?.[0]?.name || 'Expense';
 }
 
-function ExpenseRow({ trip, expense, items, viewerUid }: { trip: GroupDoc; expense: ExpenseDoc; items?: ItemDoc[]; viewerUid: string }) {
+function ExpenseRow({ trip, expense, items, viewerUid, cashValues }: {
+  trip: GroupDoc; expense: ExpenseDoc; items?: ItemDoc[]; viewerUid: string; cashValues: Record<string, number | null>;
+}) {
   const home = trip.currency;
   const currency = expense.currency ?? home;
-  const homeTotal = expenseHomeTotal(expense, home);
+  const homeTotal = expenseHomeTotal(expense, home, cashValues);
+  const isCash = expense.paidWith?.kind === 'wallet';
   const payer = expense.payerUid === viewerUid ? 'You' : memberName(trip, expense.payerUid);
   return (
     <li>
@@ -34,12 +39,15 @@ function ExpenseRow({ trip, expense, items, viewerUid }: { trip: GroupDoc; expen
         </span>
         <span className="shrink-0 text-right">
           <span className="block text-sm font-semibold tabular-nums text-ink">{formatMinor(expense.total, currency)}</span>
-          {currency !== home && homeTotal !== null && (
+          {currency !== home && (homeTotal !== null || isCash) && (
             <span className="flex items-center justify-end gap-1.5 text-xs tabular-nums text-ink-muted">
               {isEstimated(expense, home) && (
                 <span className="rounded-full bg-warning-soft px-1.5 py-px text-[10px] font-medium text-warning">Estimated</span>
               )}
-              <span>{`≈ ${formatMinor(homeTotal, home)}`}</span>
+              {isCash && (
+                <span className="rounded-full bg-recessed px-1.5 py-px text-[10px] font-medium text-ink-muted">Cash</span>
+              )}
+              <span>{homeTotal !== null ? `≈ ${formatMinor(homeTotal, home)}` : 'Not valued yet'}</span>
             </span>
           )}
         </span>
@@ -49,12 +57,13 @@ function ExpenseRow({ trip, expense, items, viewerUid }: { trip: GroupDoc; expen
 }
 
 /** A trip's expenses by day, each in its own currency with its home value, and the trip's total so far. */
-export default function TripExpenseList({ trip, expenses, itemsByExpense, viewerUid }: Props) {
+export default function TripExpenseList({ trip, expenses, itemsByExpense, viewerUid, cashValues = {} }: Props) {
   const home = trip.currency;
   const days = trip.trip ? tripDayGroups(expenses, trip.trip) : [];
-  const totals = expenses.map((e) => expenseHomeTotal(e, home));
+  const totals = expenses.map((e) => expenseHomeTotal(e, home, cashValues));
   const spent = totals.reduce<number>((s, t) => s + (t ?? 0), 0);
-  const estimated = expenses.some((e) => isEstimated(e, home));
+  // Cash values move as cash is added, so they're approximate too.
+  const estimated = expenses.some((e) => isEstimated(e, home) || e.paidWith?.kind === 'wallet');
 
   return (
     <section aria-labelledby="trip-expenses" className="space-y-3">
@@ -84,7 +93,7 @@ export default function TripExpenseList({ trip, expenses, itemsByExpense, viewer
               <h4 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">{day.label}</h4>
               <ul className="card divide-y divide-line overflow-hidden">
                 {day.expenses.map((e) => (
-                  <ExpenseRow key={e.id} trip={trip} expense={e} items={itemsByExpense[e.id]} viewerUid={viewerUid} />
+                  <ExpenseRow key={e.id} trip={trip} expense={e} items={itemsByExpense[e.id]} viewerUid={viewerUid} cashValues={cashValues} />
                 ))}
               </ul>
             </div>

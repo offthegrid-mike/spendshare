@@ -33,7 +33,7 @@ import { makeExpense, makeItem } from '../../test/fixtures';
 import type { BuiltTripExpense } from '../../lib/travel/tripExpense';
 
 const built: BuiltTripExpense = {
-  date: '2027-05-12', shopName: 'Ichiran', payerUid: 'alex', currency: 'JPY', rate: 99, total: 6000,
+  date: '2027-05-12', shopName: 'Ichiran', payerUid: 'alex', currency: 'JPY', rate: 99, payment: { kind: 'card' }, total: 6000,
   items: [
     { name: 'Ramen', categoryId: 'food', amount: 4500, shared: true, sharedWith: ['alex', 'ben'] },
     { name: 'Souvenir', categoryId: 'shop', amount: 1500, shared: false },
@@ -95,6 +95,13 @@ describe('saveTripExpense', () => {
     await saveTripExpense({ tripId: 'japan', uid: 'alex', home: 'AUD', built, categories, existing: { expense: existing, items: [] } });
     const exp = fs.ops.find((op) => op[0] === 'set')![2] as Record<string, unknown>;
     expect(exp.paidWith).toEqual({ kind: 'card', rate: 99, rateStatus: 'estimated' });
+  });
+});
+
+describe('saveTripExpense from a cash wallet', () => {
+  it('records the wallet it was paid from instead of a card rate', async () => {
+    await saveTripExpense({ tripId: 'japan', uid: 'alex', home: 'AUD', built: { ...built, payment: { kind: 'wallet', walletId: 'alex_JPY' } }, categories });
+    expect((fs.ops[0][2] as { paidWith: unknown }).paidWith).toEqual({ kind: 'wallet', walletId: 'alex_JPY' });
   });
 });
 

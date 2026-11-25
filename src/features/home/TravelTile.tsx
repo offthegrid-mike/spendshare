@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Plane } from 'lucide-react';
 import { useSettlements } from '../../hooks/useSettlements';
-import { useTripExpenses } from '../../hooks/useTripExpenses';
+import { useTripData } from '../../hooks/useTripData';
 import { useWorkClock } from '../../hooks/useWorkClock';
 import { formatMinor } from '../../lib/travel/currency';
 import { TRIP_SETTLEMENT_MONTH, viewerTripFigures } from '../../lib/travel/valueTrip';
@@ -18,10 +18,10 @@ export default function TravelTile({ trips, viewerUid }: { trips: GroupDoc[]; vi
   const { today } = useWorkClock();
   const trip = featuredTrip(trips, today);
   // Only the featured trip's expenses load; with none featured, nothing does.
-  const { expenses, itemsByExpense, loading, itemsLoading } = useTripExpenses(trip?.id ?? null);
+  const { expenses, itemsByExpense, cash, loading, itemsLoading } = useTripData(trip?.id ?? null);
   const { settlements, loading: settlementsLoading } = useSettlements(trip?.id ?? null, TRIP_SETTLEMENT_MONTH);
   const figures = trip && !loading && !itemsLoading && !settlementsLoading
-    ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements)
+    ? viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values)
     : null;
 
   return (

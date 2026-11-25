@@ -24,6 +24,8 @@ interface Props {
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
   settlements: SettlementDoc[];
+  /** Cash payments' home values, from tripCash. */
+  cashValues?: Record<string, number | null>;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -31,7 +33,7 @@ function plural(n: number, one: string, many: string): string {
 }
 
 /** A trip's balances and settle-up in its home currency, with what was spent by category and currency. */
-export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements }: Props) {
+export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements, cashValues = {} }: Props) {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState('');
   const home = trip.currency;
@@ -39,7 +41,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   const nameOf = (uid: string) => tripMemberName(trip, uid, user.uid);
   const avatarName = (uid: string) => trip.members[uid]?.displayName || '?';
 
-  const valuation = valueTrip(trip, expenses, itemsByExpense);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues);
   const summary = tripSummary(valuation, settlements);
   const { all: categories } = useCategories(trip.id);
   const breakdown = tripBreakdown(valuation, expenses, home, Object.fromEntries(categories.map((c) => [c.id, c.name])));
@@ -92,7 +94,7 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
 
       {valuation.unvalued.length > 0 && (
         <p className="card p-4 text-sm text-ink-muted">
-          {`${valuation.unvalued.length} cash ${plural(valuation.unvalued.length, 'payment isn’t', 'payments aren’t')} in the balances yet.`}
+          {`${valuation.unvalued.length} cash ${plural(valuation.unvalued.length, 'payment isn’t', 'payments aren’t')} in the balances yet: add the cash that was bought on the Cash page.`}
         </p>
       )}
 

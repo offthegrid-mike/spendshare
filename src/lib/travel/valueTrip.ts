@@ -25,7 +25,7 @@ export interface TripValuation {
   parties: string[];
   /** Card payments still on an estimated rate. */
   estimated: ExpenseDoc[];
-  /** Payments that can't be valued yet (cash wallets, until T4). */
+  /** Cash payments that can't be valued yet: their wallet has no cash in it, or is gone. */
   unvalued: ExpenseDoc[];
 }
 
@@ -47,7 +47,13 @@ export function spreadInProportion(total: number, amounts: number[]): number[] {
   return parts;
 }
 
-export function valueTrip(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpense: Record<string, ItemDoc[]>): TripValuation {
+export function valueTrip(
+  trip: GroupDoc,
+  expenses: ExpenseDoc[],
+  itemsByExpense: Record<string, ItemDoc[]>,
+  /** Cash payments' home values, from tripCash. */
+  cashValues: Record<string, number | null> = {},
+): TripValuation {
   const home = trip.currency;
   const items: ValuedItem[] = [];
   const estimated: ExpenseDoc[] = [];
@@ -60,7 +66,7 @@ export function valueTrip(trip: GroupDoc, expenses: ExpenseDoc[], itemsByExpense
   for (const expense of expenses) {
     const expenseItems = itemsByExpense[expense.id];
     if (!expenseItems || expenseItems.length === 0) continue;
-    const homeTotal = expenseHomeTotal(expense, home);
+    const homeTotal = expenseHomeTotal(expense, home, cashValues);
     if (homeTotal === null) {
       unvalued.push(expense);
       continue;
@@ -155,10 +161,11 @@ export function viewerTripFigures(
   expenses: ExpenseDoc[],
   itemsByExpense: Record<string, ItemDoc[]>,
   settlements: PaidSettlement[],
+  cashValues: Record<string, number | null> = {},
 ): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } | null {
   // Nothing to show until something was spent or paid back; a paid settlement alone still leaves a balance.
   if (expenses.length === 0 && !settlements.some((s) => s.paid)) return null;
-  const valuation = valueTrip(trip, expenses, itemsByExpense);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues);
   const summary = tripSummary(valuation, settlements);
   return {
     spent: valuation.items.reduce((s, it) => s + it.amount, 0),

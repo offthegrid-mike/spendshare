@@ -18,7 +18,7 @@
 | **T1** — Trip groups and the Travel shell | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T2** — Trip expenses in foreign currency (card) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T3** — Trip summary and settle-up | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
-| **T4** — Personal cash wallets | ⬜ | `travel/T4-wallets` | |
+| **T4** — Personal cash wallets | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T5** — Shared kitty | ⬜ | `travel/T5-kitty` | |
 | **T6** — Cash hand-overs, closing a trip, export | ⬜ | `travel/T6-close` | |
 | **T7** — Extras (live rates, budgets, foreign receipts) | ⬜ optional | `travel/T7-extras` | |
@@ -105,19 +105,18 @@ paidWith?:
 sharedWith?: Uid[];                // missing = every member; only meaningful when shared
 // amount: on a trip item it's in the expense's currency (minor units)
 
-// New: groups/{gid}/wallets/{walletId}
+// groups/{gid}/wallets/{ownerUid_CUR}: one wallet per person per currency (T4).
+// T5 adds kind 'kitty'; the rules allow only 'personal' until then.
 interface WalletDoc {
-  id: string; kind: 'personal' | 'kitty';
-  ownerUid?: Uid;                  // personal only
-  currency: string; name: string; createdAt: Timestamp;
+  id: string; kind: 'personal';
+  ownerUid: Uid; currency: string; createdByUid: Uid; createdAt: Timestamp;
 }
-// New: groups/{gid}/wallets/{walletId}/topUps/{id}
+// groups/{gid}/topUps/{id}: a flat collection, so a trip loads all its cash in one query.
 interface TopUpDoc {
-  id: string; byUid: Uid; date: string;
-  foreignAmount: number;           // minor units of wallet.currency (> 0)
-  homeAmount: number;              // minor units of group currency (>= 0)
-  source?: 'exchange' | 'handover' | 'returned'; // T6
-  fromWalletId?: string;           // a hand-over (T6)
+  id: string; walletId: string; byUid: Uid; date: string; createdAt: Timestamp;
+  foreignAmount: number;           // minor units of the wallet's currency (> 0, whole)
+  homeAmount: number;              // minor units of the home currency (>= 0, whole)
+  // T6 may add source ('exchange' | 'handover' | 'returned') and fromWalletId; the rules allow no other keys yet.
 }
 ```
 
@@ -208,18 +207,19 @@ Pure modules with no UI. Everything later depends on these.
 
 # T4 — Personal cash wallets
 
-### Task 4.1: Wallets screen
-- A wallet per person per currency. **Add cash** records a top-up: foreign received and home paid, with the resulting rate shown.
-- The wallet card shows cash left, average rate, home value left, and the top-up history.
-- Members without an account can have a wallet, managed by any member.
+### Task 4.1: Cash screen — done
+- `/travel/:tripId/cash` (linked from the trip page): a card per wallet with cash left, what it cost, the average rate ("1 AUD = 97.09 JPY"), what was bought and spent, and each top-up with Remove. A wallet spent beyond its cash, or with no cash added yet, says so.
+- **Add cash**: whose cash (any member, including one without an account), currency (any but the home one), cash received, what was paid in the home currency, and the date. It shows the rate this works out to, and creates the wallet the first time, in the same batch.
 
-### Task 4.2: Paying from a wallet
-- **Paid with → Alex's ¥ wallet** in the editor. It offers only wallets in the expense's currency, and the payer becomes the wallet owner.
-- A warning appears if the payment is more than the cash left (it's saved anyway, since money may be borrowed).
-- A cash refund puts the money back in the wallet.
+### Task 4.2: Paying from a wallet — done
+- The editor's **Paid with** is Card or Cash. Cash offers the wallets in the expense's currency (yours first); the wallet's owner becomes the payer, and there's no rate to enter. A warning shows when the payment is more than the cash left (it's still saved).
+- `tripCash` values every cash payment at its wallet's average rate, cumulatively in the order spent (day, then when added) with `valueSpends`, so spending plus what's left always equals what the cash cost. The list ("Cash" chip), detail, summary, trip page and Home tile all use these values. A payment from a wallet with no cash added stays out of the balances, and says so.
+- `useTripData` combines a trip's expenses and wallets for every screen.
+- **Not in T4:** refunds (trips have none yet).
 
-### Task 4.3: Rules
-- Wallets and top-ups are readable and writable by trip members. `foreignAmount > 0`, `homeAmount >= 0`, a personal wallet has `ownerUid`, and `kind` never changes.
+### Task 4.3: Rules — done
+- Wallets: members only; `kind` 'personal'; the id is `ownerUid_CUR`; the owner is on the trip; owner and currency never change.
+- Top-ups: members only; written by their author (`byUid`); whole amounts, `foreignAmount > 0` and `homeAmount >= 0`; an ISO date; into a wallet that exists once the batch lands; no other keys.
 
 **Acceptance:** example A gives Ben and Chris A$206 each to pay Alex, and the wallet shows ¥40,000 left at 0.0103.
 

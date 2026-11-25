@@ -59,6 +59,8 @@ export interface TripExpenseDraft {
   payerUid: string;
   currency: string;
   rate: string;
+  /** Card (the default) or a cash wallet, whose owner is then the payer. */
+  payment?: { kind: 'card' } | { kind: 'wallet'; walletId: string; ownerUid: string };
   items: TripItemDraft[];
 }
 
@@ -75,8 +77,9 @@ export interface BuiltTripExpense {
   shopName: string;
   payerUid: string;
   currency: string;
-  /** 1 in the home currency. */
+  /** A card payment's rate; 1 in the home currency or for cash (valued at its wallet's rate). */
   rate: number;
+  payment: { kind: 'card' } | { kind: 'wallet'; walletId: string };
   total: number;
   items: BuiltTripItem[];
 }
@@ -96,9 +99,12 @@ export function buildTripExpense(
   { categoryRequired = true }: { categoryRequired?: boolean } = {},
 ): BuildResult {
   if (!draft.date) return { ok: false, error: 'Choose the date.' };
-  if (!draft.payerUid) return { ok: false, error: 'Choose who paid.' };
+  const cash = draft.payment?.kind === 'wallet' ? draft.payment : null;
+  if (cash && !cash.walletId) return { ok: false, error: 'Choose whose cash paid.' };
+  const payerUid = cash ? cash.ownerUid : draft.payerUid;
+  if (!payerUid) return { ok: false, error: 'Choose who paid.' };
   const inHome = draft.currency.toUpperCase() === home.toUpperCase();
-  const rate = inHome ? 1 : parseRate(draft.rate);
+  const rate = inHome || cash ? 1 : parseRate(draft.rate);
   if (!(rate > 0)) return { ok: false, error: 'Enter the exchange rate.' };
 
   const rows = draft.items.filter((it) => !isBlank(it));
@@ -128,9 +134,10 @@ export function buildTripExpense(
     value: {
       date: draft.date,
       shopName: draft.shopName.trim(),
-      payerUid: draft.payerUid,
+      payerUid,
       currency: draft.currency,
       rate,
+      payment: cash ? { kind: 'wallet', walletId: cash.walletId } : { kind: 'card' },
       total: items.reduce((s, it) => s + it.amount, 0),
       items,
     },
@@ -139,11 +146,19 @@ export function buildTripExpense(
 
 type Priced = Pick<ExpenseDoc, 'total' | 'currency' | 'paidWith'>;
 
-/** The expense in home minor units: what the card was charged, or an estimate at its rate. Null for a wallet payment (valued in T4). */
-export function expenseHomeTotal(expense: Priced, home: string): number | null {
+/**
+ * The expense in home minor units: what the card was charged, an estimate at its
+ * rate, or for cash its value at the wallet's rate (from tripCash's `values`;
+ * null when the wallet has no cash in it yet).
+ */
+export function expenseHomeTotal(
+  expense: Priced & { id?: string },
+  home: string,
+  cashValues: Record<string, number | null> = {},
+): number | null {
   const currency = expense.currency ?? home;
   const paid = expense.paidWith;
-  if (paid?.kind === 'wallet') return null;
+  if (paid?.kind === 'wallet') return expense.id !== undefined ? cashValues[expense.id] ?? null : null;
   if (currency.toUpperCase() === home.toUpperCase() || !paid) return expense.total;
   return paid.homeTotal ?? toHome(expense.total, currency, home, paid.rate);
 }
@@ -182,7 +197,8 @@ export function tripDayGroups(expenses: ExpenseDoc[], trip: TripDates): TripDay[
     });
 }
 
-function createdMillis(e: ExpenseDoc): number {
+/** When an expense was added, for ordering; one still saving counts as the newest. */
+export function createdMillis(e: ExpenseDoc): number {
   // A write still waiting for the server has no createdAt yet: it is the newest.
   const ts = e.createdAt as { toMillis?: () => number } | null;
   return ts?.toMillis ? ts.toMillis() : Number.POSITIVE_INFINITY;

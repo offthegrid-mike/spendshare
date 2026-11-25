@@ -59,4 +59,18 @@ describe('TripExpenseList', () => {
     expect(screen.getByText('No expenses yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/travel/japan/expense/new');
   });
+
+  it('marks a cash payment and shows its value at the wallet’s rate, or that it can’t be valued yet', () => {
+    const dinner = makeExpense('e3', { day: '2027-05-12', shopName: 'Dinner', payerUid: 'alex', currency: 'JPY', total: 60000, paidWith: { kind: 'wallet', walletId: 'alex_JPY' } });
+    const lunch = makeExpense('e4', { day: '2027-05-12', shopName: 'Lunch', payerUid: 'ben', currency: 'JPY', total: 2000, paidWith: { kind: 'wallet', walletId: 'ben_JPY' } });
+    render(
+      <MemoryRouter>
+        <TripExpenseList trip={trip} expenses={[dinner, lunch]} itemsByExpense={{}} viewerUid="alex" cashValues={{ e3: 61800, e4: null }} />
+      </MemoryRouter>,
+    );
+    const row = screen.getByRole('link', { name: /Dinner/ });
+    expect(within(row).getByText('Cash')).toBeInTheDocument();
+    expect(within(row).getByText('≈ A$618.00')).toBeInTheDocument();
+    expect(within(screen.getByRole('link', { name: /Lunch/ })).getByText('Not valued yet')).toBeInTheDocument();
+  });
 });
