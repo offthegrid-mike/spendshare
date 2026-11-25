@@ -34,6 +34,25 @@ describe('toMinor', () => {
     expect(toMinor(' 1,234.50 ', 'AUD')).toBe(123450);
   });
 
+  it('reads a comma before one or two final digits as a decimal comma', () => {
+    expect(toMinor('12,50', 'EUR')).toBe(1250);
+    expect(toMinor('12,5', 'EUR')).toBe(1250);
+  });
+
+  it('reads a comma before three digits as a thousands separator', () => {
+    expect(toMinor('1,500', 'AUD')).toBe(150000);
+    expect(toMinor('1,500', 'JPY')).toBe(1500);
+  });
+
+  it('reads European grouping: dots for thousands and a decimal comma', () => {
+    expect(toMinor('1.234,50', 'EUR')).toBe(123450);
+    expect(toMinor('1,234.50', 'USD')).toBe(123450);
+  });
+
+  it('never reads a comma as decimals in a currency with none', () => {
+    expect(toMinor('1,50', 'JPY')).toBe(150);
+  });
+
   it('returns NaN for something that is not a number', () => {
     expect(toMinor('abc', 'AUD')).toBeNaN();
     expect(toMinor('', 'JPY')).toBeNaN();
@@ -50,6 +69,15 @@ describe('formatMinor', () => {
   it('gives a negative amount a true minus sign, as formatMoney does', () => {
     expect(formatMinor(-1250, 'AUD')).toBe('−A$12.50');
     expect(formatMinor(-500, 'JPY')).toBe('−¥500');
+  });
+});
+
+describe('an empty or unknown currency code', () => {
+  it('does not throw: it assumes two decimals and formats the bare figure', () => {
+    expect(minorDigits('')).toBe(2);
+    expect(toMinor('5', 'NOT')).toBe(500);
+    expect(formatMinor(1250, '')).toBe('12.50');
+    expect(formatMinor(-1250, 'XX')).toBe('−XX 12.50');
   });
 });
 

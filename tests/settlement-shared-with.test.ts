@@ -50,6 +50,14 @@ describe('computeSummary with sharedWith', () => {
     expect(s.shareOf).toEqual({ alex: 0, ben: 1, chris: 1 });
   });
 
+  it('treats sharedWith listing every member the same as no sharedWith', () => {
+    const s = computeSummary(['alex', 'ben', 'chris'], [
+      { amount: 1, shared: true, payerUid: 'alex' },
+      { amount: 1, shared: true, payerUid: 'alex', sharedWith: ['chris', 'alex', 'ben'] },
+    ], []);
+    expect(s.shareOf).toEqual({ alex: 1, ben: 1, chris: 0 });
+  });
+
   it('ignores sharedWith on a personal item', () => {
     const s = computeSummary(['alex', 'ben'], [
       { amount: 5000, shared: false, payerUid: 'alex', sharedWith: ['ben'] },

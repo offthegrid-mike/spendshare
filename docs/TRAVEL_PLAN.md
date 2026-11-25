@@ -14,7 +14,7 @@
 
 | Milestone | Status | Branch | Merged |
 |-----------|--------|--------|--------|
-| **T0** — Money foundations (minor units, split among chosen people) | ✅ **DONE** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 |
+| **T0** — Money foundations (minor units, split among chosen people) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 (open) |
 | **T1** — Trip groups and the Travel shell | ⬜ | `travel/T1-trips` | |
 | **T2** — Trip expenses in foreign currency (card) | ⬜ | `travel/T2-expenses` | |
 | **T3** — Trip summary and settle-up | ⬜ | `travel/T3-settle` | |
@@ -190,6 +190,8 @@ Pure modules with no UI. Everything later depends on these.
 ### Task 3.2: Summary screen
 - Settle-up first (reusing the Summary components and `markSettlementPaid` with `month: 'trip'`), then balances, totals by person, by category and by day, and spending in each currency.
 - A banner lists any card payments still on estimated rates, linking to each one.
+- Settle-up can name someone who has since left the trip (`computeSummary` keeps a former member's share). Show a readable name for them, not the uid that `memberName` falls back to: for example, keep each member's name on the trip after they leave.
+- Cash payments are valued with `valueSpends` (cumulatively, in date order), not `valueCash` one at a time, so rounding doesn't drift from what was paid in.
 
 **Acceptance:** example C settles as expected, and marking it paid and undoing it both work.
 
@@ -263,4 +265,5 @@ Pure modules with no UI. Everything later depends on these.
 - **Values move while a trip is open.** A late top-up changes a wallet's average rate, which changes earlier cash values. This is correct, but may surprise people. Show "values update as cash is added", and freeze them at close.
 - **`ItemDoc.amount` means different things.** In a household it's cents in the group currency. On a trip it's minor units of the expense's currency. Every trip screen must format with the expense currency. A test helper should fail if a trip item is formatted with `formatMoney`.
 - **Collection-group queries on items** (year summary, search) are scoped per group, so trip items don't leak into household totals. Check this again in T1.
+- **A former member who paid for something** (found in T0 review, and already true for households): `computeSummary` gives a balance only to current members and to people named in `sharedWith`. A removed member's payments are left out, so balances don't sum to zero and no one is told to pay them back. Fixing it changes household settle-up as well, so it needs its own decision. Handle it before T3, or block removing a trip member who still has a balance.
 - **Offline creation of a trip** works through the Firestore cache, but invites need a connection, so this should be documented.

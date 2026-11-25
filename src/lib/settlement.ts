@@ -22,6 +22,7 @@ export function computeSummary(members: string[], items: SummaryItem[], settleme
   // Shared spending per set of sharers, keyed by the set's sorted uids ('' = every member).
   // Each set is split once, so rounding costs at most one minor unit per set.
   const bySet = new Map<string, { uids: string[]; total: number }>();
+  const everyoneKey = [...new Set(members)].sort().join('\u0000');
   for (const it of items) {
     if (paidTotal[it.payerUid] === undefined) { paidTotal[it.payerUid] = 0; paidShared[it.payerUid] = 0; }
     // A refund is money back to its payer, so it comes off what they paid.
@@ -29,9 +30,10 @@ export function computeSummary(members: string[], items: SummaryItem[], settleme
     paidTotal[it.payerUid] += amount;
     if (it.shared) {
       sharedTotal += amount; paidShared[it.payerUid] += amount;
-      const uids = it.sharedWith?.length ? [...new Set(it.sharedWith)].sort() : members;
-      const key = it.sharedWith?.length ? uids.join('\u0000') : '';
-      const set = bySet.get(key) ?? { uids, total: 0 };
+      const chosen = it.sharedWith?.length ? [...new Set(it.sharedWith)].sort() : null;
+      // Choosing every member is the same set as choosing nobody, so it rounds as one.
+      const key = chosen && chosen.join('\u0000') !== everyoneKey ? chosen.join('\u0000') : '';
+      const set = bySet.get(key) ?? { uids: key ? chosen! : members, total: 0 };
       set.total += amount;
       bySet.set(key, set);
     }
