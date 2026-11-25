@@ -14,7 +14,7 @@
 
 | Milestone | Status | Branch | Merged |
 |-----------|--------|--------|--------|
-| **T0** — Money foundations (minor units, split among chosen people) | ⬜ | `travel/T0-foundations` | |
+| **T0** — Money foundations (minor units, split among chosen people) | ✅ **DONE** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 |
 | **T1** — Trip groups and the Travel shell | ⬜ | `travel/T1-trips` | |
 | **T2** — Trip expenses in foreign currency (card) | ⬜ | `travel/T2-expenses` | |
 | **T3** — Trip summary and settle-up | ⬜ | `travel/T3-settle` | |
