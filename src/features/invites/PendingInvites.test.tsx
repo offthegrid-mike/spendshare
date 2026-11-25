@@ -6,7 +6,7 @@ import PendingInvites from './PendingInvites';
 import { useUIStore } from '../../stores/uiStore';
 
 const { acceptInvite, declineInvite } = vi.hoisted(() => ({ acceptInvite: vi.fn(), declineInvite: vi.fn() }));
-const invite = {
+const invite: Record<string, unknown> = {
   ref: { path: 'groups/g9/invites/mike@example.com', parent: { parent: { id: 'g9' } } },
   invitedByName: 'Priya',
   groupName: 'Tasmania trip',
@@ -20,6 +20,7 @@ vi.mock('../../hooks/useInvites', () => ({
 const user = { uid: 'mike', email: 'mike@example.com' } as unknown as User;
 
 beforeEach(() => {
+  delete invite.groupKind;
   acceptInvite.mockReset().mockResolvedValue(undefined);
   useUIStore.setState({ selectedGroupId: 'g1', pendingGroupId: null, notice: null });
 });
@@ -32,6 +33,16 @@ describe('PendingInvites', () => {
     await waitFor(() => expect(useUIStore.getState().pendingGroupId).toBe('g9'));
     expect(useUIStore.getState().selectedGroupId).toBe('g1');
     expect(useUIStore.getState().notice?.message).toBe('You joined Tasmania trip');
+  });
+
+  it('leaves the household alone when joining a trip', async () => {
+    invite.groupKind = 'trip';
+    render(<PendingInvites user={user} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+
+    await waitFor(() => expect(useUIStore.getState().notice?.message).toBe('You joined Tasmania trip'));
+    expect(useUIStore.getState().pendingGroupId).toBeNull();
+    expect(useUIStore.getState().selectedGroupId).toBe('g1');
   });
 
   it('changes nothing when accepting fails', async () => {

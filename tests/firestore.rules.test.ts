@@ -1264,3 +1264,129 @@ describe('Firestore Rules - Work', () => {
     });
   });
 });
+
+describe('/groups trips (kind: trip)', () => {
+  let testEnv: RulesTestEnvironment;
+
+  const owner = { userA: { role: 'owner', displayName: 'Alice', email: 'alice@test.com', joinedAt: new Date() } };
+  /** A copy of `obj` without the given keys. */
+  function without(obj: Record<string, unknown>, ...keys: string[]) {
+    return Object.fromEntries(Object.entries(obj).filter(([k]) => !keys.includes(k)));
+  }
+
+  const baseTrip = {
+    id: '',
+    name: 'Japan',
+    currency: 'AUD',
+    ownerUid: 'userA',
+    members: owner,
+    memberUids: ['userA'],
+    createdAt: new Date(),
+    kind: 'trip',
+    trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+  };
+
+  beforeAll(async () => {
+    testEnv = await initRulesEnv();
+  });
+
+  beforeEach(async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'groups', 'japan'), {
+        ...baseTrip,
+        members: { ...owner, userB: { role: 'member', displayName: 'Bob', email: 'userb@test.com', joinedAt: new Date() } },
+        memberUids: ['userA', 'userB'],
+      });
+      await setDoc(doc(db, 'groups', 'home'), { ...without(baseTrip, 'kind', 'trip'), name: 'Home' });
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  const as = (uid: string) => testEnv.authenticatedContext(uid).firestore();
+
+  describe('create', () => {
+    it('allows creating a trip with valid dates', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), baseTrip));
+    });
+
+    it('allows a one-day trip', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-10' },
+      }));
+    });
+
+    it('still allows a household with neither kind nor trip', async () => {
+      await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'kind', 'trip')));
+    });
+
+    it('denies any kind other than trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), { ...baseTrip, kind: 'household' }));
+    });
+
+    it('denies a trip without dates, and dates without kind trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'trip')));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), without(baseTrip, 'kind')));
+    });
+
+    it('denies an end before the start, a malformed date, or extra keys in trip', async () => {
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-09' },
+      }));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '10/05/2027', endDate: '2027-05-20' },
+      }));
+      await assertFails(setDoc(doc(as('userA'), 'groups', 'new'), {
+        ...baseTrip, trip: { startDate: '2027-05-10', endDate: '2027-05-20', closedAt: 'x' },
+      }));
+    });
+  });
+
+  describe('update', () => {
+    it('lets the owner change the dates', async () => {
+      await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-21' },
+      }));
+    });
+
+    it('denies the owner invalid dates', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-01' },
+      }));
+    });
+
+    it('denies a member who is not the owner changing the dates', async () => {
+      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), {
+        trip: { startDate: '2027-05-11', endDate: '2027-05-21' },
+      }));
+    });
+
+    it('still lets a member rename the trip', async () => {
+      await assertSucceeds(updateDoc(doc(as('userB'), 'groups', 'japan'), { name: 'Japan & Korea' }));
+    });
+
+    it('never lets anyone change kind: not turning a trip into a household or back', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { kind: deleteField(), trip: deleteField() }));
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'home'), {
+        kind: 'trip', trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      }));
+    });
+
+    it('denies adding trip dates to a household', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'home'), {
+        trip: { startDate: '2027-05-10', endDate: '2027-05-20' },
+      }));
+    });
+  });
+
+  it('lets a member send an invite marked as a trip invite', async () => {
+    await assertSucceeds(setDoc(doc(as('userA'), 'groups', 'japan', 'invites', 'userc@test.com'), {
+      email: 'userc@test.com', invitedByUid: 'userA', invitedByName: 'Alice', groupName: 'Japan',
+      groupKind: 'trip', status: 'pending', createdAt: new Date(),
+    }));
+  });
+});

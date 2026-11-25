@@ -9,12 +9,19 @@ export interface UserDoc {
   memberOf: string[]; createdAt: Timestamp;
 }
 export interface GroupMember { role: Role; displayName: string; email: string; joinedAt: Timestamp; manual?: boolean; }
+/** A trip's first and last days, 'YYYY-MM-DD', both included. */
+export interface TripDates { startDate: string; endDate: string; }
 export interface GroupDoc {
-  id: string; name: string; currency: string; ownerUid: Uid;
+  id: string; name: string;
+  currency: string; // a trip's home currency, which balances and settle-up use
+  ownerUid: Uid;
   members: Record<Uid, GroupMember>; memberUids: Uid[]; createdAt: Timestamp;
+  kind?: 'trip';    // missing = a household; set at creation and never changed (see lib/travel/trips.ts)
+  trip?: TripDates; // trips only
 }
 export interface InviteDoc {
   email: string; invitedByUid: Uid; invitedByName: string; groupName: string;
+  groupKind?: 'trip'; // so accepting a trip invite doesn't switch the household
   status: 'pending' | 'accepted' | 'revoked' | 'declined'; createdAt: Timestamp;
 }
 export interface CategoryDoc {

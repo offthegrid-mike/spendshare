@@ -50,7 +50,8 @@ export default function PendingInvites({ user }: Props) {
                     .then(() => {
                       const gid = invite.ref.parent.parent?.id;
                       if (!gid) return;
-                      selectGroupWhenReady(gid);
+                      // A trip lives under Travel; only a household becomes the selected group.
+                      if (invite.groupKind !== 'trip') selectGroupWhenReady(gid);
                       showNotice({ message: `You joined ${invite.groupName}` });
                     })
                     .catch(() =>

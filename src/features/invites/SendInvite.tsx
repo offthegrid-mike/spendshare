@@ -8,7 +8,7 @@ import {
 
 interface Props {
   user: User;
-  group: { id: string; name: string };
+  group: { id: string; name: string; kind?: 'trip' };
 }
 
 export default function SendInvite({ user, group }: Props) {
@@ -35,6 +35,7 @@ export default function SendInvite({ user, group }: Props) {
         invitedByUid: user.uid,
         invitedByName: user.displayName ?? user.email ?? '',
         groupName: group.name,
+        ...(group.kind === 'trip' ? { groupKind: 'trip' as const } : {}),
       });
       setEmail('');
     } catch {

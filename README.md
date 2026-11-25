@@ -31,6 +31,15 @@ The original roadmap (milestones M0–M8: authentication, groups, invites, categ
 - **Export:** two CSV files per income year, one row per day with the year's totals, and one row per revision.
 - Set the rate for each income year (known rates are built in), your usual work days and your default hours. Work data is private to each user, not shared with a household.
 
+### Travel (in development)
+
+Shared trip costs in any currency, built milestone by milestone from [docs/TRAVEL_PLAN.md](docs/TRAVEL_PLAN.md). It is always on in development and off in production builds unless `VITE_TRAVEL_ENABLED=true`.
+
+- A **trip** is its own group, with a name, first and last days, and a home currency that balances are worked out in. Trips never appear in the household switcher.
+- Trips are listed under **Now**, **Upcoming** and **Past** at `/travel`. A Home tile shows the trip under way ("Day 3 of 11") or the next one.
+- Invite people by email, or add members without an account, as in a household. Accepting a trip invite leaves your household selection alone.
+- Recording expenses, cash wallets, the kitty and settle-up come in later milestones.
+
 ### Expenses
 
 - Record an expense with a shop, date, payer, and line items. Each item has a category, an amount, an optional quantity and remark, and a **shared** or **personal** flag.

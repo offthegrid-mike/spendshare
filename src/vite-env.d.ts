@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   // Optional: URL of the receipt-OCR proxy (Cloudflare Worker in worker/).
   // Absent → scanning is disabled at runtime.
   readonly VITE_OCR_PROXY_URL?: string;
+  // 'true' turns Travel on in a production build (it is always on in development).
+  readonly VITE_TRAVEL_ENABLED?: string;
 }
 
 interface ImportMeta {

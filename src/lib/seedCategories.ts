@@ -7,9 +7,9 @@ const DEFAULTS = [
   'Household', 'Entertainment', 'Health', 'Other',
 ];
 
-export async function seedDefaultCategories(gid: string) {
+export async function seedDefaultCategories(gid: string, names: readonly string[] = DEFAULTS) {
   const batch = writeBatch(db);
-  DEFAULTS.forEach((name, order) => {
+  names.forEach((name, order) => {
     const ref = doc(categoriesCol(gid));
     batch.set(ref, { id: ref.id, name, order, archived: false });
   });

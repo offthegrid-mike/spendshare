@@ -95,18 +95,21 @@ export function sendInvite({
   invitedByUid,
   invitedByName,
   groupName,
+  groupKind,
 }: {
   gid: string;
   email: string;
   invitedByUid: string;
   invitedByName: string;
   groupName: string;
+  groupKind?: 'trip';
 }) {
   return setDoc(doc(invitesCol(gid), email.toLowerCase()), {
     email: email.toLowerCase(),
     invitedByUid,
     invitedByName,
     groupName,
+    ...(groupKind ? { groupKind } : {}),
     status: 'pending',
     createdAt: serverTimestamp(),
   });

@@ -15,7 +15,7 @@
 | Milestone | Status | Branch | Merged |
 |-----------|--------|--------|--------|
 | **T0** — Money foundations (minor units, split among chosen people) | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` (with this plan) | PR #17 (open) |
-| **T1** — Trip groups and the Travel shell | ⬜ | `travel/T1-trips` | |
+| **T1** — Trip groups and the Travel shell | 🔄 **In review** | `claude/eloquent-dijkstra-dtf9bi` | PR #17 (open) |
 | **T2** — Trip expenses in foreign currency (card) | ⬜ | `travel/T2-expenses` | |
 | **T3** — Trip summary and settle-up | ⬜ | `travel/T3-settle` | |
 | **T4** — Personal cash wallets | ⬜ | `travel/T4-wallets` | |
@@ -152,9 +152,10 @@ Pure modules with no UI. Everything later depends on these.
 
 ### Task 1.2: Shell, routes and Home tile
 - `paths.travel = '/travel'` with `/travel/:tripId`, `/travel/:tripId/expense/new`, `/travel/:tripId/summary`, `/travel/:tripId/wallets` and `/travel/:tripId/settings`.
-- A `TRAVEL_ENABLED` flag in `features.ts`. A **Travel** tile on Home: the current or next trip, its total so far, and your balance.
+- A `TRAVEL_ENABLED` flag in `features.ts`: on in development, and in production only with `VITE_TRAVEL_ENABLED=true`, so milestones can merge (every merge deploys) before Travel is usable. A **Travel** tile on Home: the current or next trip and which day of it today is. Its total so far and your balance are added in T3, once there are expenses.
 - Trip list screen: upcoming, current and past trips, plus **New trip**.
-- Trip settings reuse the group settings screen: name, dates, members, invites, members without an account.
+- Trip settings reuse the group settings' members section (extracted as `MembersSection`) and `SendInvite`: name (any member), dates (owner only), members, invites, members without an account. The home currency is fixed once the trip exists.
+- A trip invite carries `groupKind: 'trip'`, so accepting it doesn't switch the selected household.
 
 **Acceptance:** create a trip, invite a member, add a member without an account, and see it on Home. The household switcher still shows only households.
 
