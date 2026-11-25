@@ -29,18 +29,25 @@ export function isKittyId(id: string): boolean {
 
 export interface KittyContributor {
   uid: string;
-  /** Cash put in, and what it cost, in minor units. */
+  /** Cash put in, and what it cost them, in minor units. */
   foreign: number;
   home: number;
-  /** Their share of the cash left, handed back in proportion to the cash each put in, and its cost. */
+  /** Their share of the cash left, handed back in proportion to the cash each put in. */
   handBack: number;
-  handBackHome: number;
-  /** What they're credited with in the balances: what they put in, less what they get back. */
-  credit: number;
 }
 
-/** A settle-up-like credit that moves value from a person to the kitty's party. */
-export interface KittyCredit { fromUid: string; toUid: string; amount: number; paid: true; }
+/**
+ * What valueTrip needs to settle a kitty: who put in what, and for each of its
+ * payments how far (in foreign units) it went past the cash put in.
+ */
+export interface KittyInfo {
+  walletId: string;
+  currency: string;
+  paidIn: { foreign: number; home: number };
+  left: { foreign: number; home: number | null };
+  contributors: KittyContributor[];
+  beyond: Record<string, number>;
+}
 
 export interface WalletState {
   wallet: WalletDoc;
@@ -64,12 +71,8 @@ export interface TripCash {
   wallets: WalletState[];
   /** Home value of each cash payment, by expense id; null when its wallet can't value it. */
   values: Record<string, number | null>;
-  /**
-   * The kitty's credits for valueTrip: each contributor's credit, and what
-   * whoever handed over the cash paid beyond what was in the kitty. With the
-   * kitty's spending, they leave its party at exactly zero.
-   */
-  kittyCredits: KittyCredit[];
+  /** The trip's kitties, for valueTrip to credit their contributors. */
+  kitties: KittyInfo[];
 }
 
 /** When a top-up was added; one still saving counts as the newest. */
@@ -109,7 +112,7 @@ function runningValues(topUps: TopUpDoc[], payments: ExpenseDoc[], overall: Wall
 }
 
 /** Who put what into a kitty, and their share of what's left, in proportion to the cash each put in. */
-function kittyContributors(topUps: TopUpDoc[], left: { foreign: number; home: number | null }): KittyContributor[] {
+function kittyContributors(topUps: TopUpDoc[], left: { foreign: number }): KittyContributor[] {
   const byUid = new Map<string, { foreign: number; home: number }>();
   for (const t of topUps) {
     const uid = t.fromUid ?? t.byUid;
@@ -119,46 +122,26 @@ function kittyContributors(topUps: TopUpDoc[], left: { foreign: number; home: nu
     byUid.set(uid, c);
   }
   const list = [...byUid.entries()];
-  const weights = list.map(([, c]) => c.foreign);
   // Nothing is handed back from a kitty that's used up or overspent.
-  const handBack = spreadInProportion(Math.max(left.foreign, 0), weights);
-  const handBackHome = left.foreign > 0 && left.home !== null ? spreadInProportion(Math.max(left.home, 0), weights) : weights.map(() => 0);
-  return list.map(([uid, c], i) => ({
-    uid, foreign: c.foreign, home: c.home, handBack: handBack[i], handBackHome: handBackHome[i], credit: c.home - handBackHome[i],
-  }));
+  const handBack = spreadInProportion(Math.max(left.foreign, 0), list.map(([, c]) => c.foreign));
+  return list.map(([uid, c], i) => ({ uid, foreign: c.foreign, home: c.home, handBack: handBack[i] }));
 }
 
-/**
- * The kitty's credits: each contributor's, and for an overspent kitty, the part
- * of its spending beyond its cost, credited to whoever handed that cash over
- * (they covered it), in proportion to how far past the cash each payment went.
- */
-function creditsFor(state: WalletState, valued: (number | null)[]): KittyCredit[] {
-  const id = state.wallet.id;
-  const credits: KittyCredit[] = state.kitty!.contributors
-    .filter((c) => c.credit !== 0)
-    .map((c) => ({ fromUid: c.uid, toUid: id, amount: c.credit, paid: true }));
-  const spentValue = valued.reduce<number>((s, v) => s + (v ?? 0), 0);
-  const credited = credits.reduce((s, c) => s + c.amount, 0);
-  const shortfall = spentValue - credited;
-  if (shortfall > 0 && state.left.foreign < 0) {
-    let cumulative = 0;
-    const beyond = state.payments.map((e) => {
-      const before = cumulative;
-      cumulative += e.total;
-      return Math.max(0, Math.min(e.total, cumulative - Math.max(before, state.paidIn.foreign)));
-    });
-    const parts = spreadInProportion(shortfall, beyond);
-    state.payments.forEach((e, i) => {
-      if (parts[i] > 0) credits.push({ fromUid: e.payerUid, toUid: id, amount: parts[i], paid: true });
-    });
+/** For each payment, in spending order, how far it went past the cash put in. */
+function beyondCash(payments: ExpenseDoc[], paidInForeign: number): Record<string, number> {
+  const beyond: Record<string, number> = {};
+  let cumulative = 0;
+  for (const e of payments) {
+    const before = cumulative;
+    cumulative += e.total;
+    beyond[e.id] = Math.max(0, Math.min(e.total, cumulative - Math.max(before, paidInForeign)));
   }
-  return credits;
+  return beyond;
 }
 
 export function tripCash(wallets: WalletDoc[], topUps: TopUpDoc[], expenses: ExpenseDoc[]): TripCash {
   const values: Record<string, number | null> = {};
-  const kittyCredits: KittyCredit[] = [];
+  const kitties: KittyInfo[] = [];
   const byId = new Map(wallets.map((w) => [w.id, w]));
   const cashPayments: ExpenseDoc[] = [];
   for (const e of expenses) {
@@ -195,13 +178,16 @@ export function tripCash(wallets: WalletDoc[], topUps: TopUpDoc[], expenses: Exp
       payments,
     };
     if (wallet.kind === 'kitty') {
-      state.kitty = { contributors: kittyContributors(own, left) };
-      kittyCredits.push(...creditsFor(state, valued));
+      const contributors = kittyContributors(own, left);
+      state.kitty = { contributors };
+      kitties.push({
+        walletId: wallet.id, currency: wallet.currency, paidIn, left, contributors, beyond: beyondCash(payments, paidIn.foreign),
+      });
     }
     return state;
   });
 
-  return { wallets: states, values, kittyCredits };
+  return { wallets: states, values, kitties };
 }
 
 /** A wallet's average rate as read on an exchange board, "1 home = x foreign", to four significant digits. */

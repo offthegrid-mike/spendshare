@@ -51,7 +51,7 @@ Tell Claude **"Continue the Travel plan — do T<n>"**. Each milestone follows t
 2. **Valuation is computed, not stored.** Trip items store their amount in the **expense's own currency**. A pure `valueTrip()` step converts everything to home currency when the summary is built. A later top-up changes a wallet's average rate, and stored home amounts would then go stale. Closing a trip (T6) freezes the values.
 3. **Card payments** carry their own rate on the expense. Save it as *estimated* (the last rate used for that currency is remembered). When the statement arrives, replace it with the *actual* amount charged in home currency, fees included.
 4. **Leftover cash in a personal wallet belongs to its owner** and never enters the split.
-5. **Leftover cash in the kitty** is shared out **in proportion to the foreign cash each person put in**, valued at the kitty's average rate (so it splits into round cash amounts to hand back). Alternative at close: one person keeps all of it and the others are credited at the average rate.
+5. **The kitty:** the cash left is handed back **in proportion to the foreign cash each person put in** (round amounts to hand over). The kitty's spending is credited to the people who put money in **in proportion to what their cash cost them**, so everyone bears the same share of their own cost, and with nothing spent nobody owes anyone. (Changed in the T5 review from valuing each person's hand-back at the kitty's pooled rate, which made people who bought cheaper yen owe those who bought dearer yen, even when nothing was spent.)
 6. **Amounts use each currency's minor unit**, from `Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits`: JPY 0, AUD 2, KWD 3. Household screens keep their current cents helpers unchanged.
 7. **`sharedWith` missing means everyone.** Household items don't set it, so household behaviour and data stay exactly as they are.
 
@@ -69,10 +69,10 @@ All in A$ for a trip to Japan with Alex, Ben and Chris.
 **B. Shared kitty**
 - Alex puts in A$300 (¥30,000), Ben puts in A$300 (¥30,000), and Chris puts in A$420 (¥40,000, bought at an airport rate). Kitty: ¥100,000 for A$1,020, so the average is 0.0102.
 - The kitty pays ¥50,000 for a dinner shared by all three (A$510, A$170 each) and ¥30,000 for a museum visit shared by Alex and Ben (A$306, A$153 each).
-- That leaves ¥20,000 (A$204). By foreign cash put in, it's shared out as Alex ¥6,000 (A$61.20), Ben ¥6,000 (A$61.20) and Chris ¥8,000 (A$81.60).
-- Credit = put in − leftover handed back: Alex 238.80, Ben 238.80, Chris 338.40 (these add up to 816 = 510 + 306).
-- Balances: Alex 238.80 − 323 = −84.20; Ben −84.20; Chris 338.40 − 170 = +168.40.
-- Settle up: Alex pays Chris A$84.20 and Ben pays Chris A$84.20.
+- That leaves ¥20,000 (A$204). By foreign cash put in, it's handed back as Alex ¥6,000, Ben ¥6,000 and Chris ¥8,000.
+- The kitty spent A$816. In proportion to what each person's cash cost (300 : 300 : 420), it's credited as Alex A$240, Ben A$240, Chris A$336.
+- Balances: Alex 240 − 323 = −83; Ben −83; Chris 336 − 170 = +166.
+- Settle up: Alex pays Chris A$83 and Ben pays Chris A$83.
 
 **C. Card with an estimated rate, corrected later**
 - Ben pays ¥15,000 for a hotel tax by card, shared by Ben and Chris. Estimate at 1 A$ = ¥99: A$151.52.
@@ -236,9 +236,11 @@ Pure modules with no UI. Everything later depends on these.
 
 ### Task 5.2: Kitty in the settlement (`src/lib/travel/cash.ts`, pure)
 - The kitty's payments are valued like any wallet's: a running average in date order.
-- **Contributors:** what's left is handed back in proportion to the foreign cash each person put in, along with its cost. Each person's credit is what they put in, less what they get back.
-- **The kitty as a party:** in `valueTrip`, kitty payments are paid by the kitty itself, a party named after its id and shown to no one. The contributors' credits move value from each of them to the kitty (`kittyCredits`, applied like paid settlements). Its spending equals the credits exactly, so the kitty nets to zero and never appears in settle-up.
-- **Overspent kitty:** whatever it paid beyond the cash put in is credited to whoever handed that cash over.
+- **Contributors:** what's left is handed back in proportion to the foreign cash each person put in.
+- **The kitty as a party:** in `valueTrip`, kitty payments are paid by the kitty itself, a party named after its id and shown to no one. `valueTrip` credits the kitty spending it actually counts to the contributors, in proportion to what their cash cost them, so the credits always equal the spending: the kitty nets to exactly zero and never appears in settle-up, even with cash recorded late or items still loading. (`tripCash` gives the facts as `kitties`.)
+- **Overspent kitty:** whatever it paid beyond what was put in is credited to whoever handed that cash over.
+- **Personal items:** an unshared item bought from the kitty is charged to whoever handed the cash over.
+- A kitty payment with no kitty data is left unvalued, never mis-settled.
 - Tests cover example B exactly, contributions adding up, an overspent kitty, and a kitty payment never credited to the person who carried it.
 
 ### Task 5.3: UI
@@ -249,9 +251,9 @@ Pure modules with no UI. Everything later depends on these.
 ### Rules
 - A kitty wallet has id `kitty_CUR` and no `ownerUid`; its kind never changes.
 - A top-up into a kitty must name a trip member as `fromUid`. A personal wallet's top-up may not have `fromUid`.
-- Anyone on the trip may pay from the kitty.
+- Anyone on the trip may pay from the kitty, and whoever hands its cash over must be on the trip.
 
-**Acceptance (met):** example B gives two payments of A$84.20 to Chris, and the kitty hands back ¥6,000 / ¥6,000 / ¥8,000.
+**Acceptance (met):** example B gives two payments of A$83 to Chris, and the kitty hands back ¥6,000 / ¥6,000 / ¥8,000.
 
 ---
 

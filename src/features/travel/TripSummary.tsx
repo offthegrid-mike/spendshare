@@ -25,10 +25,8 @@ interface Props {
   expenses: ExpenseDoc[];
   itemsByExpense: Record<string, ItemDoc[]>;
   settlements: SettlementDoc[];
-  /** Cash payments' home values, from tripCash. */
-  cashValues?: Record<string, number | null>;
-  /** The trip's cash, for its values, the kitty's credits and what the kitty hands back. Takes over `cashValues`. */
-  cash?: TripCash;
+  /** The trip's cash: its payments' values, and the kitties to settle and hand back. */
+  cash?: Pick<TripCash, 'values' | 'kitties'> & Partial<Pick<TripCash, 'wallets'>>;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -36,7 +34,7 @@ function plural(n: number, one: string, many: string): string {
 }
 
 /** A trip's balances and settle-up in its home currency, with what was spent by category and currency. */
-export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements, cashValues = {}, cash }: Props) {
+export default function TripSummary({ trip, user, expenses, itemsByExpense, settlements, cash }: Props) {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState('');
   const home = trip.currency;
@@ -44,11 +42,11 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
   const nameOf = (uid: string) => tripMemberName(trip, uid, user.uid);
   const avatarName = (uid: string) => trip.members[uid]?.displayName || '?';
 
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cash?.values ?? cashValues, cash?.kittyCredits ?? []);
-  const kitties = (cash?.wallets ?? []).filter((w) => w.kitty && w.kitty.contributors.length > 0);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cash?.values ?? {}, cash?.kitties ?? []);
+  const kitties = (cash?.kitties ?? []).filter((k) => k.contributors.length > 0);
   const putIn = (uid: string) => kitties.flatMap((k) => {
-    const c = k.kitty!.contributors.find((x) => x.uid === uid);
-    return c ? [`Put in the kitty ${money(c.home)}, back ${formatMinor(c.handBack, k.wallet.currency)}`] : [];
+    const c = k.contributors.find((x) => x.uid === uid);
+    return c ? [`Put in the kitty ${money(c.home)}, back ${formatMinor(c.handBack, k.currency)}`] : [];
   });
   const summary = tripSummary(valuation, settlements);
   const { all: categories } = useCategories(trip.id);
@@ -168,19 +166,21 @@ export default function TripSummary({ trip, user, expenses, itemsByExpense, sett
         <section aria-labelledby="kitty" className="card p-5">
           <h2 id="kitty" className="mb-2 text-base font-semibold text-ink">Kitty</h2>
           {kitties.map((k) => {
-            const { currency } = k.wallet;
-            const back = k.kitty!.contributors.filter((c) => c.handBack > 0);
-            return (
-              <p key={k.wallet.id} className="text-sm text-ink">
-                {k.left.foreign > 0
-                  ? `Hand back the ${formatMinor(k.left.foreign, currency)} left: ${back
-                    .map((c) => `${c.uid === user.uid ? 'you' : tripMemberName(trip, c.uid, user.uid)} ${formatMinor(c.handBack, currency)}`)
-                    .join(', ')}.`
-                  : `The ${currency} kitty is used up.`}
-              </p>
-            );
+            const { currency } = k;
+            const back = k.contributors.filter((c) => c.handBack > 0);
+            let text: string;
+            if (k.left.foreign > 0) {
+              text = `Hand back the ${formatMinor(k.left.foreign, currency)} left: ${back
+                .map((c) => `${c.uid === user.uid ? 'you' : tripMemberName(trip, c.uid, user.uid)} ${formatMinor(c.handBack, currency)}`)
+                .join(', ')}.`;
+            } else if (k.left.foreign < 0) {
+              text = `The ${currency} kitty paid out ${formatMinor(-k.left.foreign, currency)} more than was put in; whoever handed that cash over is credited for it.`;
+            } else {
+              text = `The ${currency} kitty is used up.`;
+            }
+            return <p key={k.walletId} className="text-sm text-ink">{text}</p>;
           })}
-          <p className="mt-1 text-xs text-ink-muted">Each person gets back their share of what's left, in proportion to the cash they put in. The balances already count it.</p>
+          <p className="mt-1 text-xs text-ink-muted">Each person gets back their share of what's left, in proportion to the cash they put in, and bears the kitty's spending in proportion to what their cash cost. The balances already count it.</p>
         </section>
       )}
 

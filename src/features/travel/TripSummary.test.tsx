@@ -126,7 +126,8 @@ describe('TripSummary', () => {
     render(
       <MemoryRouter>
         <TripSummary
-          trip={trip} user={chris} expenses={[dinner]} settlements={[]} cashValues={{ dinner: 61800 }}
+          trip={trip} user={chris} expenses={[dinner]} settlements={[]}
+          cash={{ wallets: [], kitties: [], values: { dinner: 61800 } }}
           itemsByExpense={{ dinner: [makeItem('d', 'dinner', { amount: 60000, payerUid: 'alex', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] }}
         />
       </MemoryRouter>,
@@ -136,7 +137,7 @@ describe('TripSummary', () => {
     expect(settle.getAllByText('A$206.00')).toHaveLength(2);
   });
 
-  it('settles a kitty (example B): Alex and Ben each pay Chris A$84.20, and the cash left is handed back', () => {
+  it('settles a kitty (example B): Alex and Ben each pay Chris A$83, and the cash left is handed back', () => {
     const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
     const put = (id: string, fromUid: string, foreignAmount: number, homeAmount: number): TopUpDoc => ({
       id, walletId: 'kitty_JPY', byUid: 'alex', fromUid, date: '2027-05-09', foreignAmount, homeAmount, createdAt: null as never,
@@ -158,11 +159,26 @@ describe('TripSummary', () => {
     const settle = within(screen.getByRole('region', { name: 'Settle up' }));
     expect(settle.getByText('Alex → You')).toBeInTheDocument();
     expect(settle.getByText('Ben → You')).toBeInTheDocument();
-    expect(settle.getAllByText('A$84.20')).toHaveLength(2);
+    expect(settle.getAllByText('A$83.00')).toHaveLength(2);
     const people = within(screen.getByRole('region', { name: 'Per person' }));
     expect(people.queryByRole('listitem', { name: /kitty/i })).not.toBeInTheDocument();
     expect(people.getByRole('listitem', { name: 'You' })).toHaveTextContent('Put in the kitty A$420.00, back ¥8,000');
     expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('Hand back the ¥20,000 left: Alex ¥6,000, Ben ¥6,000, you ¥8,000.');
+  });
+
+  it('says when the kitty paid out more than was put in, and who covered it', () => {
+    const kitty: WalletDoc = { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY', createdByUid: 'alex', createdAt: null as never };
+    const e = makeExpense('o', { currency: 'JPY', total: 1500, payerUid: 'ben', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' } });
+    const cash = tripCash([kitty], [
+      { id: 't', walletId: 'kitty_JPY', byUid: 'alex', fromUid: 'alex', date: '2027-05-09', foreignAmount: 1000, homeAmount: 1000, createdAt: null as never },
+    ], [e]);
+    render(
+      <MemoryRouter>
+        <TripSummary trip={trip} user={chris} expenses={[e]} settlements={[]} cash={cash}
+          itemsByExpense={{ o: [makeItem('oi', 'o', { amount: 1500, payerUid: 'ben', shared: true, sharedWith: ['alex', 'ben', 'chris'] })] }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('region', { name: 'Kitty' })).toHaveTextContent('The JPY kitty paid out ¥500 more than was put in; whoever handed that cash over is credited for it.');
   });
 
   it('says when there is nothing to settle yet', () => {

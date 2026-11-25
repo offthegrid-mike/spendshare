@@ -1,7 +1,11 @@
 import { computeSummary, type PaidSettlement, type Summary, type SummaryItem } from '../settlement';
 import { formatMinor } from './currency';
 import { expenseHomeTotal, isEstimated } from './tripExpense';
-import { isKittyId, type KittyCredit } from './cash';
+import { isKittyId, type KittyInfo } from './cash';
+import { signedAmount } from '../refund';
+
+/** A credit that moves value from a person to a kitty's party, applied like a paid settlement. */
+export interface KittyCredit { fromUid: string; toUid: string; amount: number; paid: true; }
 import { spreadInProportion } from './spread';
 
 export { spreadInProportion };
@@ -43,8 +47,8 @@ export function valueTrip(
   itemsByExpense: Record<string, ItemDoc[]>,
   /** Cash payments' home values, from tripCash. */
   cashValues: Record<string, number | null> = {},
-  /** The kitties' credits, from tripCash. */
-  kittyCredits: KittyCredit[] = [],
+  /** The trip's kitties, from tripCash. */
+  kitties: KittyInfo[] = [],
 ): TripValuation {
   const home = trip.currency;
   const items: ValuedItem[] = [];
@@ -58,7 +62,10 @@ export function valueTrip(
   for (const expense of expenses) {
     const expenseItems = itemsByExpense[expense.id];
     if (!expenseItems || expenseItems.length === 0) continue;
-    const homeTotal = expenseHomeTotal(expense, home, cashValues);
+    const paidWith = expense.paidWith;
+    const kittyId = paidWith?.kind === 'wallet' && isKittyId(paidWith.walletId) ? paidWith.walletId : null;
+    // Without its kitty's contributions a kitty payment can't be settled, so it waits like any unvalued cash.
+    const homeTotal = kittyId && !kitties.some((k) => k.walletId === kittyId) ? null : expenseHomeTotal(expense, home, cashValues);
     if (homeTotal === null) {
       unvalued.push(expense);
       continue;
@@ -66,17 +73,20 @@ export function valueTrip(
     if (isEstimated(expense, home)) estimated.push(expense);
     const parts = spreadInProportion(homeTotal, expenseItems.map((it) => it.amount));
     // A kitty payment is paid by the kitty, not by whoever handed the cash over.
-    const paidWith = expense.paidWith;
-    const payer = paidWith?.kind === 'wallet' && isKittyId(paidWith.walletId) ? paidWith.walletId : expense.payerUid;
+    const payer = kittyId ?? expense.payerUid;
     expenseItems.forEach((it, i) => {
       addParty(payer);
       // A shared item without a list (written before T2) is shared by the current members,
       // never by everyone in `parties`, which also holds people who have left.
-      const sharedWith = it.shared ? (it.sharedWith?.length ? it.sharedWith : trip.memberUids) : it.sharedWith;
+      // A personal item bought from the kitty is charged to whoever handed the cash over.
+      const shared = it.shared || kittyId !== null;
+      const sharedWith = it.shared
+        ? (it.sharedWith?.length ? it.sharedWith : trip.memberUids)
+        : kittyId ? [expense.payerUid] : it.sharedWith;
       for (const uid of sharedWith ?? []) addParty(uid);
       items.push({
         amount: parts[i],
-        shared: it.shared,
+        shared,
         payerUid: payer,
         ...(it.refund ? { refund: true } : {}),
         ...(sharedWith ? { sharedWith } : {}),
@@ -86,11 +96,42 @@ export function valueTrip(
       });
     });
   }
-  for (const c of kittyCredits) {
+  const credits = kitties.flatMap((k) => kittyCredits(k, items, expenses));
+  for (const c of credits) {
     addParty(c.fromUid);
     addParty(c.toUid);
   }
-  return { items, parties, people: parties.filter((uid) => !isKittyId(uid)), credits: kittyCredits, estimated, unvalued };
+  return { items, parties, people: parties.filter((uid) => !isKittyId(uid)), credits, estimated, unvalued };
+}
+
+/**
+ * Credits that leave a kitty at exactly zero: its spending, as counted here,
+ * is credited to the people who put money in, in proportion to what their
+ * cash cost them (so with nothing spent nobody owes anyone, and everyone bears
+ * the same share of their own cost). Spending past the cash put in is credited
+ * to whoever handed that cash over, in proportion to how far each payment went past it.
+ */
+function kittyCredits(k: KittyInfo, items: ValuedItem[], expenses: ExpenseDoc[]): KittyCredit[] {
+  const spent = items.filter((it) => it.payerUid === k.walletId).reduce((s, it) => s + signedAmount(it), 0);
+  if (spent === 0 || k.contributors.length === 0) return [];
+  const toContributors = k.left.foreign > 0 ? spent : Math.min(spent, k.paidIn.home);
+  const homes = k.contributors.map((c) => c.home);
+  const weights = homes.some((h) => h > 0) ? homes : k.contributors.map((c) => c.foreign);
+  const parts = spreadInProportion(toContributors, weights);
+  const credits: KittyCredit[] = k.contributors
+    .map((c, i) => ({ fromUid: c.uid, toUid: k.walletId, amount: parts[i], paid: true as const }))
+    .filter((c) => c.amount !== 0);
+  const rest = spent - parts.reduce((s, p) => s + p, 0);
+  if (rest !== 0) {
+    const counted = new Set(items.filter((it) => it.payerUid === k.walletId).map((it) => it.expenseId));
+    const payments = expenses.filter((e) => counted.has(e.id));
+    const beyond = payments.map((e) => k.beyond[e.id] ?? 0);
+    const shares = spreadInProportion(rest, beyond.some((b) => b > 0) ? beyond : payments.map((e) => e.total));
+    payments.forEach((e, i) => {
+      if (shares[i] !== 0) credits.push({ fromUid: e.payerUid, toUid: k.walletId, amount: shares[i], paid: true });
+    });
+  }
+  return credits;
 }
 
 /** Balances and the fewest payments to settle, in home minor units, after any settle-up already paid. */
@@ -161,11 +202,11 @@ export function viewerTripFigures(
   itemsByExpense: Record<string, ItemDoc[]>,
   settlements: PaidSettlement[],
   cashValues: Record<string, number | null> = {},
-  kittyCredits: KittyCredit[] = [],
+  kitties: KittyInfo[] = [],
 ): { spent: number; estimated: boolean; balance: ReturnType<typeof tripBalanceCopy> } | null {
   // Nothing to show until something was spent or paid back; a paid settlement alone still leaves a balance.
   if (expenses.length === 0 && !settlements.some((s) => s.paid)) return null;
-  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues, kittyCredits);
+  const valuation = valueTrip(trip, expenses, itemsByExpense, cashValues, kitties);
   const summary = tripSummary(valuation, settlements);
   return {
     spent: valuation.items.reduce((s, it) => s + it.amount, 0),

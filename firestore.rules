@@ -192,7 +192,9 @@ service cloud.firestore {
                 && d.paidWith.get('walletId', null) is string
                 // Cash comes out of the kitty or the payer's own wallet, which must exist.
                 && existsAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId))
-                && (getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.kind == 'kitty'
+                && ((getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.kind == 'kitty'
+                     // Whoever hands over the kitty's cash is on the trip.
+                     && d.payerUid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids)
                     || getAfter(/databases/$(database)/documents/groups/$(groupId)/wallets/$(d.paidWith.walletId)).data.get('ownerUid', null) == d.payerUid))));
         }
         allow create, update: if isMember(groupId)

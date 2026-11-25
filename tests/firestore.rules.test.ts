@@ -1644,6 +1644,18 @@ describe('/groups the kitty', () => {
     await assertFails(updateDoc(doc(fs(), 'groups', 'japan', 'wallets', 'kitty_KRW'), { kind: 'personal', ownerUid: 'kitty' }));
   });
 
+  it('requires whoever hands over the kitty’s cash to be on the trip', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });
+    });
+    const db = fs();
+    await assertFails(setDoc(doc(db, 'groups', 'japan', 'expenses', 'e2'), {
+      groupId: 'japan', date: new Date(), month: '2027-05', shopName: 'Dinner', payerUid: 'stranger',
+      total: 500, itemCount: 0, createdByUid: 'userA', createdAt: new Date(), updatedAt: new Date(),
+      currency: 'JPY', paidWith: { kind: 'wallet', walletId: 'kitty_JPY' },
+    }));
+  });
+
   it('lets anyone on the trip pay from the kitty', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'groups', 'japan', 'wallets', 'kitty_JPY'), { id: 'kitty_JPY', kind: 'kitty', currency: 'JPY' });

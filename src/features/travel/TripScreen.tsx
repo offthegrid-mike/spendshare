@@ -66,7 +66,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
       </section>
 
       {!loading && !itemsLoading && !settlementsLoading && (() => {
-        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values, cash.kittyCredits);
+        const figures = viewerTripFigures(trip, viewerUid, expenses, itemsByExpense, settlements, cash.values, cash.kitties);
         if (!figures) return null;
         const { balance } = figures;
         const tone = { owed: 'text-accent-ink', owe: 'text-negative', settled: 'text-ink-muted' }[balance.tone];
