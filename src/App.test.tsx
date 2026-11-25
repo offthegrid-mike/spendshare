@@ -475,6 +475,14 @@ describe('App with trips', () => {
     expect(screen.getByTestId('trip-settings')).toHaveAttribute('data-trip', 'japan');
   });
 
+  it('defaults a new trip to the selected household’s currency', () => {
+    const usd = { ...makeGroup('g2', 'Flat'), currency: 'USD' };
+    state.groups = [japan, home, usd];
+    useUIStore.setState({ selectedGroupId: 'g2' });
+    renderApp('/travel/new');
+    expect(screen.getByTestId('new-trip')).toHaveAttribute('data-currency', 'USD');
+  });
+
   it('sends the settings of an unknown trip back to the trip list', () => {
     renderApp('/travel/nope/settings');
     expect(location()).toBe('/travel');

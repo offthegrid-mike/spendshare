@@ -1376,6 +1376,12 @@ describe('/groups trips (kind: trip)', () => {
       }));
     });
 
+    it('never lets anyone change a trip’s home currency, though a household’s can change', async () => {
+      await assertFails(updateDoc(doc(as('userA'), 'groups', 'japan'), { currency: 'USD' }));
+      await assertFails(updateDoc(doc(as('userB'), 'groups', 'japan'), { currency: 'USD' }));
+      await assertSucceeds(updateDoc(doc(as('userA'), 'groups', 'home'), { currency: 'USD' }));
+    });
+
     it('denies adding trip dates to a household', async () => {
       await assertFails(updateDoc(doc(as('userA'), 'groups', 'home'), {
         trip: { startDate: '2027-05-10', endDate: '2027-05-20' },

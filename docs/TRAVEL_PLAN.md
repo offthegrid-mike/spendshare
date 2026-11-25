@@ -88,7 +88,8 @@ All in A$ for a trip to Japan with Alex, Ben and Chris.
 ```ts
 // GroupDoc (src/types/models.ts)
 kind?: 'trip';                     // missing = household
-trip?: { startDate: string; endDate: string; closedAt?: Timestamp }; // 'YYYY-MM-DD'
+trip?: { startDate: string; endDate: string }; // 'YYYY-MM-DD'; the rules allow no other keys
+tripClosedAt?: Timestamp;          // T6: set when the trip is closed (a top-level field)
 // currency stays the trip's HOME currency
 
 // ExpenseDoc: trip expenses only
@@ -242,7 +243,7 @@ Pure modules with no UI. Everything later depends on these.
 - On a settle-up line, **Pay in cash (¥)** moves cash from the payer's wallet to the receiver's (creating the receiver's wallet if needed). It's valued at the payer's average rate and recorded as a top-up with `source: 'handover'` (example D).
 
 ### Task 6.2: Close the trip
-- **Close trip** (owner only) freezes all valuations into `homeTotal` on each expense, sets `trip.closedAt`, and makes the trip read-only in the app and in the rules. The owner can reopen it.
+- **Close trip** (owner only) freezes all valuations into `homeTotal` on each expense, sets `tripClosedAt`, and makes the trip read-only in the app and in the rules. The owner can reopen it.
 - Kitty leftover: choose **share out** (the default) or **one person keeps it** (decision 5).
 
 ### Task 6.3: Export
@@ -267,4 +268,5 @@ Pure modules with no UI. Everything later depends on these.
 - **`ItemDoc.amount` means different things.** In a household it's cents in the group currency. On a trip it's minor units of the expense's currency. Every trip screen must format with the expense currency. A test helper should fail if a trip item is formatted with `formatMoney`.
 - **Collection-group queries on items** (year summary, search) are scoped per group, so trip items don't leak into household totals. Check this again in T1.
 - **A former member who paid for something** (found in T0 review, and already true for households): `computeSummary` gives a balance only to current members and to people named in `sharedWith`. A removed member's payments are left out, so balances don't sum to zero and no one is told to pay them back. Fixing it changes household settle-up as well, so it needs its own decision. Handle it before T3, or block removing a trip member who still has a balance.
-- **Offline creation of a trip** works through the Firestore cache, but invites need a connection, so this should be documented.
+- **Turning Travel on in production** (found in T1 review): a client still running a cached version from before T1 doesn't know `kind`, and would list trips as households. Before setting `VITE_TRAVEL_ENABLED=true` in production, make sure the deployed version has been live long enough for installed apps to update.
+- **Offline creation of a trip** (also true for households): `createGroup` awaits `addDoc`, which resolves only once the server has the write, so offline the form stays on "Creating…". Fix before Travel goes live: write with `setDoc` on a ref from `doc(groupsCol)` and don't wait for the server. Invites need a connection anyway.

@@ -27,7 +27,12 @@ export default function TripSettings({ trip, user }: Props) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const problem = validateTripInput({ name, startDate, endDate });
+    // Only the owner edits dates, so only their dates are checked. Unchanged
+    // dates aren't written, so a rename never puts back dates changed elsewhere.
+    const datesChanged = isOwner && (startDate !== trip.trip?.startDate || endDate !== trip.trip?.endDate);
+    const problem = datesChanged
+      ? validateTripInput({ name, startDate, endDate })
+      : name.trim() ? null : 'Enter a trip name.';
     if (problem) {
       setError(problem);
       return;
@@ -37,7 +42,7 @@ export default function TripSettings({ trip, user }: Props) {
     try {
       await updateDoc(doc(groupsCol, trip.id), {
         name: name.trim(),
-        ...(isOwner ? { trip: { startDate, endDate } } : {}),
+        ...(datesChanged ? { trip: { startDate, endDate } } : {}),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

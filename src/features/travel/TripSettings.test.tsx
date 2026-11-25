@@ -41,6 +41,7 @@ describe('TripSettings', () => {
     await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, {
       name: 'Japan', trip: { startDate: '2027-05-10', endDate: '2027-05-22' },
     }));
+    expect(updateDoc).toHaveBeenCalledTimes(1);
   });
 
   it('does not save invalid dates', async () => {
@@ -59,6 +60,22 @@ describe('TripSettings', () => {
     render(<TripSettings trip={trip} user={member} />);
     expect(screen.queryByLabelText('First day')).not.toBeInTheDocument();
     expect(screen.getByText('10–20 May 2027')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { name: 'Japan' }));
+  });
+
+  it('saves only the name when the owner leaves the dates alone, so newer dates are not overwritten', async () => {
+    const u = userEvent.setup();
+    render(<TripSettings trip={trip} user={owner} />);
+    await u.type(screen.getByLabelText('Trip name'), ' 2027');
+    await u.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { name: 'Japan 2027' }));
+  });
+
+  it('lets another member rename a trip that has no dates', async () => {
+    const u = userEvent.setup();
+    const undated = { ...trip, trip: undefined };
+    render(<TripSettings trip={undated} user={member} />);
     await u.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(updateDoc).toHaveBeenCalledWith({ id: 'japan' }, { name: 'Japan' }));
   });

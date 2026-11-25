@@ -167,7 +167,7 @@ function App() {
       {TRAVEL_ENABLED && (
         <Route path={paths.travel} element={<TravelLayout />}>
           <Route index element={<TripList trips={trips} user={user} />} />
-          <Route path="new" element={<NewTripScreen user={user} defaultCurrency={groups[0]?.currency ?? 'AUD'} />} />
+          <Route path="new" element={<NewTripScreen user={user} defaultCurrency={(groups.find((g) => g.id === selectedGroupId) ?? groups[0])?.currency ?? 'AUD'} />} />
           <Route path=":tripId" element={<TripScreen trips={trips} viewerUid={user.uid} />} />
           <Route path=":tripId/settings" element={<TripSettingsRoute trips={trips} user={user} />} />
         </Route>
