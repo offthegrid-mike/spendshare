@@ -40,6 +40,7 @@ export interface ExpenseDoc {
   // are minor units of `currency`, not of the group's (home) currency.
   currency?: string;        // missing = the group's currency
   paidWith?: TripPayment;
+  tripDay?: string;         // 'YYYY-MM-DD' as chosen; `date` read in another time zone can fall on another day
 }
 
 /**

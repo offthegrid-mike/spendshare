@@ -16,7 +16,7 @@ export default function TripScreen({ trips, viewerUid }: Props) {
   const { tripId } = useParams<{ tripId: string }>();
   const { today } = useWorkClock();
   const trip = trips.find((t) => t.id === tripId);
-  const { expenses, itemsByExpense, loading, error } = useTripExpenses(trip?.trip ? trip.id : null);
+  const { expenses, itemsByExpense, loading, error, retry } = useTripExpenses(trip?.trip ? trip.id : null);
 
   if (!trip?.trip) {
     return (
@@ -56,7 +56,10 @@ export default function TripScreen({ trips, viewerUid }: Props) {
       </section>
 
       {error ? (
-        <p role="alert" className="text-sm text-negative">Couldn't load the trip's expenses.</p>
+        <div role="alert" className="card flex items-center justify-between gap-3 p-4 text-sm text-negative">
+          Couldn't load the trip's expenses.
+          <button type="button" onClick={retry} className="btn-outline shrink-0">Try again</button>
+        </div>
       ) : loading ? (
         <div role="status" aria-label="Loading expenses" className="card h-24 animate-pulse" />
       ) : (

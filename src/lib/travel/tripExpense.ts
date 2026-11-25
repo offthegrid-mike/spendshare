@@ -80,7 +80,11 @@ const isBlank = (it: TripItemDraft) => !it.name.trim() && !it.amount.trim();
  * units. Blank rows are skipped. A shared item always lists its sharers, so
  * someone who joins the trip later isn't added to what was already split.
  */
-export function buildTripExpense(draft: TripExpenseDraft, home: string): BuildResult {
+export function buildTripExpense(
+  draft: TripExpenseDraft,
+  home: string,
+  { categoryRequired = true }: { categoryRequired?: boolean } = {},
+): BuildResult {
   if (!draft.date) return { ok: false, error: 'Choose the date.' };
   if (!draft.payerUid) return { ok: false, error: 'Choose who paid.' };
   const inHome = draft.currency.toUpperCase() === home.toUpperCase();
@@ -96,7 +100,8 @@ export function buildTripExpense(draft: TripExpenseDraft, home: string): BuildRe
     if (!it.name.trim()) return { ok: false, error: `Item ${n}: enter a name.` };
     const amount = toMinor(it.amount, draft.currency);
     if (!(amount > 0)) return { ok: false, error: `Item ${n}: enter an amount.` };
-    if (!it.categoryId) return { ok: false, error: `Item ${n}: choose a category.` };
+    // A trip whose categories have all been archived can still record what was spent.
+    if (!it.categoryId && categoryRequired) return { ok: false, error: `Item ${n}: choose a category.` };
     const sharers = [...new Set(it.sharedWith)];
     if (it.shared && sharers.length === 0) return { ok: false, error: `Item ${n}: choose who shares it.` };
     items.push({
@@ -141,8 +146,9 @@ export function isEstimated(expense: Priced, home: string): boolean {
     && expense.paidWith.rateStatus === 'estimated';
 }
 
-export function expenseDay(expense: Pick<ExpenseDoc, 'date'>): string {
-  return format(expense.date.toDate(), 'yyyy-MM-dd');
+/** The expense's day as the payer chose it; older expenses fall back to the timestamp's local day. */
+export function expenseDay(expense: Pick<ExpenseDoc, 'date' | 'tripDay'>): string {
+  return expense.tripDay ?? format(expense.date.toDate(), 'yyyy-MM-dd');
 }
 
 export interface TripDay { date: string; label: string; expenses: ExpenseDoc[]; }

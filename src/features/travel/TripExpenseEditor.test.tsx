@@ -12,7 +12,11 @@ const cats: CategoryDoc[] = [
   { id: 'food', name: 'Food', order: 0, archived: false },
   { id: 'fun', name: 'Activities', order: 1, archived: false },
 ];
-vi.mock('../../hooks/useCategories', () => ({ useCategories: () => ({ active: cats, all: cats, loading: false }) }));
+const archived: CategoryDoc = { id: 'old', name: 'Souvenirs', order: 2, archived: true };
+const catState = vi.hoisted(() => ({ active: null as unknown, all: null as unknown }));
+vi.mock('../../hooks/useCategories', () => ({
+  useCategories: () => ({ active: catState.active, all: catState.all, loading: false }),
+}));
 vi.mock('../expenses/DatePicker', () => ({
   default: ({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) => (
     <input id={id} aria-label="Date" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -25,6 +29,8 @@ const onSaved = vi.fn();
 const lastJpy = makeExpense('prev', { currency: 'JPY', paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' } });
 
 beforeEach(() => {
+  catState.active = cats;
+  catState.all = [...cats, archived];
   saveTripExpense.mockReset().mockResolvedValue('new-id');
   onSaved.mockReset();
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -67,7 +73,7 @@ describe('TripExpenseEditor', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith('new-id'));
     expect(saveTripExpense).toHaveBeenCalledWith({
       tripId: 'japan', uid: 'alex', home: 'AUD',
-      categories: { food: 'Food', fun: 'Activities' },
+      categories: { food: 'Food', fun: 'Activities', old: 'Souvenirs' },
       built: {
         date: '2027-05-12', shopName: 'Ichiran', payerUid: 'alex', currency: 'JPY', rate: 99, total: 5300,
         items: [
@@ -130,5 +136,24 @@ describe('TripExpenseEditor', () => {
     expect(sharers.getAllByRole('button', { pressed: true }).map((b) => b.textContent)).toEqual(['Ben', 'Chris']);
     await u.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(saveTripExpense).toHaveBeenCalledWith(expect.objectContaining({ existing: { expense, items } })));
+  });
+
+  it('keeps an archived category on an item being edited, by name', async () => {
+    const expense = makeExpense('e1', { day: '2027-05-11', currency: 'AUD', total: 500, paidWith: { kind: 'card', rate: 1, rateStatus: 'actual' } });
+    const items = [makeItem('i1', 'e1', { name: 'Magnet', amount: 500, categoryId: 'old', category: 'Souvenirs', shared: false })];
+    render(<TripExpenseEditor trip={trip} user={alex} expenses={[expense]} existing={{ expense, items }} onSaved={onSaved} />);
+    expect(screen.getByRole('combobox', { name: 'Item 1 category' })).toHaveTextContent('Souvenirs');
+  });
+
+  it('saves without a category when the trip has none', async () => {
+    catState.active = [];
+    catState.all = [];
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<TripExpenseEditor trip={trip} user={alex} expenses={[lastJpy]} onSaved={onSaved} />);
+    expect(screen.queryByRole('combobox', { name: 'Item 1 category' })).not.toBeInTheDocument();
+    await u.type(screen.getByLabelText('Item 1 name'), 'Ramen');
+    await u.type(screen.getByLabelText('Item 1 amount'), '4500');
+    await u.click(screen.getByRole('button', { name: 'Save expense' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 });

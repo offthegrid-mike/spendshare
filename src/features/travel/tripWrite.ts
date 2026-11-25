@@ -54,6 +54,7 @@ export async function saveTripExpense({ tripId, uid, home, built, categories, ex
     updatedAt: serverTimestamp(),
     currency: built.currency,
     paidWith: payment(built, home, existing?.expense),
+    tripDay: built.date,
   } as unknown as ExpenseDoc);
   for (const old of existing?.items ?? []) batch.delete(doc(itemsCol(tripId, ref.id), old.id));
   for (const it of built.items) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseRate, toHome, chargedRate, buildTripExpense, expenseHomeTotal, isEstimated, tripDayGroups, lastRates,
+  parseRate, toHome, chargedRate, buildTripExpense, expenseHomeTotal, isEstimated, tripDayGroups, lastRates, expenseDay,
   type TripExpenseDraft,
 } from './tripExpense';
 import { makeExpense } from '../../test/fixtures';
@@ -63,6 +63,11 @@ const draft = (over: Partial<TripExpenseDraft> = {}): TripExpenseDraft => ({
 });
 
 describe('buildTripExpense', () => {
+  it('lets items go without a category when the trip has none to choose from', () => {
+    const item = { ...draft().items[0], categoryId: '' };
+    expect(buildTripExpense(draft({ items: [item] }), 'AUD', { categoryRequired: false }).ok).toBe(true);
+  });
+
   it('builds the expense in its own currency, with explicit sharers only on shared items', () => {
     const result = buildTripExpense(draft(), 'AUD');
     expect(result).toEqual({
@@ -142,6 +147,17 @@ describe('expenseHomeTotal and isEstimated', () => {
 
   it('cannot value a wallet payment yet', () => {
     expect(expenseHomeTotal(tripExpense('e1', { paidWith: { kind: 'wallet', walletId: 'w1' } }), 'AUD')).toBeNull();
+  });
+});
+
+describe('expenseDay', () => {
+  it('uses the day as chosen when the expense stores it, whatever the viewer’s time zone', () => {
+    // The timestamp says 13 May here, but the payer chose 12 May.
+    expect(expenseDay(makeExpense('e', { day: '2027-05-13', tripDay: '2027-05-12' } as never))).toBe('2027-05-12');
+  });
+
+  it('falls back to the timestamp’s local day', () => {
+    expect(expenseDay(makeExpense('e', { day: '2027-05-13' }))).toBe('2027-05-13');
   });
 });
 

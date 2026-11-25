@@ -89,7 +89,7 @@ function blankItem(categoryId: string, sharedWith: string[]): TripItemDraft {
 export default function TripExpenseEditor({ trip, user, expenses, existing, onSaved }: Props) {
   const id = useId();
   const { today } = useWorkClock();
-  const { active: categories } = useCategories(trip.id);
+  const { active: categories, all: allCategories } = useCategories(trip.id);
   const firstCategory = categories[0]?.id ?? '';
   const [draft, setDraft] = useState<TripExpenseDraft>(() =>
     initialDraft(trip, user.uid, today, expenses, firstCategory, existing),
@@ -127,7 +127,7 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const result = buildTripExpense({ ...draft, items }, home);
+    const result = buildTripExpense({ ...draft, items }, home, { categoryRequired: allCategories.length > 0 });
     if (!result.ok) {
       setError(result.error);
       return;
@@ -140,7 +140,8 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
         uid: user.uid,
         home,
         built: result.value,
-        categories: Object.fromEntries(categories.map((c) => [c.id, c.name])),
+        // All categories, so an item kept in an archived one keeps its name.
+        categories: Object.fromEntries(allCategories.map((c) => [c.id, c.name])),
         existing,
       });
       onSaved(expenseId);
@@ -150,7 +151,9 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
     }
   }
 
-  const categoryOptions = categories.map((c) => ({ value: c.id, label: c.name }));
+  // Active categories, plus any archived one an item already uses.
+  const categoryOptions = (used: string) =>
+    allCategories.filter((c) => !c.archived || c.id === used).map((c) => ({ value: c.id, label: c.name }));
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -243,15 +246,17 @@ export default function TripExpenseEditor({ trip, user, expenses, existing, onSa
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-[10rem] flex-1">
-                <Select
-                  aria-label={`Item ${n} category`}
-                  title="Category"
-                  value={it.categoryId}
-                  onChange={(categoryId) => patchItem(i, { categoryId })}
-                  options={categoryOptions}
-                />
-              </div>
+              {allCategories.length > 0 && (
+                <div className="min-w-[10rem] flex-1">
+                  <Select
+                    aria-label={`Item ${n} category`}
+                    title="Category"
+                    value={it.categoryId}
+                    onChange={(categoryId) => patchItem(i, { categoryId })}
+                    options={categoryOptions(it.categoryId)}
+                  />
+                </div>
+              )}
               <Checkbox checked={it.shared} onChange={(e) => patchItem(i, { shared: e.target.checked })}>
                 Shared
               </Checkbox>

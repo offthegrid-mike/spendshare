@@ -55,7 +55,7 @@ describe('saveTripExpense', () => {
     expect(expOp[2]).toEqual({
       groupId: 'japan', date: { date: new Date(2027, 4, 12, 12) }, month: '2027-05', shopName: 'Ichiran',
       payerUid: 'alex', total: 6000, itemCount: 2, createdByUid: 'alex', createdAt: 'TS', updatedAt: 'TS',
-      currency: 'JPY', paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' },
+      currency: 'JPY', paidWith: { kind: 'card', rate: 99, rateStatus: 'estimated' }, tripDay: '2027-05-12',
     });
     expect(itemOps.map((op) => op[2])).toEqual([
       { groupId: 'japan', expenseId: 'new1', month: '2027-05', name: 'Ramen', categoryId: 'food', category: 'Food',

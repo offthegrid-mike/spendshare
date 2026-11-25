@@ -58,4 +58,15 @@ describe('useTripExpenses', () => {
     second.unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(2);
   });
+
+  it('listens again on retry after an error, and clears the error', () => {
+    const { result } = renderHook(() => useTripExpenses('japan'));
+    act(() => { listeners[0].error(); listeners[1].error(); });
+    expect(result.current.error).toBe(true);
+    act(() => result.current.retry());
+    expect(listeners).toHaveLength(4);
+    expect(result.current.error).toBe(false);
+    act(() => { listeners[2].next(snap([{ id: 'e1' }])); listeners[3].next(snap([])); });
+    expect(result.current.expenses.map((e) => e.id)).toEqual(['e1']);
+  });
 });

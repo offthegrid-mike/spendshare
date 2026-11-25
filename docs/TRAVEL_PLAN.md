@@ -94,6 +94,7 @@ tripClosedAt?: Timestamp;          // T6: set when the trip is closed (a top-lev
 
 // ExpenseDoc: trip expenses only
 currency?: string;                 // the expense's own currency; missing = group currency
+tripDay?: string;                  // 'YYYY-MM-DD' as chosen, so members in other time zones see the same day
 paidWith?:
   | { kind: 'card'; rate: number; rateStatus: 'estimated' | 'actual'; homeTotal?: number }
   //   rate is "1 home = rate foreign" (1 A$ = ¥99), as exchange boards show it

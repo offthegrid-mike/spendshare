@@ -15,24 +15,30 @@ export function useTripExpenses(tripId: string | null): {
   loading: boolean;
   itemsLoading: boolean;
   error: boolean;
+  /** Listens again after an error (Firestore stops a listener once it fails). */
+  retry: () => void;
 } {
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [itemsByExpense, setItemsByExpense] = useState<Record<string, ItemDoc[]>>({});
   const [expensesKey, setExpensesKey] = useState<string | null>(null);
   const [itemsKey, setItemsKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  // Keys carry the attempt, so a retry shows as loading again rather than as the old error.
+  const key = tripId ? `${tripId}#${attempt}` : null;
 
   useEffect(() => {
     if (!tripId) return;
+    const k = `${tripId}#${attempt}`;
     const unsubExpenses = onSnapshot(
       query(expensesCol(tripId), orderBy('date', 'desc')),
       (snap) => {
         setExpenses(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
-        setExpensesKey(tripId);
+        setExpensesKey(k);
       },
       () => {
-        setErrorKey(tripId);
-        setExpensesKey(tripId);
+        setErrorKey(k);
+        setExpensesKey(k);
       },
     );
     const unsubItems = onSnapshot(
@@ -44,27 +50,28 @@ export function useTripExpenses(tripId: string | null): {
           (map[item.expenseId] ??= []).push(item);
         }
         setItemsByExpense(map);
-        setItemsKey(tripId);
+        setItemsKey(k);
       },
       () => {
-        setErrorKey(tripId);
-        setItemsKey(tripId);
+        setErrorKey(k);
+        setItemsKey(k);
       },
     );
     return () => {
       unsubExpenses();
       unsubItems();
     };
-  }, [tripId]);
+  }, [tripId, attempt]);
 
   // Derived from the stored keys, so the effect never sets state synchronously
   // and a previous trip's data never shows as this one's.
-  const current = tripId !== null && expensesKey === tripId;
+  const current = key !== null && expensesKey === key;
   return {
     expenses: current ? expenses : [],
-    itemsByExpense: current && itemsKey === tripId ? itemsByExpense : {},
-    loading: tripId !== null && expensesKey !== tripId,
-    itemsLoading: tripId !== null && itemsKey !== tripId,
-    error: tripId !== null && errorKey === tripId,
+    itemsByExpense: current && itemsKey === key ? itemsByExpense : {},
+    loading: key !== null && expensesKey !== key,
+    itemsLoading: key !== null && itemsKey !== key,
+    error: key !== null && errorKey === key,
+    retry: () => setAttempt((a) => a + 1),
   };
 }

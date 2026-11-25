@@ -3,11 +3,11 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import TripScreen from './TripScreen';
 
-const hook = vi.hoisted(() => ({ calls: [] as (string | null)[] }));
+const hook = vi.hoisted(() => ({ calls: [] as (string | null)[], error: false, retry: vi.fn() }));
 vi.mock('../../hooks/useTripExpenses', () => ({
   useTripExpenses: (id: string | null) => {
     hook.calls.push(id);
-    return { expenses: [], itemsByExpense: {}, loading: false, itemsLoading: false, error: false };
+    return { expenses: [], itemsByExpense: {}, loading: false, itemsLoading: false, error: hook.error, retry: hook.retry };
   },
 }));
 import { makeTrip } from '../../test/fixtures';
@@ -58,5 +58,13 @@ describe('TripScreen', () => {
     renderAt('/travel/japan');
     expect(hook.calls).toContain('japan');
     expect(screen.getByRole('link', { name: 'Add expense' })).toHaveAttribute('href', '/travel/japan/expense/new');
+  });
+
+  it('offers to try again when the expenses could not be loaded', async () => {
+    hook.error = true;
+    renderAt('/travel/japan');
+    screen.getByRole('button', { name: 'Try again' }).click();
+    expect(hook.retry).toHaveBeenCalled();
+    hook.error = false;
   });
 });

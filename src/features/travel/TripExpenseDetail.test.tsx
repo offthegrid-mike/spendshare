@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth';
 import TripExpenseDetail from './TripExpenseDetail';
 import { makeExpense, makeItem, makeTrip } from '../../test/fixtures';
 import type { ExpenseDoc } from '../../types/models';
+import { useUIStore } from '../../stores/uiStore';
 
 const { recordCharge, deleteTripExpense } = vi.hoisted(() => ({ recordCharge: vi.fn(), deleteTripExpense: vi.fn() }));
 vi.mock('./tripWrite', () => ({ recordCharge, deleteTripExpense }));
@@ -77,6 +78,9 @@ describe('TripExpenseDetail', () => {
     expect(screen.queryByLabelText('Amount charged (AUD)')).not.toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: 'Change' }));
     expect(screen.getByLabelText('Amount charged (AUD)')).toHaveValue('155.10');
+    await u.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('Amount charged (AUD)')).not.toBeInTheDocument();
+    expect(screen.getByText('Charged A$155.10 (1 AUD = 96.71 JPY)')).toBeInTheDocument();
   });
 
   it('asks nothing about a home-currency expense', () => {
@@ -94,6 +98,22 @@ describe('TripExpenseDetail', () => {
     await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(deleteTripExpense).toHaveBeenCalledWith('japan', 'e1', ['i1']));
     expect(screen.getByTestId('where')).toHaveTextContent('/travel/japan');
+  });
+
+  it('goes straight back to the trip on delete, and says so if the delete fails later', async () => {
+    deleteTripExpense.mockRejectedValue(new Error('denied'));
+    useUIStore.setState({ notice: null });
+    const u = userEvent.setup();
+    renderDetail();
+    await u.click(screen.getByRole('button', { name: 'Delete' }));
+    await u.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/travel/japan');
+    await waitFor(() => expect(useUIStore.getState().notice?.message).toBe("Couldn't delete the expense. Try again."));
+  });
+
+  it('shows the day the payer chose', () => {
+    renderDetail({ ...estimated, tripDay: '2027-05-11' });
+    expect(screen.getByText('Ben paid · Tue 11 May 2027')).toBeInTheDocument();
   });
 
   it('says so for an expense that is not on the trip', () => {
