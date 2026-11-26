@@ -3,6 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { groupsCol } from '../../lib/converters';
 import Select from '../../components/ui/Select';
 import { formatVersionLabel } from '../../lib/appVersion';
+import BackupExport from './BackupExport';
 import RebuildSuggestions from './RebuildSuggestions';
 import MembersSection from './MembersSection';
 import type { GroupDoc } from '../../types/models';
@@ -72,6 +73,8 @@ export default function GroupSettings({ group, currentUserUid }: Props) {
       <MembersSection group={group} currentUserUid={currentUserUid} />
 
       <RebuildSuggestions groupId={group.id} />
+
+      <BackupExport group={group} />
 
       {/* Desktop only — mobile already shows this on the More tab */}
       <p className="hidden px-1 text-center text-xs text-ink-faint lg:block">
